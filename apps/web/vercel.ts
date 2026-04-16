@@ -1,20 +1,17 @@
 import { routes, type VercelConfig } from '@vercel/config/v1';
 
-// Root Vercel config for the monorepo. apps/web deploys from this root
-// with the buildCommand targeting the Next.js app via Turborepo.
+// Vercel project config for the ai-edge web app.
+// Root Directory is apps/web (set in project settings). Framework + build
+// command are auto-detected from apps/web/package.json.
 export const config: VercelConfig = {
-  framework: 'nextjs',
-  buildCommand: 'pnpm turbo run build --filter=@ai-edge/web',
-  installCommand: 'pnpm install --frozen-lockfile',
-  outputDirectory: 'apps/web/.next',
   crons: [
-    // Weekly full audit per firm — fan-out inside the handler
+    // Weekly full audit per firm (Monday 06:00 UTC)
     { path: '/api/cron/audit-weekly', schedule: '0 6 * * 1' },
-    // Daily top-20 priority queries per firm
+    // Daily top-20 priority queries per firm (08:00 UTC)
     { path: '/api/cron/audit-daily', schedule: '0 8 * * *' },
-    // Reddit 24h poll (daily at 07:00 UTC)
+    // Reddit 24h poll (07:00 UTC)
     { path: '/api/cron/reddit-poll', schedule: '0 7 * * *' },
-    // Citation diff nightly
+    // Citation diff nightly (04:00 UTC)
     { path: '/api/cron/citation-diff', schedule: '0 4 * * *' },
   ],
   headers: [
