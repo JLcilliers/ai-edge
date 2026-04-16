@@ -1,0 +1,37 @@
+node_modules/
+.pnpm-store/
+.next/
+dist/
+build/
+.turbo/
+coverage/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Env & secrets
+.env
+.env.local
+.env.*.local
+*.pem
+
+# Vercel
+.vercel/
+
+# Fly.io
+.fly/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
