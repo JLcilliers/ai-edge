@@ -12,8 +12,8 @@ export const config: VercelConfig = {
     { path: '/api/cron/audit-weekly', schedule: '0 6 * * 1' },
     // Daily top-20 priority queries per firm
     { path: '/api/cron/audit-daily', schedule: '0 8 * * *' },
-    // Reddit 24h poll
-    { path: '/api/cron/reddit-poll', schedule: '0 */24 * * *' },
+    // Reddit 24h poll (daily at 07:00 UTC)
+    { path: '/api/cron/reddit-poll', schedule: '0 7 * * *' },
     // Citation diff nightly
     { path: '/api/cron/citation-diff', schedule: '0 4 * * *' },
   ],
