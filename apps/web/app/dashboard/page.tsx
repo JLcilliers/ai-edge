@@ -5,7 +5,7 @@ export default function DashboardPage() {
     <div>
       <h1 className="text-2xl font-semibold">Dashboard</h1>
       <p className="mt-2 text-sm text-neutral-500">
-        AI Edge — Trust Alignment for the AI search era.
+        Clixsy Intercept — Trust Alignment for the AI search era.
       </p>
       <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Link

@@ -10,7 +10,7 @@ Ordered by what blocks downstream work. 🟢 = user action. 🔵 = Claude Code a
 - [ ] 🟢 Clerk via Vercel Marketplace → `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`
 - [ ] 🟢 Neon Postgres via Vercel Marketplace → `DATABASE_URL`, `DIRECT_URL`
 - [ ] 🟢 Upstash Redis via Vercel Marketplace → `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`
-- [ ] 🟢 Pinecone via Vercel Marketplace → `PINECONE_API_KEY` + create index `ai-edge` (dimension TBD in Phase 1)
+- [ ] 🟢 Pinecone via Vercel Marketplace → `PINECONE_API_KEY` + create index `brand-truth` (dimension 3072, cosine, us-east-1, serverless) ✅ DONE
 - [ ] 🟢 Vercel Blob → `BLOB_READ_WRITE_TOKEN` (private, for raw LLM JSON + AIO captures)
 - [ ] 🟢 Vercel AI Gateway enabled on the team → OIDC auto-wiring (no manual key needed on Vercel; local dev uses `vercel env pull` for `VERCEL_OIDC_TOKEN`)
 - [ ] 🟢 `vercel env pull .env.local --yes` after each Marketplace provisioning step

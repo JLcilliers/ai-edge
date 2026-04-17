@@ -1,6 +1,6 @@
 import { routes, type VercelConfig } from '@vercel/config/v1';
 
-// Vercel project config for the ai-edge web app.
+// Vercel project config for the Clixsy Intercept web app.
 // Root Directory is apps/web (set in project settings). Framework + build
 // command are auto-detected from apps/web/package.json.
 export const config: VercelConfig = {

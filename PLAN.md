@@ -1,4 +1,4 @@
-# AI Edge™ — Research & Implementation Plan
+# Clixsy Intercept™ — Research & Implementation Plan
 
 **Date:** 2026-04-16
 **Source of truth:** `AI_Edge_Technical_Framework_v2.docx` + manager's brief
@@ -8,7 +8,7 @@
 
 ## 1. Product definition
 
-AI Edge™ is a **vertical-agnostic AI Engine Optimization (AEO)** platform. The Trust Alignment methodology works anywhere a firm has declarative brand positioning and a defined competitive set. Two outcomes, one loop:
+Clixsy Intercept is a **vertical-agnostic AI Engine Optimization (AEO)** platform. The Trust Alignment methodology works anywhere a firm has declarative brand positioning and a defined competitive set. Two outcomes, one loop:
 
 1. **Visibility** — the firm appears in LLM answers to high-intent queries in its vertical.
 2. **Alignment** — when it appears, the narrative matches the firm's declared "Brand Truth."

@@ -1,4 +1,3 @@
-import { UserButton } from '@clerk/nextjs';
 import Link from 'next/link';
 
 const navItems = [
@@ -13,7 +12,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Sidebar */}
       <aside className="w-64 shrink-0 border-r border-neutral-800 bg-neutral-900 p-6">
         <Link href="/dashboard" className="mb-8 block text-xl font-semibold tracking-tight">
-          AI Edge
+          Clixsy Intercept
         </Link>
         <nav className="flex flex-col gap-1">
           {navItems.map((item) => (
@@ -31,7 +30,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Main content */}
       <div className="flex flex-1 flex-col">
         <header className="flex h-14 items-center justify-end border-b border-neutral-800 px-6">
-          <UserButton afterSignOutUrl="/" />
+          <span className="text-xs text-neutral-600">Internal Tool</span>
         </header>
         <main className="flex-1 p-6">{children}</main>
       </div>

@@ -1,4 +1,4 @@
-# AI Edge
+# Clixsy Intercept
 
 Trust Alignment for the AI search era. AEO platform that measures and closes the gap between how a firm positions itself and how LLMs actually describe it.
 

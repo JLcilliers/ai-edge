@@ -1,4 +1,4 @@
-# ADR log — AI Edge
+# ADR log — Clixsy Intercept
 
 Architecture Decision Records. Append-only. Reference decisions by ID from PRs and code comments.
 
@@ -51,7 +51,7 @@ Architecture Decision Records. Append-only. Reference decisions by ID from PRs a
 ## ADR-0008: Monthly reporting hands off to existing N8N pipeline
 
 **Status**: Accepted.
-**Decision.** AI Edge generates monthly client-facing report payloads (PPTX or structured JSON) and hands off to the existing N8N monthly SEO reporting pipeline for delivery. No new delivery infrastructure (email, Slack, PDF-renderer) in v1.
+**Decision.** Clixsy Intercept generates monthly client-facing report payloads (PPTX or structured JSON) and hands off to the existing N8N monthly SEO reporting pipeline for delivery. No new delivery infrastructure (email, Slack, PDF-renderer) in v1.
 **Why.** Consolidates with existing workflow; avoids parallel delivery infra. Aligns agency ops.
 
 ## ADR-0009: SERP capture via DataForSEO, AIO fallback via Playwright
@@ -92,7 +92,7 @@ Architecture Decision Records. Append-only. Reference decisions by ID from PRs a
 
 **Status**: Accepted.
 **Decision.** Fly apps are brand-prefixed: `clixsy-ai-edge-api`, `clixsy-ai-edge-worker`. GitHub repo lives at `JLcilliers/ai-edge` (private); transferable to a Clixsy/QRM org later without breaking Fly app names.
-**Why.** Single Fly org will host more than one product (AI Edge, future QRM / Fresh / FSE / Globe Runner products). Unprefixed names collide at the first sibling deploy. GitHub org migration is easy; Fly app renames are not.
+**Why.** Single Fly org will host more than one product (Clixsy Intercept, future QRM / Fresh / FSE / Globe Runner products). Unprefixed names collide at the first sibling deploy. GitHub org migration is easy; Fly app renames are not.
 
 ## ADR-0012: Scheduling cadence
 
