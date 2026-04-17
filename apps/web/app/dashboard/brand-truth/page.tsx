@@ -2,6 +2,9 @@ import { getLatestBrandTruth, getBrandTruthVersions } from '../../actions/brand-
 import { BrandTruthEditor } from './editor';
 import { CLIXSY_SEED } from './seed-data';
 
+// Force dynamic — this page hits the DB at render time
+export const dynamic = 'force-dynamic';
+
 export default async function BrandTruthPage() {
   const [latest, versions] = await Promise.all([
     getLatestBrandTruth(),

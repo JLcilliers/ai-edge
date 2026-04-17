@@ -1,6 +1,8 @@
 import { getAuditRuns } from '../../actions/audit-actions';
 import { AuditListClient } from './audit-list-client';
 
+export const dynamic = 'force-dynamic';
+
 export default async function AuditsPage() {
   const runs = await getAuditRuns().catch(() => []);
 
