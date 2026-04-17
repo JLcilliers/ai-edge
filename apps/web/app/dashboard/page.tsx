@@ -1,29 +1,38 @@
 import Link from 'next/link';
+import { FileText, BarChart3 } from 'lucide-react';
 
 export default function DashboardPage() {
   return (
     <div>
-      <h1 className="text-2xl font-semibold">Dashboard</h1>
-      <p className="mt-2 text-sm text-neutral-500">
-        Clixsy Intercept — Trust Alignment for the AI search era.
-      </p>
-      <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mb-8">
+        <h1 className="font-[family-name:var(--font-jakarta)] text-3xl font-extrabold tracking-tight text-white">
+          Overview
+        </h1>
+        <p className="mt-2 text-white/55">
+          Clixsy Intercept — AI search visibility at a glance
+        </p>
+      </div>
+
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         <Link
           href="/dashboard/brand-truth"
-          className="rounded-lg border border-neutral-800 bg-neutral-900 p-6 transition hover:border-neutral-700"
+          className="group rounded-xl border border-white/10 bg-[--bg-secondary] p-6 transition-colors hover:border-[--accent]/30"
         >
-          <h2 className="font-medium">Brand Truth</h2>
-          <p className="mt-1 text-sm text-neutral-500">
-            Edit your firm&apos;s brand identity and positioning.
+          <FileText size={24} strokeWidth={1.5} className="text-[--accent] mb-3" />
+          <h2 className="font-[family-name:var(--font-jakarta)] text-lg font-bold text-white">Brand Truth</h2>
+          <p className="mt-1 text-sm text-white/55">
+            Define how AI should describe your brand.
           </p>
         </Link>
+
         <Link
           href="/dashboard/audits"
-          className="rounded-lg border border-neutral-800 bg-neutral-900 p-6 transition hover:border-neutral-700"
+          className="group rounded-xl border border-white/10 bg-[--bg-secondary] p-6 transition-colors hover:border-[--accent]/30"
         >
-          <h2 className="font-medium">Trust Alignment Audits</h2>
-          <p className="mt-1 text-sm text-neutral-500">
-            Run and review LLM alignment audits.
+          <BarChart3 size={24} strokeWidth={1.5} className="text-[--accent] mb-3" />
+          <h2 className="font-[family-name:var(--font-jakarta)] text-lg font-bold text-white">Trust Alignment Audits</h2>
+          <p className="mt-1 text-sm text-white/55">
+            How LLMs actually describe you vs how you want to be described.
           </p>
         </Link>
       </div>

@@ -1,0 +1,14 @@
+<svg width="400" height="400" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <pattern id="topo" patternUnits="userSpaceOnUse" width="400" height="400">
+      <path d="M50,200 Q100,150 200,180 Q300,210 350,160" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="1"/>
+      <path d="M0,100 Q80,60 160,90 Q240,120 320,80 Q400,40 400,100" fill="none" stroke="rgba(255,255,255,0.02)" stroke-width="1"/>
+      <path d="M30,300 Q120,260 200,290 Q280,320 370,280" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="1"/>
+      <path d="M0,50 Q100,20 200,50 Q300,80 400,30" fill="none" stroke="rgba(255,255,255,0.015)" stroke-width="1"/>
+      <path d="M20,350 Q100,330 200,360 Q300,390 380,340" fill="none" stroke="rgba(255,255,255,0.02)" stroke-width="1"/>
+      <path d="M100,10 Q180,40 260,20 Q340,0 400,25" fill="none" stroke="rgba(255,255,255,0.02)" stroke-width="1"/>
+      <path d="M0,250 Q60,230 140,260 Q220,290 300,250 Q380,210 400,240" fill="none" stroke="rgba(255,255,255,0.015)" stroke-width="1"/>
+    </pattern>
+  </defs>
+  <rect width="100%" height="100%" fill="url(#topo)"/>
+</svg>

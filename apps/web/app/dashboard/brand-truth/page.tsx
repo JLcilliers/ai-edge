@@ -16,10 +16,17 @@ export default async function BrandTruthPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold">Brand Truth Editor</h1>
-      <p className="mt-1 text-sm text-neutral-500">
-        Version {currentVersion || 'unsaved'} — edit fields and save to create a new version.
-      </p>
+      <div className="mb-8">
+        <h1 className="font-[family-name:var(--font-jakarta)] text-3xl font-extrabold tracking-tight text-white">
+          Brand Truth
+        </h1>
+        <p className="mt-2 text-white/55">
+          Define how AI should describe your brand
+        </p>
+        <p className="mt-1 text-xs font-[family-name:var(--font-geist-mono)] text-white/40">
+          Version {currentVersion || 'unsaved'}
+        </p>
+      </div>
       <BrandTruthEditor
         initialPayload={initialPayload}
         currentVersion={currentVersion}

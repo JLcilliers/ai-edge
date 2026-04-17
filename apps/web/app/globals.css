@@ -1,1 +1,40 @@
 @import "tailwindcss";
+
+@layer base {
+  :root {
+    --bg-primary: #030305;
+    --bg-secondary: #0a101c;
+    --bg-tertiary: #05080e;
+    --accent: #16dc76;
+    --accent-hover: #25dd7e;
+    --text-primary: #ffffff;
+    --text-secondary: rgba(255,255,255,0.64);
+    --text-tertiary: rgba(255,255,255,0.55);
+    --text-muted: rgba(224,224,224,0.86);
+    --border-default: rgba(255,255,255,0.1);
+    --border-active: #25dd7e;
+    --rag-red: #ef4444;
+    --rag-red-bg: rgba(239,68,68,0.15);
+    --rag-yellow: #eab308;
+    --rag-yellow-bg: rgba(234,179,8,0.15);
+    --rag-green: #16dc76;
+    --rag-green-bg: rgba(22,220,118,0.15);
+  }
+
+  body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg-secondary); }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
+  /* Selection */
+  ::selection {
+    background-color: rgba(22, 220, 118, 0.3);
+    color: white;
+  }
+}

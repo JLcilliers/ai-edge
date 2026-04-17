@@ -8,13 +8,13 @@ export default async function AuditsPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Trust Alignment Audits</h1>
-          <p className="mt-1 text-sm text-neutral-500">
-            Run and review LLM alignment audits against your Brand Truth.
-          </p>
-        </div>
+      <div className="mb-8">
+        <h1 className="font-[family-name:var(--font-jakarta)] text-3xl font-extrabold tracking-tight text-white">
+          Trust Alignment Audits
+        </h1>
+        <p className="mt-2 text-white/55">
+          How LLMs actually describe you vs how you want to be described
+        </p>
       </div>
       <AuditListClient initialRuns={runs} />
     </div>

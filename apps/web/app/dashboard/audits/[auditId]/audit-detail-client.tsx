@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
+import { ArrowLeft, Download, ChevronDown } from 'lucide-react';
 import { exportAuditCsv } from '../../../actions/audit-actions';
 
 type Result = {
@@ -29,19 +30,13 @@ type Detail = {
   summary: { red: number; yellow: number; green: number };
 };
 
-const RAG_COLORS: Record<string, string> = {
-  red: 'bg-red-600 text-white',
-  yellow: 'bg-yellow-500 text-black',
-  green: 'bg-green-600 text-white',
+const RAG_BADGE: Record<string, string> = {
+  red: 'bg-[--rag-red-bg] text-[--rag-red]',
+  yellow: 'bg-[--rag-yellow-bg] text-[--rag-yellow]',
+  green: 'bg-[--rag-green-bg] text-[--rag-green]',
 };
 
-export function AuditDetailClient({
-  detail,
-  auditId,
-}: {
-  detail: Detail;
-  auditId: string;
-}) {
+export function AuditDetailClient({ detail, auditId }: { detail: Detail; auditId: string }) {
   const { run, results, summary } = detail;
   const [filter, setFilter] = useState<'all' | 'red' | 'yellow' | 'green'>('all');
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
@@ -63,142 +58,158 @@ export function AuditDetailClient({
     });
   };
 
+  const dateStr = run.startedAt ? new Date(run.startedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+  const durationSec = run.finishedAt && run.startedAt
+    ? Math.round((new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime()) / 1000)
+    : null;
+
   return (
     <div>
-      {/* Header */}
-      <div className="flex items-start justify-between">
+      {/* Back + header */}
+      <Link href="/dashboard/audits" className="mb-4 inline-flex items-center gap-1.5 text-xs text-white/40 transition hover:text-white/70">
+        <ArrowLeft size={14} /> Back to audits
+      </Link>
+
+      <div className="mb-8 flex items-start justify-between">
         <div>
-          <Link href="/dashboard/audits" className="text-xs text-neutral-500 hover:text-neutral-300">
-            &larr; Back to audits
-          </Link>
-          <h1 className="mt-1 text-2xl font-semibold">Audit Detail</h1>
-          <p className="mt-1 text-sm text-neutral-500">
-            {run.status} &middot;{' '}
-            {run.startedAt ? new Date(run.startedAt).toLocaleString() : 'pending'}{' '}
-            {run.finishedAt && run.startedAt && (
-              <span>
-                &middot;{' '}
-                {Math.round(
-                  (new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime()) / 1000,
-                )}
-                s
-              </span>
-            )}
+          <h1 className="font-[family-name:var(--font-jakarta)] text-3xl font-extrabold tracking-tight text-white">
+            Audit Results — {dateStr}
+          </h1>
+          <p className="mt-2 text-white/55">
+            Red = missing or wrong. Yellow = mentioned but off-brand. Green = on-brand.
           </p>
+          <div className="mt-2 flex gap-4 font-[family-name:var(--font-geist-mono)] text-xs text-white/40">
+            <span>{run.status}</span>
+            {durationSec !== null && <span>{durationSec}s</span>}
+            <span>{total} results</span>
+          </div>
         </div>
         <button
           onClick={handleExport}
           disabled={isExporting}
-          className="rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2 text-sm text-neutral-200 transition hover:bg-neutral-700 disabled:opacity-50"
+          className="flex items-center gap-2 rounded-full border border-white/10 bg-transparent px-5 py-2.5 text-sm text-white transition-colors hover:border-[--accent] disabled:opacity-50"
         >
+          <Download size={16} strokeWidth={1.5} />
           {isExporting ? 'Exporting...' : 'Export CSV'}
         </button>
       </div>
 
-      {/* RAG summary bar */}
-      <div className="mt-6">
-        <div className="flex gap-4 text-sm">
-          <span className="text-red-400">{summary.red} Red</span>
-          <span className="text-yellow-400">{summary.yellow} Yellow</span>
-          <span className="text-green-400">{summary.green} Green</span>
-          <span className="text-neutral-500">{total} total</span>
+      {/* RAG summary stats */}
+      <div className="mb-6 grid grid-cols-3 gap-4">
+        <div className="rounded-xl border border-white/10 bg-[--bg-secondary] p-6">
+          <span className="text-xs font-medium uppercase tracking-widest text-white/55">Red</span>
+          <p className="mt-1 font-[family-name:var(--font-geist-mono)] text-3xl font-bold tracking-tight text-[--rag-red]">{summary.red}</p>
         </div>
-        {total > 0 && (
-          <div className="mt-2 flex h-4 overflow-hidden rounded-full">
-            {summary.red > 0 && (
-              <div className="bg-red-600" style={{ width: `${(summary.red / total) * 100}%` }} />
-            )}
-            {summary.yellow > 0 && (
-              <div className="bg-yellow-500" style={{ width: `${(summary.yellow / total) * 100}%` }} />
-            )}
-            {summary.green > 0 && (
-              <div className="bg-green-600" style={{ width: `${(summary.green / total) * 100}%` }} />
-            )}
-          </div>
-        )}
+        <div className="rounded-xl border border-white/10 bg-[--bg-secondary] p-6">
+          <span className="text-xs font-medium uppercase tracking-widest text-white/55">Yellow</span>
+          <p className="mt-1 font-[family-name:var(--font-geist-mono)] text-3xl font-bold tracking-tight text-[--rag-yellow]">{summary.yellow}</p>
+        </div>
+        <div className="rounded-xl border border-white/10 bg-[--bg-secondary] p-6">
+          <span className="text-xs font-medium uppercase tracking-widest text-white/55">Green</span>
+          <p className="mt-1 font-[family-name:var(--font-geist-mono)] text-3xl font-bold tracking-tight text-[--rag-green]">{summary.green}</p>
+        </div>
       </div>
 
+      {/* RAG distribution bar */}
+      {total > 0 && (
+        <div className="mb-8 flex h-3 overflow-hidden rounded-full bg-white/5">
+          {summary.red > 0 && <div className="bg-[--rag-red]" style={{ width: `${(summary.red / total) * 100}%` }} />}
+          {summary.yellow > 0 && <div className="bg-[--rag-yellow]" style={{ width: `${(summary.yellow / total) * 100}%` }} />}
+          {summary.green > 0 && <div className="bg-[--rag-green]" style={{ width: `${(summary.green / total) * 100}%` }} />}
+        </div>
+      )}
+
       {/* Filters */}
-      <div className="mt-6 flex gap-2">
+      <div className="mb-4 flex gap-2">
         {(['all', 'red', 'yellow', 'green'] as const).map((f) => (
           <button
             key={f}
             onClick={() => setFilter(f)}
-            className={`rounded-md px-3 py-1 text-xs font-medium transition ${
+            className={`rounded-full px-4 py-1.5 text-xs font-medium uppercase tracking-wider transition-colors ${
               filter === f
-                ? 'bg-neutral-700 text-white'
-                : 'bg-neutral-900 text-neutral-500 hover:text-neutral-300'
+                ? 'bg-white/10 text-white'
+                : 'text-white/40 hover:text-white/70'
             }`}
           >
-            {f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)} ({f === 'all' ? total : summary[f]})
+            {f === 'all' ? `All (${total})` : `${f} (${summary[f]})`}
           </button>
         ))}
       </div>
 
-      {/* Results table */}
-      <div className="mt-4 flex flex-col gap-1">
+      {/* Results */}
+      <div className="overflow-hidden rounded-xl border border-white/10 bg-[--bg-secondary]">
+        {/* Table header */}
+        <div className="flex items-center gap-4 bg-[--bg-tertiary] px-5 py-3 text-xs font-medium uppercase tracking-widest text-white/55">
+          <span className="w-16">Label</span>
+          <span className="flex-1">Query</span>
+          <span className="w-24">Provider</span>
+          <span className="w-20 text-right">Score</span>
+          <span className="w-8" />
+        </div>
+
         {filtered.length === 0 && (
-          <p className="py-8 text-center text-sm text-neutral-600">No results for this filter.</p>
+          <p className="py-12 text-center text-sm text-white/30">No results for this filter.</p>
         )}
 
         {filtered.map((r, i) => (
-          <div key={i} className="rounded-lg border border-neutral-800 bg-neutral-900">
+          <div key={i} className="border-t border-white/5">
             <button
               type="button"
               onClick={() => setExpandedRow(expandedRow === i ? null : i)}
-              className="flex w-full items-center gap-4 px-4 py-3 text-left text-sm hover:bg-neutral-800/50"
+              className="flex w-full items-center gap-4 px-5 py-3.5 text-left text-sm transition-colors hover:bg-white/[0.02]"
             >
-              <span
-                className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${RAG_COLORS[r.ragLabel] ?? 'bg-neutral-600 text-white'}`}
-              >
-                {r.ragLabel.toUpperCase()}
+              <span className={`w-16 rounded-full px-3 py-1 text-center text-xs font-medium uppercase tracking-wider ${RAG_BADGE[r.ragLabel] ?? 'bg-white/10 text-white/55'}`}>
+                {r.ragLabel}
               </span>
-              <span className="flex-1 truncate text-neutral-200">{r.queryText}</span>
-              <span className="text-xs text-neutral-500">{r.provider}</span>
-              <span className="text-xs text-neutral-500">{r.mentioned ? 'Mentioned' : 'Not mentioned'}</span>
-              <span className="w-12 text-right text-xs text-neutral-500">
+              <span className="flex-1 truncate text-white/80">{r.queryText}</span>
+              <span className="w-24 font-[family-name:var(--font-geist-mono)] text-xs text-white/40">{r.provider}</span>
+              <span className="w-20 text-right font-[family-name:var(--font-geist-mono)] text-sm text-white/60">
                 {r.toneScore !== null ? `${r.toneScore}/10` : '—'}
               </span>
-              <span className="text-xs text-neutral-600">{r.citationUrls.length} cites</span>
+              <ChevronDown size={16} className={`text-white/30 transition-transform ${expandedRow === i ? 'rotate-180' : ''}`} />
             </button>
 
             {expandedRow === i && (
-              <div className="border-t border-neutral-800 px-4 py-4 text-sm">
-                <div className="mb-3">
-                  <span className="text-xs font-medium text-neutral-400">Full Response:</span>
-                  <p className="mt-1 max-h-48 overflow-y-auto whitespace-pre-wrap text-xs text-neutral-300">
+              <div className="border-t border-white/5 bg-[--bg-tertiary] p-6">
+                <div className="mb-4 flex gap-4 text-xs text-white/40">
+                  <span>{r.mentioned ? '✓ Mentioned' : '✗ Not mentioned'}</span>
+                  <span>Provider: {r.provider}</span>
+                  <span>Model: {r.model}</span>
+                  <span>{r.citationUrls.length} citations</span>
+                </div>
+
+                <div className="mb-4">
+                  <span className="text-xs font-medium uppercase tracking-widest text-white/55">Response</span>
+                  <p className="mt-2 max-h-48 overflow-y-auto rounded-lg bg-black/30 p-4 font-[family-name:var(--font-geist-mono)] text-sm leading-relaxed text-white/70">
                     {r.fullResponse}
                   </p>
                 </div>
+
                 {r.gapReasons.length > 0 && (
-                  <div className="mb-3">
-                    <span className="text-xs font-medium text-neutral-400">Gap Reasons:</span>
-                    <ul className="mt-1 list-inside list-disc text-xs text-yellow-300">
-                      {r.gapReasons.map((g, j) => (
-                        <li key={j}>{g}</li>
-                      ))}
+                  <div className="mb-4">
+                    <span className="text-xs font-medium uppercase tracking-widest text-white/55">Gap Reasons</span>
+                    <ul className="mt-2 list-inside list-disc text-sm text-[--rag-yellow]">
+                      {r.gapReasons.map((g, j) => <li key={j}>{g}</li>)}
                     </ul>
                   </div>
                 )}
+
                 {r.factualErrors.length > 0 && (
-                  <div className="mb-3">
-                    <span className="text-xs font-medium text-neutral-400">Factual Errors:</span>
-                    <ul className="mt-1 list-inside list-disc text-xs text-red-300">
-                      {r.factualErrors.map((e, j) => (
-                        <li key={j}>{e}</li>
-                      ))}
+                  <div className="mb-4">
+                    <span className="text-xs font-medium uppercase tracking-widest text-white/55">Factual Errors</span>
+                    <ul className="mt-2 list-inside list-disc text-sm text-[--rag-red]">
+                      {r.factualErrors.map((e, j) => <li key={j}>{e}</li>)}
                     </ul>
                   </div>
                 )}
+
                 {r.citationUrls.length > 0 && (
                   <div>
-                    <span className="text-xs font-medium text-neutral-400">Citations:</span>
-                    <ul className="mt-1 list-inside list-disc text-xs text-blue-300">
+                    <span className="text-xs font-medium uppercase tracking-widest text-white/55">Citations</span>
+                    <ul className="mt-2 list-inside list-disc text-sm text-[--accent]">
                       {r.citationUrls.map((url, j) => (
                         <li key={j}>
-                          <a href={url} target="_blank" rel="noopener noreferrer" className="underline">
-                            {url}
-                          </a>
+                          <a href={url} target="_blank" rel="noopener noreferrer" className="underline">{url}</a>
                         </li>
                       ))}
                     </ul>

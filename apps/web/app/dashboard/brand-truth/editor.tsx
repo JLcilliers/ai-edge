@@ -17,16 +17,16 @@ function Section({
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="rounded-lg border border-neutral-800 bg-neutral-900">
+    <div className="rounded-xl border border-white/10 bg-[--bg-secondary]">
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium text-neutral-200 hover:bg-neutral-800/50"
+        className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-semibold text-black hover:bg-[--bg-tertiary]/50"
       >
         {title}
-        <span className="text-neutral-500">{open ? '−' : '+'}</span>
+        <span className="text-white/55">{open ? '−' : '+'}</span>
       </button>
-      {open && <div className="border-t border-neutral-800 px-4 py-4">{children}</div>}
+      {open && <div className="border-t border-white/10 px-4 py-4">{children}</div>}
     </div>
   );
 }
@@ -35,12 +35,12 @@ function Section({
 function Field({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
     <label className="block">
-      <span className="text-xs text-neutral-500">{label}</span>
+      <span className="text-xs text-white/55">{label}</span>
       <input
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-1 block w-full rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-600 focus:border-blue-600 focus:outline-none"
+        className="mt-1 block w-full rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-2 text-sm text-white placeholder:text-white/40 focus:border-[--accent] focus:outline-none"
       />
     </label>
   );
@@ -58,7 +58,7 @@ function StringArray({
 }) {
   return (
     <div>
-      <span className="text-xs text-neutral-500">{label}</span>
+      <span className="text-xs text-white/55">{label}</span>
       <div className="mt-1 flex flex-col gap-1">
         {items.map((item, i) => (
           <div key={i} className="flex gap-2">
@@ -70,7 +70,7 @@ function StringArray({
                 copy[i] = e.target.value;
                 onChange(copy);
               }}
-              className="flex-1 rounded-md border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-100 focus:border-blue-600 focus:outline-none"
+              className="flex-1 rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
             />
             <button
               type="button"
@@ -85,7 +85,7 @@ function StringArray({
       <button
         type="button"
         onClick={() => onChange([...items, ''])}
-        className="mt-2 rounded-md border border-dashed border-neutral-700 px-3 py-1 text-xs text-neutral-500 hover:border-neutral-500 hover:text-neutral-300"
+        className="mt-2 rounded-lg border border-dashed border-white/10 px-3 py-1 text-xs text-white/55 hover:border-white/20 hover:text-white"
       >
         + Add Item
       </button>
@@ -158,9 +158,9 @@ export function BrandTruthEditor({
     >
       {/* Read-only banner */}
       {isReadOnly && (
-        <div className="flex items-center justify-between rounded-lg border border-yellow-800 bg-yellow-950/30 px-4 py-3">
-          <span className="text-sm text-yellow-300">Viewing version {viewingVersion} (read-only)</span>
-          <button type="button" onClick={handleBackToCurrent} className="rounded-md bg-yellow-600 px-3 py-1 text-xs font-medium text-black hover:bg-yellow-500">Back to Current Version</button>
+        <div className="flex items-center justify-between rounded-xl border border-yellow-500/30 bg-yellow-500/15 px-4 py-3">
+          <span className="text-sm text-yellow-400">Viewing version {viewingVersion} (read-only)</span>
+          <button type="button" onClick={handleBackToCurrent} className="rounded-lg bg-yellow-500 px-3 py-1 text-xs font-medium text-black hover:bg-yellow-400">Back to Current Version</button>
         </div>
       )}
       {/* Core identity */}
@@ -203,7 +203,7 @@ export function BrandTruthEditor({
                 copy[i] = { ...copy[i], name: e.target.value };
                 set('service_offerings', copy);
               }}
-              className="w-40 rounded-md border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-100 focus:border-blue-600 focus:outline-none"
+              className="w-40 rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
             />
             <input
               placeholder="Scope"
@@ -213,7 +213,7 @@ export function BrandTruthEditor({
                 copy[i] = { ...copy[i], scope: e.target.value };
                 set('service_offerings', copy);
               }}
-              className="flex-1 rounded-md border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-100 focus:border-blue-600 focus:outline-none"
+              className="flex-1 rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
             />
             <button
               type="button"
@@ -227,7 +227,7 @@ export function BrandTruthEditor({
         <button
           type="button"
           onClick={() => set('service_offerings', [...(data.service_offerings ?? []), { name: '', scope: '' }])}
-          className="rounded-md border border-dashed border-neutral-700 px-3 py-1 text-xs text-neutral-500 hover:border-neutral-500 hover:text-neutral-300"
+          className="rounded-lg border border-dashed border-white/10 px-3 py-1 text-xs text-white/55 hover:border-white/20 hover:text-white"
         >
           + Add Service Offering
         </button>
@@ -247,7 +247,7 @@ export function BrandTruthEditor({
       {/* Banned Claims */}
       <Section title="Banned Claims">
         {(data.banned_claims ?? []).map((bc: any, i: number) => (
-          <div key={i} className="mb-3 rounded border border-neutral-800 p-3">
+          <div key={i} className="mb-3 rounded border border-white/10 p-3">
             <div className="grid gap-2 sm:grid-cols-2">
               <input
                 placeholder="Claim"
@@ -257,7 +257,7 @@ export function BrandTruthEditor({
                   copy[i] = { ...copy[i], claim: e.target.value };
                   set('banned_claims', copy);
                 }}
-                className="rounded-md border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-100 focus:border-blue-600 focus:outline-none"
+                className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
               />
               <input
                 placeholder="Source Rule"
@@ -267,7 +267,7 @@ export function BrandTruthEditor({
                   copy[i] = { ...copy[i], source_rule: e.target.value };
                   set('banned_claims', copy);
                 }}
-                className="rounded-md border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-100 focus:border-blue-600 focus:outline-none"
+                className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
               />
             </div>
             <textarea
@@ -279,7 +279,7 @@ export function BrandTruthEditor({
                 set('banned_claims', copy);
               }}
               rows={2}
-              className="mt-2 w-full rounded-md border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-100 focus:border-blue-600 focus:outline-none"
+              className="mt-2 w-full rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
             />
             <button
               type="button"
@@ -293,7 +293,7 @@ export function BrandTruthEditor({
         <button
           type="button"
           onClick={() => set('banned_claims', [...(data.banned_claims ?? []), { claim: '', reason: '', source_rule: '' }])}
-          className="rounded-md border border-dashed border-neutral-700 px-3 py-1 text-xs text-neutral-500 hover:border-neutral-500 hover:text-neutral-300"
+          className="rounded-lg border border-dashed border-white/10 px-3 py-1 text-xs text-white/55 hover:border-white/20 hover:text-white"
         >
           + Add Banned Claim
         </button>
@@ -332,43 +332,43 @@ export function BrandTruthEditor({
       {/* Key Clients (Public) */}
       <Section title="Key Clients (Public)">
         {(data.key_clients_public ?? []).map((kc: any, i: number) => (
-          <div key={i} className="mb-3 rounded border border-neutral-800 p-3">
+          <div key={i} className="mb-3 rounded border border-white/10 p-3">
             <div className="grid gap-2 sm:grid-cols-2">
-              <input placeholder="Client Name" value={kc.name ?? ''} onChange={(e) => { const copy = [...(data.key_clients_public ?? [])]; copy[i] = { ...copy[i], name: e.target.value }; set('key_clients_public', copy); }} className="rounded-md border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-100 focus:border-blue-600 focus:outline-none" />
-              <input placeholder="Vertical" value={kc.vertical ?? ''} onChange={(e) => { const copy = [...(data.key_clients_public ?? [])]; copy[i] = { ...copy[i], vertical: e.target.value }; set('key_clients_public', copy); }} className="rounded-md border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-100 focus:border-blue-600 focus:outline-none" />
-              <input placeholder="Location" value={kc.location ?? ''} onChange={(e) => { const copy = [...(data.key_clients_public ?? [])]; copy[i] = { ...copy[i], location: e.target.value }; set('key_clients_public', copy); }} className="rounded-md border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-100 focus:border-blue-600 focus:outline-none" />
-              <input placeholder="Attribution" value={kc.attribution ?? ''} onChange={(e) => { const copy = [...(data.key_clients_public ?? [])]; copy[i] = { ...copy[i], attribution: e.target.value }; set('key_clients_public', copy); }} className="rounded-md border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-100 focus:border-blue-600 focus:outline-none" />
-              <input placeholder="Source URL" value={kc.source_url ?? ''} onChange={(e) => { const copy = [...(data.key_clients_public ?? [])]; copy[i] = { ...copy[i], source_url: e.target.value }; set('key_clients_public', copy); }} className="col-span-2 rounded-md border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-100 focus:border-blue-600 focus:outline-none" />
+              <input placeholder="Client Name" value={kc.name ?? ''} onChange={(e) => { const copy = [...(data.key_clients_public ?? [])]; copy[i] = { ...copy[i], name: e.target.value }; set('key_clients_public', copy); }} className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none" />
+              <input placeholder="Vertical" value={kc.vertical ?? ''} onChange={(e) => { const copy = [...(data.key_clients_public ?? [])]; copy[i] = { ...copy[i], vertical: e.target.value }; set('key_clients_public', copy); }} className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none" />
+              <input placeholder="Location" value={kc.location ?? ''} onChange={(e) => { const copy = [...(data.key_clients_public ?? [])]; copy[i] = { ...copy[i], location: e.target.value }; set('key_clients_public', copy); }} className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none" />
+              <input placeholder="Attribution" value={kc.attribution ?? ''} onChange={(e) => { const copy = [...(data.key_clients_public ?? [])]; copy[i] = { ...copy[i], attribution: e.target.value }; set('key_clients_public', copy); }} className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none" />
+              <input placeholder="Source URL" value={kc.source_url ?? ''} onChange={(e) => { const copy = [...(data.key_clients_public ?? [])]; copy[i] = { ...copy[i], source_url: e.target.value }; set('key_clients_public', copy); }} className="col-span-2 rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none" />
             </div>
-            <textarea placeholder="Testimonial Quote" value={kc.testimonial_quote ?? ''} onChange={(e) => { const copy = [...(data.key_clients_public ?? [])]; copy[i] = { ...copy[i], testimonial_quote: e.target.value }; set('key_clients_public', copy); }} rows={2} className="mt-2 w-full rounded-md border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-100 focus:border-blue-600 focus:outline-none" />
+            <textarea placeholder="Testimonial Quote" value={kc.testimonial_quote ?? ''} onChange={(e) => { const copy = [...(data.key_clients_public ?? [])]; copy[i] = { ...copy[i], testimonial_quote: e.target.value }; set('key_clients_public', copy); }} rows={2} className="mt-2 w-full rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none" />
             <button type="button" onClick={() => set('key_clients_public', (data.key_clients_public ?? []).filter((_: any, j: number) => j !== i))} className="mt-1 text-xs text-red-400 hover:text-red-300">Remove</button>
           </div>
         ))}
-        <button type="button" onClick={() => set('key_clients_public', [...(data.key_clients_public ?? []), { name: '', vertical: '', location: '', testimonial_quote: '', attribution: '', source_url: '' }])} className="rounded-md border border-dashed border-neutral-700 px-3 py-1 text-xs text-neutral-500 hover:border-neutral-500 hover:text-neutral-300">+ Add Client</button>
+        <button type="button" onClick={() => set('key_clients_public', [...(data.key_clients_public ?? []), { name: '', vertical: '', location: '', testimonial_quote: '', attribution: '', source_url: '' }])} className="rounded-lg border border-dashed border-white/10 px-3 py-1 text-xs text-white/55 hover:border-white/20 hover:text-white">+ Add Client</button>
       </Section>
 
       {/* Awards & Badges */}
       <Section title="Awards & Badges">
         {(data.awards ?? []).map((aw: any, i: number) => (
-          <div key={i} className="mb-3 rounded border border-neutral-800 p-3">
+          <div key={i} className="mb-3 rounded border border-white/10 p-3">
             <div className="grid gap-2 sm:grid-cols-2">
-              <input placeholder="Award Name" value={aw.name ?? ''} onChange={(e) => { const copy = [...(data.awards ?? [])]; copy[i] = { ...copy[i], name: e.target.value }; set('awards', copy); }} className="rounded-md border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-100 focus:border-blue-600 focus:outline-none" />
-              <select value={aw.verification_status ?? 'unverified_at_ingestion'} onChange={(e) => { const copy = [...(data.awards ?? [])]; copy[i] = { ...copy[i], verification_status: e.target.value }; set('awards', copy); }} className="rounded-md border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-100 focus:border-blue-600 focus:outline-none">
+              <input placeholder="Award Name" value={aw.name ?? ''} onChange={(e) => { const copy = [...(data.awards ?? [])]; copy[i] = { ...copy[i], name: e.target.value }; set('awards', copy); }} className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none" />
+              <select value={aw.verification_status ?? 'unverified_at_ingestion'} onChange={(e) => { const copy = [...(data.awards ?? [])]; copy[i] = { ...copy[i], verification_status: e.target.value }; set('awards', copy); }} className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none">
                 <option value="unverified_at_ingestion">Unverified</option>
                 <option value="verified">Verified</option>
                 <option value="pending">Pending</option>
               </select>
-              <input placeholder="Source URL" value={aw.source_url ?? ''} onChange={(e) => { const copy = [...(data.awards ?? [])]; copy[i] = { ...copy[i], source_url: e.target.value }; set('awards', copy); }} className="rounded-md border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-100 focus:border-blue-600 focus:outline-none" />
-              <label className="flex items-center gap-2 text-xs text-neutral-400">
+              <input placeholder="Source URL" value={aw.source_url ?? ''} onChange={(e) => { const copy = [...(data.awards ?? [])]; copy[i] = { ...copy[i], source_url: e.target.value }; set('awards', copy); }} className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none" />
+              <label className="flex items-center gap-2 text-xs text-white/55">
                 <input type="checkbox" checked={aw.source_required ?? true} onChange={(e) => { const copy = [...(data.awards ?? [])]; copy[i] = { ...copy[i], source_required: e.target.checked }; set('awards', copy); }} className="rounded border-neutral-600" />
                 Source Required
               </label>
             </div>
-            <textarea placeholder="Notes" value={aw.notes ?? ''} onChange={(e) => { const copy = [...(data.awards ?? [])]; copy[i] = { ...copy[i], notes: e.target.value }; set('awards', copy); }} rows={2} className="mt-2 w-full rounded-md border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-100 focus:border-blue-600 focus:outline-none" />
+            <textarea placeholder="Notes" value={aw.notes ?? ''} onChange={(e) => { const copy = [...(data.awards ?? [])]; copy[i] = { ...copy[i], notes: e.target.value }; set('awards', copy); }} rows={2} className="mt-2 w-full rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none" />
             <button type="button" onClick={() => set('awards', (data.awards ?? []).filter((_: any, j: number) => j !== i))} className="mt-1 text-xs text-red-400 hover:text-red-300">Remove</button>
           </div>
         ))}
-        <button type="button" onClick={() => set('awards', [...(data.awards ?? []), { name: '', source_url: '', source_required: true, verification_status: 'unverified_at_ingestion', notes: '' }])} className="rounded-md border border-dashed border-neutral-700 px-3 py-1 text-xs text-neutral-500 hover:border-neutral-500 hover:text-neutral-300">+ Add Award</button>
+        <button type="button" onClick={() => set('awards', [...(data.awards ?? []), { name: '', source_url: '', source_required: true, verification_status: 'unverified_at_ingestion', notes: '' }])} className="rounded-lg border border-dashed border-white/10 px-3 py-1 text-xs text-white/55 hover:border-white/20 hover:text-white">+ Add Award</button>
       </Section>
 
       {/* Service Areas */}
@@ -381,11 +381,11 @@ export function BrandTruthEditor({
 
       {/* Save (hidden in read-only mode) */}
       {!isReadOnly && (
-        <div className="sticky bottom-0 flex items-center gap-4 border-t border-neutral-800 bg-neutral-950 py-4">
+        <div className="sticky bottom-0 flex items-center gap-4 border-t border-white/10 bg-[--bg-primary] py-4">
           <button
             type="submit"
             disabled={isPending}
-            className="rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-medium text-white transition hover:bg-blue-500 disabled:opacity-50"
+            className="rounded-full bg-[--accent] px-6 py-2.5 text-sm font-semibold text-black transition hover:bg-[--accent-hover] disabled:opacity-50"
           >
             {isPending ? 'Saving...' : 'Save New Version'}
           </button>
@@ -399,14 +399,14 @@ export function BrandTruthEditor({
 
       {/* Compliance violations */}
       {complianceViolations.length > 0 && (
-        <div className="rounded-lg border border-red-800 bg-red-950/30 p-4">
+        <div className="rounded-xl border border-red-800 bg-red-950/30 p-4">
           <h3 className="text-sm font-medium text-red-300">Compliance Violations Detected</h3>
           <p className="mt-1 text-xs text-red-400">Fix these before saving. The following text matches banned-claim patterns:</p>
           <ul className="mt-2 flex flex-col gap-2">
             {complianceViolations.map((v, i) => (
               <li key={i} className="rounded border border-red-900 bg-red-950/50 p-2 text-xs">
                 <span className="font-medium text-red-300">Match: &quot;{v.match}&quot;</span>
-                <span className="ml-2 text-neutral-500">[{v.jurisdiction}]</span>
+                <span className="ml-2 text-white/55">[{v.jurisdiction}]</span>
                 <p className="mt-1 text-red-400">{v.reason}</p>
               </li>
             ))}
@@ -417,11 +417,11 @@ export function BrandTruthEditor({
 
     {/* Version history sidebar */}
     <aside className="w-64 shrink-0">
-      <h2 className="text-sm font-medium text-neutral-400">Version History</h2>
-      {isLoadingVersion && <p className="mt-2 text-xs text-neutral-600 animate-pulse">Loading version...</p>}
+      <h2 className="text-sm font-semibold text-black/55">Version History</h2>
+      {isLoadingVersion && <p className="mt-2 text-xs text-white/40 animate-pulse">Loading version...</p>}
       <div className="mt-3 flex flex-col gap-1">
         {versions.length === 0 ? (
-          <p className="text-xs text-neutral-600">No versions saved yet.</p>
+          <p className="text-xs text-white/40">No versions saved yet.</p>
         ) : (
           versions.map((v) => (
             <button
@@ -434,14 +434,14 @@ export function BrandTruthEditor({
                   handleViewVersion(v.id, v.version);
                 }
               }}
-              className={`w-full rounded-md border px-3 py-2 text-left text-xs transition hover:border-neutral-600 ${
+              className={`w-full rounded-lg border px-3 py-2 text-left text-xs transition hover:border-[--accent]/30 ${
                 (viewingVersion === null && v.version === currentVersion) || viewingVersion === v.version
-                  ? 'border-blue-600 bg-blue-950/30 text-blue-300'
-                  : 'border-neutral-800 text-neutral-500'
+                  ? 'border-[--accent] bg-[--accent]/10 text-[--accent]'
+                  : 'border-white/10 text-white/55'
               }`}
             >
               <span className="font-medium">v{v.version}</span>
-              {v.version === currentVersion && <span className="ml-1 text-neutral-600">(latest)</span>}
+              {v.version === currentVersion && <span className="ml-1 text-white/40">(latest)</span>}
               <span className="ml-2">
                 {v.createdAt.toLocaleDateString('en-US', {
                   month: 'short',

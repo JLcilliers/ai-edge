@@ -3,6 +3,7 @@
 import { useState, useTransition, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { BarChart3 } from 'lucide-react';
 import { startAudit, getAuditRunStatus } from '../../actions/audit-actions';
 
 type Run = {
@@ -21,7 +22,6 @@ export function AuditListClient({ initialRuns }: { initialRuns: Run[] }) {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
-  // Poll for running audit status
   useEffect(() => {
     if (!runningId) return;
     const interval = setInterval(async () => {
@@ -49,42 +49,50 @@ export function AuditListClient({ initialRuns }: { initialRuns: Run[] }) {
   };
 
   return (
-    <div className="mt-6">
+    <div>
       <button
         onClick={handleStartAudit}
         disabled={isPending || !!runningId}
-        className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white transition hover:bg-blue-500 disabled:opacity-50"
+        className="rounded-full bg-[--accent] px-6 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-[--accent-hover] disabled:opacity-50"
       >
         {isPending ? 'Starting...' : runningId ? 'Audit Running...' : 'Run New Audit'}
       </button>
 
-      {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
-
-      {runningId && (
-        <div className="mt-4 flex items-center gap-3 rounded-lg border border-blue-800 bg-blue-950/30 px-4 py-3">
-          <div className="h-3 w-3 animate-pulse rounded-full bg-blue-500" />
-          <span className="text-sm text-blue-300">
-            Audit in progress... polling every 5s
-          </span>
+      {error && (
+        <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/15 p-4 text-sm text-red-400">
+          {error}
         </div>
       )}
 
-      <div className="mt-6 flex flex-col gap-2">
+      {runningId && (
+        <div className="mt-4 flex items-center gap-3 rounded-xl border border-[--accent]/30 bg-[--accent]/10 px-4 py-3">
+          <div className="h-3 w-3 animate-pulse rounded-full bg-[--accent]" />
+          <span className="text-sm text-[--accent]">Audit in progress... polling every 5s</span>
+        </div>
+      )}
+
+      <div className="mt-8 flex flex-col gap-2">
         {runs.length === 0 && !runningId && (
-          <p className="text-sm text-neutral-600">No audits yet. Run your first one!</p>
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <BarChart3 className="mb-4 h-12 w-12 text-white/20" strokeWidth={1.5} />
+            <h3 className="mb-2 text-lg font-semibold text-white/60">No audits yet</h3>
+            <p className="mb-6 max-w-md text-sm text-white/40">
+              Run your first Trust Alignment Audit to see how AI models describe your brand.
+            </p>
+          </div>
         )}
 
         {runs.map((run) => (
           <Link
             key={run.id}
             href={`/dashboard/audits/${run.id}`}
-            className="flex items-center justify-between rounded-lg border border-neutral-800 bg-neutral-900 px-4 py-3 transition hover:border-neutral-700"
+            className="flex items-center justify-between rounded-xl border border-white/10 bg-[--bg-secondary] px-5 py-4 transition-colors hover:border-white/20"
           >
             <div className="flex items-center gap-3">
               <StatusBadge status={run.status} />
               <div>
-                <span className="text-sm font-medium">{run.kind} audit</span>
-                <span className="ml-3 text-xs text-neutral-500">
+                <span className="text-sm font-medium text-white">{run.kind} audit</span>
+                <span className="ml-3 font-[family-name:var(--font-geist-mono)] text-xs text-white/40">
                   {run.startedAt
                     ? new Date(run.startedAt).toLocaleDateString('en-US', {
                         month: 'short',
@@ -96,7 +104,7 @@ export function AuditListClient({ initialRuns }: { initialRuns: Run[] }) {
                 </span>
               </div>
             </div>
-            <span className="text-xs text-neutral-600">{run.id.slice(0, 8)}</span>
+            <span className="font-[family-name:var(--font-geist-mono)] text-xs text-white/30">{run.id.slice(0, 8)}</span>
           </Link>
         ))}
       </div>
@@ -105,16 +113,14 @@ export function AuditListClient({ initialRuns }: { initialRuns: Run[] }) {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const colors: Record<string, string> = {
-    completed: 'bg-green-600',
-    running: 'bg-blue-600 animate-pulse',
-    failed: 'bg-red-600',
-    pending: 'bg-neutral-600',
+  const styles: Record<string, string> = {
+    completed: 'bg-[--rag-green-bg] text-[--rag-green]',
+    running: 'bg-[--accent]/15 text-[--accent] animate-pulse',
+    failed: 'bg-[--rag-red-bg] text-[--rag-red]',
+    pending: 'bg-white/10 text-white/55',
   };
   return (
-    <span
-      className={`inline-block rounded px-2 py-0.5 text-xs font-medium text-white ${colors[status] ?? 'bg-neutral-600'}`}
-    >
+    <span className={`rounded-full px-3 py-1 text-xs font-medium uppercase tracking-wider ${styles[status] ?? 'bg-white/10 text-white/55'}`}>
       {status}
     </span>
   );
