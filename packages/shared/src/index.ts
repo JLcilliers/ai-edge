@@ -1,2 +1,2 @@
-export * from './brand-truth.js';
-export * from './compliance.js';
+export * from './brand-truth';
+export * from './compliance';

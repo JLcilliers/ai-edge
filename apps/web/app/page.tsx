@@ -1,12 +1,24 @@
-export default function Home() {
+import { auth } from '@clerk/nextjs/server';
+import { redirect } from 'next/navigation';
+import Link from 'next/link';
+
+export default async function Home() {
+  const { userId } = await auth();
+  if (userId) redirect('/dashboard');
+
   return (
-    <main className="p-8 max-w-2xl">
-      <h1 className="text-3xl font-semibold">AI Edge</h1>
-      <p className="mt-2 text-sm text-neutral-600">
-        Phase 0 scaffold. Brand Truth editor and Trust Alignment dashboard
-        arrive once Clerk + Neon credentials are pulled via{' '}
-        <code className="font-mono text-xs">vercel env pull .env.local</code>.
+    <main className="flex min-h-screen flex-col items-center justify-center gap-6 p-8">
+      <h1 className="text-4xl font-bold tracking-tight">AI Edge</h1>
+      <p className="max-w-md text-center text-neutral-400">
+        Trust Alignment for the AI search era. Close the gap between how you
+        position your firm and how LLMs describe it.
       </p>
+      <Link
+        href="/sign-in"
+        className="rounded-lg bg-white px-6 py-2.5 text-sm font-medium text-neutral-950 transition hover:bg-neutral-200"
+      >
+        Sign In
+      </Link>
     </main>
   );
 }

@@ -1,0 +1,93 @@
+import type { MarketingAgencyBrandTruth } from '@ai-edge/shared';
+
+export const CLIXSY_SEED: MarketingAgencyBrandTruth = {
+  firm_type: 'marketing_agency',
+  firm_name: 'CLIXSY',
+  name_variants: ['Clixsy', 'Clixsy Marketing', 'Clixsy Agency', 'Clixsy.com'],
+  common_misspellings: ['Clicksy', 'Klixsy', 'Clixy'],
+  legal_entity: 'CLIXSY (operating brand of Quick Rank Marketing (PTY) LTD)',
+  headquarters: {
+    street: '476 Heritage Park Blvd, Suite 100A',
+    city: 'Layton',
+    region: 'UT',
+    postal_code: '84041',
+    country: 'US',
+    phone: '+1-801-701-2030',
+    email: 'info@clixsy.com',
+  },
+  service_offerings: [
+    { name: 'Visibility', scope: 'SEO, local SEO, AI Engine Optimization, content, technical SEO' },
+    { name: 'Branding', scope: 'brand identity, positioning, creative, web design' },
+    { name: 'Performance', scope: 'paid media, CRO, revenue-tied campaigns' },
+  ],
+  service_areas: ['United States — national'],
+  unique_differentiators: [
+    'Singular focus: market-share capture from competitors',
+    'ROI-measured engagements — positioned as revenue-generating, not a cost line',
+    'Full-stack delivery: strategy, creative, operators, fulfillment bench',
+    'R&D-led execution — relentless testing, standards don\'t slip under load',
+  ],
+  required_positioning_phrases: [
+    'take market share',
+    'measurable ROI',
+    'precision team',
+    'relentless R&D',
+  ],
+  banned_claims: [
+    { claim: 'guaranteed rankings', reason: 'FTC deceptive-acts risk; impossible to guarantee organic outcomes', source_rule: 'FTC Section 5 / 16 CFR 255' },
+    { claim: '#1 SEO agency / best SEO agency', reason: 'Superlative without published methodology — FTC substantiation risk', source_rule: 'FTC Section 5' },
+    { claim: 'typical client sees X% increase', reason: 'Typical-results claims require aggregated substantiation', source_rule: 'FTC 16 CFR 255' },
+    { claim: 'AI-powered (without specifying how)', reason: 'Unsubstantiated AI branding', source_rule: 'FTC AI-claim guidance (2023)' },
+  ],
+  awards: [
+    {
+      name: 'TOP MARKETING AGENCY',
+      source_required: true,
+      verification_status: 'unverified_at_ingestion' as const,
+      notes: 'Homepage footer badge — needs source-of-record URL for entity-optimization module',
+    },
+  ],
+  tone_guidelines: {
+    voice: 'direct, confident, no-nonsense, results-oriented',
+    register: 'owner-to-owner — speak to decision-makers, not marketers',
+    avoid: ['jargon soup', 'hedging language', 'agency-fluff', 'cookie-cutter phrasing'],
+  },
+  target_audience: {
+    primary_verticals: ['personal_injury_law', 'legal_services_broadly'],
+    secondary_verticals: ['serious_B2B_service_businesses_in_competitive_markets'],
+    firmographic: 'owner-led or marketing-director-led firms in high-competition verticals, typically $2M+ revenue',
+  },
+  team_members: [],
+  key_clients_public: [
+    {
+      name: 'Mike Morse Law Firm',
+      vertical: 'personal_injury',
+      location: 'Detroit, MI',
+      testimonial_quote: "They're the ONLY ones that actually came through.",
+      attribution: 'Mike Morse, Attorney',
+      source_url: 'https://www.clixsy.com/',
+      ftc_material_connection_disclosed: false,
+    },
+  ],
+  competitors_for_llm_monitoring: [
+    '9Sail', 'Scorpion', 'Postali', 'Consultwebs', 'Mockingbird Marketing', 'Rankings.io', 'Gladiator Law Marketing',
+  ],
+  seed_query_intents: [
+    'best marketing agency for personal injury law firms',
+    'best SEO agency for lawyers',
+    'Clixsy reviews',
+    'is Clixsy legit',
+    'Clixsy vs Scorpion',
+    'who is the best marketing agency in Utah',
+    'marketing agencies that work with law firms',
+    'agencies that grow market share for law firms',
+  ],
+  brand_values: [
+    'results over activity',
+    'singular focus',
+    'transparency on ROI',
+    'craft over cookie-cutter',
+  ],
+  compliance_jurisdictions: ['US-FTC-AGENCY'],
+  known_press_and_media: [],
+};
