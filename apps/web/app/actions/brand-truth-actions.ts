@@ -1,7 +1,7 @@
 'use server';
 
 import { getDb, firms, brandTruthVersions } from '@ai-edge/db';
-import { brandTruthSchema, type BrandTruth } from '@ai-edge/shared';
+import { brandTruthSchema, type BrandTruth, validateClaims } from '@ai-edge/shared';
 import { eq, desc, and, sql } from 'drizzle-orm';
 
 const DOGFOOD_FIRM_SLUG = 'clixsy';
@@ -102,11 +102,39 @@ export async function getBrandTruthVersion(versionId: string): Promise<{
 // Save a new Brand Truth version
 export async function saveBrandTruth(
   rawPayload: unknown,
-): Promise<{ success: true; version: number } | { success: false; error: string }> {
+): Promise<
+  | { success: true; version: number }
+  | { success: false; error: string }
+  | { success: false; error: string; complianceViolations: Array<{ jurisdiction: string; match: string; reason: string }> }
+> {
   // Validate against Zod schema
   const parsed = brandTruthSchema.safeParse(rawPayload);
   if (!parsed.success) {
     return { success: false, error: parsed.error.message };
+  }
+
+  // Run compliance checks against the banned-claims rulebook
+  const jurisdictions = parsed.data.compliance_jurisdictions ?? [];
+  if (jurisdictions.length > 0) {
+    // Check all text fields that could contain banned claims
+    const textToCheck = [
+      parsed.data.firm_name,
+      ...(parsed.data.unique_differentiators ?? []),
+      ...(parsed.data.required_positioning_phrases ?? []),
+    ].join(' ');
+
+    const hits = validateClaims(textToCheck, jurisdictions);
+    if (hits.length > 0) {
+      return {
+        success: false,
+        error: `Compliance violations found: ${hits.map(h => h.match).join(', ')}`,
+        complianceViolations: hits.map(h => ({
+          jurisdiction: h.jurisdiction,
+          match: h.match,
+          reason: h.pattern.reason,
+        })),
+      };
+    }
   }
 
   const db = getDb();

@@ -12,6 +12,7 @@ type Result = {
   toneScore: number | null;
   ragLabel: string;
   gapReasons: string[];
+  factualErrors: string[];
   citationUrls: string[];
   responsePreview: string;
   fullResponse: string;
@@ -175,6 +176,16 @@ export function AuditDetailClient({
                     <ul className="mt-1 list-inside list-disc text-xs text-yellow-300">
                       {r.gapReasons.map((g, j) => (
                         <li key={j}>{g}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {r.factualErrors.length > 0 && (
+                  <div className="mb-3">
+                    <span className="text-xs font-medium text-neutral-400">Factual Errors:</span>
+                    <ul className="mt-1 list-inside list-disc text-xs text-red-300">
+                      {r.factualErrors.map((e, j) => (
+                        <li key={j}>{e}</li>
                       ))}
                     </ul>
                   </div>

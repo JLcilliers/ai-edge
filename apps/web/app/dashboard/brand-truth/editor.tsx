@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import type { BrandTruth } from '@ai-edge/shared';
-import { saveBrandTruth } from '../../actions/brand-truth-actions';
+import { saveBrandTruth, getBrandTruthVersion } from '../../actions/brand-truth-actions';
 
 // ── Collapsible Section ───────────────────────────────────
 function Section({
@@ -97,19 +97,42 @@ function StringArray({
 export function BrandTruthEditor({
   initialPayload,
   currentVersion,
+  versions,
 }: {
   initialPayload: BrandTruth;
   currentVersion: number;
+  versions: Array<{ id: string; version: number; createdAt: Date }>;
 }) {
   const [data, setData] = useState<Record<string, any>>(initialPayload as any);
   const [isPending, startTransition] = useTransition();
   const [saveResult, setSaveResult] = useState<string | null>(null);
+  const [complianceViolations, setComplianceViolations] = useState<Array<{ jurisdiction: string; match: string; reason: string }>>([]);
+  const [viewingVersion, setViewingVersion] = useState<number | null>(null); // null = editing latest
+  const [isLoadingVersion, setIsLoadingVersion] = useState(false);
   const router = useRouter();
+
+  const isReadOnly = viewingVersion !== null;
+
+  const handleViewVersion = async (versionId: string, versionNum: number) => {
+    setIsLoadingVersion(true);
+    const result = await getBrandTruthVersion(versionId);
+    if (result) {
+      setData(result.payload as any);
+      setViewingVersion(versionNum);
+    }
+    setIsLoadingVersion(false);
+  };
+
+  const handleBackToCurrent = () => {
+    setData(initialPayload as any);
+    setViewingVersion(null);
+  };
 
   const set = (key: string, value: any) => setData((prev) => ({ ...prev, [key]: value }));
 
   const handleSave = () => {
     setSaveResult(null);
+    setComplianceViolations([]);
     startTransition(async () => {
       const result = await saveBrandTruth(data);
       if (result.success) {
@@ -117,18 +140,29 @@ export function BrandTruthEditor({
         router.refresh();
       } else {
         setSaveResult(`Error: ${result.error}`);
+        if ('complianceViolations' in result && result.complianceViolations) {
+          setComplianceViolations(result.complianceViolations);
+        }
       }
     });
   };
 
   return (
+    <div className="mt-6 flex gap-6">
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        handleSave();
+        if (!isReadOnly) handleSave();
       }}
-      className="mt-6 flex flex-col gap-4"
+      className={`flex flex-1 flex-col gap-4 ${isReadOnly ? 'opacity-80' : ''}`}
     >
+      {/* Read-only banner */}
+      {isReadOnly && (
+        <div className="flex items-center justify-between rounded-lg border border-yellow-800 bg-yellow-950/30 px-4 py-3">
+          <span className="text-sm text-yellow-300">Viewing version {viewingVersion} (read-only)</span>
+          <button type="button" onClick={handleBackToCurrent} className="rounded-md bg-yellow-600 px-3 py-1 text-xs font-medium text-black hover:bg-yellow-500">Back to Current Version</button>
+        </div>
+      )}
       {/* Core identity */}
       <Section title="Core Identity" defaultOpen>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -295,6 +329,48 @@ export function BrandTruthEditor({
         </div>
       </Section>
 
+      {/* Key Clients (Public) */}
+      <Section title="Key Clients (Public)">
+        {(data.key_clients_public ?? []).map((kc: any, i: number) => (
+          <div key={i} className="mb-3 rounded border border-neutral-800 p-3">
+            <div className="grid gap-2 sm:grid-cols-2">
+              <input placeholder="Client Name" value={kc.name ?? ''} onChange={(e) => { const copy = [...(data.key_clients_public ?? [])]; copy[i] = { ...copy[i], name: e.target.value }; set('key_clients_public', copy); }} className="rounded-md border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-100 focus:border-blue-600 focus:outline-none" />
+              <input placeholder="Vertical" value={kc.vertical ?? ''} onChange={(e) => { const copy = [...(data.key_clients_public ?? [])]; copy[i] = { ...copy[i], vertical: e.target.value }; set('key_clients_public', copy); }} className="rounded-md border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-100 focus:border-blue-600 focus:outline-none" />
+              <input placeholder="Location" value={kc.location ?? ''} onChange={(e) => { const copy = [...(data.key_clients_public ?? [])]; copy[i] = { ...copy[i], location: e.target.value }; set('key_clients_public', copy); }} className="rounded-md border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-100 focus:border-blue-600 focus:outline-none" />
+              <input placeholder="Attribution" value={kc.attribution ?? ''} onChange={(e) => { const copy = [...(data.key_clients_public ?? [])]; copy[i] = { ...copy[i], attribution: e.target.value }; set('key_clients_public', copy); }} className="rounded-md border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-100 focus:border-blue-600 focus:outline-none" />
+              <input placeholder="Source URL" value={kc.source_url ?? ''} onChange={(e) => { const copy = [...(data.key_clients_public ?? [])]; copy[i] = { ...copy[i], source_url: e.target.value }; set('key_clients_public', copy); }} className="col-span-2 rounded-md border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-100 focus:border-blue-600 focus:outline-none" />
+            </div>
+            <textarea placeholder="Testimonial Quote" value={kc.testimonial_quote ?? ''} onChange={(e) => { const copy = [...(data.key_clients_public ?? [])]; copy[i] = { ...copy[i], testimonial_quote: e.target.value }; set('key_clients_public', copy); }} rows={2} className="mt-2 w-full rounded-md border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-100 focus:border-blue-600 focus:outline-none" />
+            <button type="button" onClick={() => set('key_clients_public', (data.key_clients_public ?? []).filter((_: any, j: number) => j !== i))} className="mt-1 text-xs text-red-400 hover:text-red-300">Remove</button>
+          </div>
+        ))}
+        <button type="button" onClick={() => set('key_clients_public', [...(data.key_clients_public ?? []), { name: '', vertical: '', location: '', testimonial_quote: '', attribution: '', source_url: '' }])} className="rounded-md border border-dashed border-neutral-700 px-3 py-1 text-xs text-neutral-500 hover:border-neutral-500 hover:text-neutral-300">+ Add Client</button>
+      </Section>
+
+      {/* Awards & Badges */}
+      <Section title="Awards & Badges">
+        {(data.awards ?? []).map((aw: any, i: number) => (
+          <div key={i} className="mb-3 rounded border border-neutral-800 p-3">
+            <div className="grid gap-2 sm:grid-cols-2">
+              <input placeholder="Award Name" value={aw.name ?? ''} onChange={(e) => { const copy = [...(data.awards ?? [])]; copy[i] = { ...copy[i], name: e.target.value }; set('awards', copy); }} className="rounded-md border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-100 focus:border-blue-600 focus:outline-none" />
+              <select value={aw.verification_status ?? 'unverified_at_ingestion'} onChange={(e) => { const copy = [...(data.awards ?? [])]; copy[i] = { ...copy[i], verification_status: e.target.value }; set('awards', copy); }} className="rounded-md border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-100 focus:border-blue-600 focus:outline-none">
+                <option value="unverified_at_ingestion">Unverified</option>
+                <option value="verified">Verified</option>
+                <option value="pending">Pending</option>
+              </select>
+              <input placeholder="Source URL" value={aw.source_url ?? ''} onChange={(e) => { const copy = [...(data.awards ?? [])]; copy[i] = { ...copy[i], source_url: e.target.value }; set('awards', copy); }} className="rounded-md border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-100 focus:border-blue-600 focus:outline-none" />
+              <label className="flex items-center gap-2 text-xs text-neutral-400">
+                <input type="checkbox" checked={aw.source_required ?? true} onChange={(e) => { const copy = [...(data.awards ?? [])]; copy[i] = { ...copy[i], source_required: e.target.checked }; set('awards', copy); }} className="rounded border-neutral-600" />
+                Source Required
+              </label>
+            </div>
+            <textarea placeholder="Notes" value={aw.notes ?? ''} onChange={(e) => { const copy = [...(data.awards ?? [])]; copy[i] = { ...copy[i], notes: e.target.value }; set('awards', copy); }} rows={2} className="mt-2 w-full rounded-md border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-100 focus:border-blue-600 focus:outline-none" />
+            <button type="button" onClick={() => set('awards', (data.awards ?? []).filter((_: any, j: number) => j !== i))} className="mt-1 text-xs text-red-400 hover:text-red-300">Remove</button>
+          </div>
+        ))}
+        <button type="button" onClick={() => set('awards', [...(data.awards ?? []), { name: '', source_url: '', source_required: true, verification_status: 'unverified_at_ingestion', notes: '' }])} className="rounded-md border border-dashed border-neutral-700 px-3 py-1 text-xs text-neutral-500 hover:border-neutral-500 hover:text-neutral-300">+ Add Award</button>
+      </Section>
+
       {/* Service Areas */}
       <Section title="Service Areas & Compliance">
         <StringArray label="Service Areas" items={data.service_areas ?? []} onChange={(v) => set('service_areas', v)} />
@@ -303,21 +379,82 @@ export function BrandTruthEditor({
         </div>
       </Section>
 
-      {/* Save */}
-      <div className="sticky bottom-0 flex items-center gap-4 border-t border-neutral-800 bg-neutral-950 py-4">
-        <button
-          type="submit"
-          disabled={isPending}
-          className="rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-medium text-white transition hover:bg-blue-500 disabled:opacity-50"
-        >
-          {isPending ? 'Saving...' : 'Save New Version'}
-        </button>
-        {saveResult && (
-          <span className={`text-sm ${saveResult.startsWith('Error') ? 'text-red-400' : 'text-green-400'}`}>
-            {saveResult}
-          </span>
+      {/* Save (hidden in read-only mode) */}
+      {!isReadOnly && (
+        <div className="sticky bottom-0 flex items-center gap-4 border-t border-neutral-800 bg-neutral-950 py-4">
+          <button
+            type="submit"
+            disabled={isPending}
+            className="rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-medium text-white transition hover:bg-blue-500 disabled:opacity-50"
+          >
+            {isPending ? 'Saving...' : 'Save New Version'}
+          </button>
+          {saveResult && (
+            <span className={`text-sm ${saveResult.startsWith('Error') ? 'text-red-400' : 'text-green-400'}`}>
+              {saveResult}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Compliance violations */}
+      {complianceViolations.length > 0 && (
+        <div className="rounded-lg border border-red-800 bg-red-950/30 p-4">
+          <h3 className="text-sm font-medium text-red-300">Compliance Violations Detected</h3>
+          <p className="mt-1 text-xs text-red-400">Fix these before saving. The following text matches banned-claim patterns:</p>
+          <ul className="mt-2 flex flex-col gap-2">
+            {complianceViolations.map((v, i) => (
+              <li key={i} className="rounded border border-red-900 bg-red-950/50 p-2 text-xs">
+                <span className="font-medium text-red-300">Match: &quot;{v.match}&quot;</span>
+                <span className="ml-2 text-neutral-500">[{v.jurisdiction}]</span>
+                <p className="mt-1 text-red-400">{v.reason}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </form>
+
+    {/* Version history sidebar */}
+    <aside className="w-64 shrink-0">
+      <h2 className="text-sm font-medium text-neutral-400">Version History</h2>
+      {isLoadingVersion && <p className="mt-2 text-xs text-neutral-600 animate-pulse">Loading version...</p>}
+      <div className="mt-3 flex flex-col gap-1">
+        {versions.length === 0 ? (
+          <p className="text-xs text-neutral-600">No versions saved yet.</p>
+        ) : (
+          versions.map((v) => (
+            <button
+              key={v.id}
+              type="button"
+              onClick={() => {
+                if (v.version === currentVersion && viewingVersion !== null) {
+                  handleBackToCurrent();
+                } else if (v.version !== currentVersion) {
+                  handleViewVersion(v.id, v.version);
+                }
+              }}
+              className={`w-full rounded-md border px-3 py-2 text-left text-xs transition hover:border-neutral-600 ${
+                (viewingVersion === null && v.version === currentVersion) || viewingVersion === v.version
+                  ? 'border-blue-600 bg-blue-950/30 text-blue-300'
+                  : 'border-neutral-800 text-neutral-500'
+              }`}
+            >
+              <span className="font-medium">v{v.version}</span>
+              {v.version === currentVersion && <span className="ml-1 text-neutral-600">(latest)</span>}
+              <span className="ml-2">
+                {v.createdAt.toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </span>
+            </button>
+          ))
         )}
       </div>
-    </form>
+    </aside>
+    </div>
   );
 }

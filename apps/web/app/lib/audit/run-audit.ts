@@ -7,6 +7,7 @@ import {
   alignmentScores,
   citations as citationsTable,
   brandTruthVersions,
+  remediationTickets,
 } from '@ai-edge/db';
 import type { BrandTruth } from '@ai-edge/shared';
 import { eq } from 'drizzle-orm';
@@ -101,17 +102,30 @@ export async function runAudit(firmId: string, brandTruthVersionId: string): Pro
 
             const consensusId = consensus!.id;
 
-            // Store alignment score
-            await db.insert(alignmentScores).values({
+            // Store alignment score (including factual errors from the judge)
+            const [alignmentRow] = await db.insert(alignmentScores).values({
               consensus_response_id: consensusId,
               mentioned: score.mentioned,
               tone_1_10: score.tone_score,
               rag_label: score.remediation_priority,
               gap_reasons: score.gap_reasons,
+              factual_errors: score.factual_accuracy?.errors ?? [],
               remediation_priority:
                 score.remediation_priority === 'red' ? 1 :
                 score.remediation_priority === 'yellow' ? 2 : 3,
-            });
+            }).returning({ id: alignmentScores.id });
+
+            // Create remediation ticket for Red results
+            if (score.remediation_priority === 'red' && alignmentRow) {
+              await db.insert(remediationTickets).values({
+                firm_id: firmId,
+                source_type: 'audit',
+                source_id: alignmentRow.id,
+                status: 'open',
+                playbook_step: 'initial_triage',
+                due_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+              });
+            }
 
             // Store citations
             if (score.citations.length > 0) {

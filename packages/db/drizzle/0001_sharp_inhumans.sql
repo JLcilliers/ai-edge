@@ -1,0 +1,1 @@
+ALTER TABLE "alignment_score" ADD COLUMN "factual_errors" jsonb DEFAULT '[]'::jsonb;

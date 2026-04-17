@@ -85,6 +85,7 @@ export const alignmentScores = pgTable('alignment_score', {
   tone_1_10: real('tone_1_10'),
   rag_label: text('rag_label').notNull(), // 'red' | 'yellow' | 'green'
   gap_reasons: jsonb('gap_reasons').$type<string[]>().default([]),
+  factual_errors: jsonb('factual_errors').$type<string[]>().default([]),
   remediation_priority: integer('remediation_priority').default(3),
 });
 

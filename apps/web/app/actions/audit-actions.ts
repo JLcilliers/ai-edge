@@ -108,6 +108,7 @@ export async function getAuditDetail(auditRunId: string): Promise<{
     toneScore: number | null;
     ragLabel: string;
     gapReasons: string[];
+    factualErrors: string[];
     citationUrls: string[];
     responsePreview: string;
     fullResponse: string;
@@ -144,19 +145,30 @@ export async function getAuditDetail(auditRunId: string): Promise<{
     toneScore: number | null;
     ragLabel: string;
     gapReasons: string[];
+    factualErrors: string[];
     citationUrls: string[];
     responsePreview: string;
     fullResponse: string;
   }> = [];
 
   for (const q of queryRows) {
-    // Get consensus responses for this query
+    // Get all model responses for this query (ordered by creation = insertion order)
+    const mrRows = await db
+      .select()
+      .from(modelResponses)
+      .where(eq(modelResponses.query_id, q.id));
+
+    // Get all consensus responses for this query (same insertion order as providers)
     const consensusRows = await db
       .select()
       .from(consensusResponses)
       .where(eq(consensusResponses.query_id, q.id));
 
-    for (const cr of consensusRows) {
+    // Match consensus to model_response by index (both inserted per-provider in same order)
+    for (let idx = 0; idx < consensusRows.length; idx++) {
+      const cr = consensusRows[idx]!;
+      const matchedMr = mrRows[idx]; // direct index match — both created in provider loop order
+
       // Get alignment score
       const [score] = await db
         .select()
@@ -170,22 +182,6 @@ export async function getAuditDetail(auditRunId: string): Promise<{
         .from(citationsTable)
         .where(eq(citationsTable.consensus_response_id, cr.id));
 
-      // Get model response to find provider info
-      const [mr] = await db
-        .select()
-        .from(modelResponses)
-        .where(eq(modelResponses.query_id, q.id))
-        .limit(1);
-
-      // Try to match consensus to a model response by looking at all responses for this query
-      const allMr = await db
-        .select()
-        .from(modelResponses)
-        .where(eq(modelResponses.query_id, q.id));
-
-      // Match by index (consensus responses are created per provider call)
-      const matchedMr = allMr[results.filter((r) => r.queryText === q.text).length];
-
       const fullResponse = cr.majority_answer ?? '';
 
       results.push({
@@ -196,6 +192,7 @@ export async function getAuditDetail(auditRunId: string): Promise<{
         toneScore: score?.tone_1_10 ?? null,
         ragLabel: score?.rag_label ?? 'red',
         gapReasons: (score?.gap_reasons as string[]) ?? [],
+        factualErrors: (score?.factual_errors as string[]) ?? [],
         citationUrls: cites.map((c) => c.url),
         responsePreview: fullResponse.slice(0, 200),
         fullResponse,
@@ -228,7 +225,7 @@ export async function exportAuditCsv(auditRunId: string): Promise<string> {
       r.ragLabel,
       escape(r.gapReasons.join('|')),
       escape(r.citationUrls.join('|')),
-      '', // factual_errors not stored separately yet
+      escape(r.factualErrors.join('|')),
       escape(r.responsePreview),
     ].join(',');
   });
