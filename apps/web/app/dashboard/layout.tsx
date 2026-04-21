@@ -1,11 +1,12 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import { LayoutDashboard, FileText, BarChart3, AlertTriangle } from 'lucide-react';
+import { LayoutDashboard, FileText, BarChart3, MessageSquare, AlertTriangle } from 'lucide-react';
 
 const navItems = [
   { href: '/dashboard' as const, label: 'Overview', icon: LayoutDashboard },
   { href: '/dashboard/brand-truth' as const, label: 'Brand Truth', icon: FileText },
   { href: '/dashboard/audits' as const, label: 'Audits', icon: BarChart3 },
+  { href: '/dashboard/reddit' as const, label: 'Reddit', icon: MessageSquare },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
