@@ -10,12 +10,14 @@ import {
   Megaphone,
   HelpCircle,
   Building2,
+  Wrench,
 } from 'lucide-react';
 import {
   getFirmBySlug,
   getFirmSummary,
   type FirmType,
 } from '../../actions/firm-actions';
+import { getOpenTicketCount } from '../../actions/remediation-actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -51,7 +53,10 @@ export default async function FirmOverviewPage({
   const firm = await getFirmBySlug(firmSlug);
   if (!firm) notFound();
 
-  const summary = await getFirmSummary(firmSlug).catch(() => null);
+  const [summary, openTicketCount] = await Promise.all([
+    getFirmSummary(firmSlug).catch(() => null),
+    getOpenTicketCount(firmSlug).catch(() => 0),
+  ]);
   const Icon = FIRM_TYPE_ICON[firm.firm_type];
 
   return (
@@ -102,9 +107,13 @@ export default async function FirmOverviewPage({
           detail={summary?.lastRedditScan?.status ?? 'no scans yet'}
         />
         <StatTile
-          label="Reddit Mentions"
-          value={String(summary?.redditMentionCount ?? 0)}
-          detail="across all scans"
+          label="Open Tickets"
+          value={String(openTicketCount)}
+          detail={
+            openTicketCount > 0
+              ? 'needs triage'
+              : `${summary?.redditMentionCount ?? 0} Reddit mentions logged`
+          }
         />
       </div>
 
@@ -112,7 +121,7 @@ export default async function FirmOverviewPage({
       <h2 className="mb-4 font-[family-name:var(--font-jakarta)] text-sm font-semibold uppercase tracking-widest text-white/55">
         Modules
       </h2>
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <ModuleCard
           href={`/dashboard/${firmSlug}/brand-truth`}
           icon={FileText}
@@ -137,6 +146,13 @@ export default async function FirmOverviewPage({
           title="Reddit Sentiment"
           description="What Redditors say about this client, and what prospects are asking. High-weight LLM citation source."
           cta="Scan & review mentions"
+        />
+        <ModuleCard
+          href={`/dashboard/${firmSlug}/remediation`}
+          icon={Wrench}
+          title="Remediation Queue"
+          description="Every red audit finding and complaint-karma Reddit post auto-opens a ticket. Triage and close them here."
+          cta={openTicketCount > 0 ? `${openTicketCount} open` : 'No open tickets'}
         />
       </div>
     </div>

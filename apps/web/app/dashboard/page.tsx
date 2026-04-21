@@ -2,6 +2,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Plus, Building2, Scale, Stethoscope, Megaphone, HelpCircle } from 'lucide-react';
 import { listFirms, getFirmSummary, type FirmType } from '../actions/firm-actions';
+import { getOpenTicketCount } from '../actions/remediation-actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,10 +23,13 @@ const FIRM_TYPE_ICON: Record<FirmType, typeof Building2> = {
 export default async function ClientListPage() {
   const firms = await listFirms();
   const summaries = await Promise.all(
-    firms.map(async (f) => ({
-      firm: f,
-      summary: await getFirmSummary(f.slug).catch(() => null),
-    })),
+    firms.map(async (f) => {
+      const [summary, openTicketCount] = await Promise.all([
+        getFirmSummary(f.slug).catch(() => null),
+        getOpenTicketCount(f.slug).catch(() => 0),
+      ]);
+      return { firm: f, summary, openTicketCount };
+    }),
   );
 
   return (
@@ -84,7 +88,7 @@ export default async function ClientListPage() {
       {/* Client cards */}
       {firms.length > 0 && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {summaries.map(({ firm, summary }) => {
+          {summaries.map(({ firm, summary, openTicketCount }) => {
             const Icon = FIRM_TYPE_ICON[firm.firm_type];
             return (
               <Link
@@ -151,10 +155,14 @@ export default async function ClientListPage() {
                   </div>
                   <div>
                     <div className="text-[10px] uppercase tracking-wider text-white/40">
-                      Mentions
+                      Open Tickets
                     </div>
-                    <div className="mt-0.5 text-white/70">
-                      {summary?.redditMentionCount ?? 0}
+                    <div
+                      className={`mt-0.5 ${
+                        openTicketCount > 0 ? 'text-[--rag-red]' : 'text-white/70'
+                      }`}
+                    >
+                      {openTicketCount}
                     </div>
                   </div>
                 </div>
