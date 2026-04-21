@@ -5,6 +5,7 @@ dist/
 build/
 .turbo/
 coverage/
+*.tsbuildinfo
 
 # Python
 .venv/

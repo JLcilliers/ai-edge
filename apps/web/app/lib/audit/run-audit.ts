@@ -13,6 +13,7 @@ import type { BrandTruth } from '@ai-edge/shared';
 import { eq } from 'drizzle-orm';
 import { queryOpenAI } from './providers/openai';
 import { queryAnthropic } from './providers/anthropic';
+import { queryOpenRouter } from './providers/openrouter';
 import { scoreAlignment } from './scoring/alignment-scorer';
 
 export async function runAudit(firmId: string, brandTruthVersionId: string): Promise<string> {
@@ -61,11 +62,13 @@ export async function runAudit(firmId: string, brandTruthVersionId: string): Pro
 
       const queryId = queryRow!.id;
 
-      // Fan out to providers in parallel
+      // Fan out to providers in parallel. OpenRouter adds Gemini (and future
+      // models) without another SDK — opt in by setting OPENROUTER_API_KEY.
       const providers = [
-        { name: 'openai', fn: queryOpenAI },
-        { name: 'anthropic', fn: queryAnthropic },
-      ] as const;
+        { name: 'openai', fn: queryOpenAI, enabled: !!process.env.OPENAI_API_KEY },
+        { name: 'anthropic', fn: queryAnthropic, enabled: !!process.env.ANTHROPIC_API_KEY },
+        { name: 'openrouter', fn: queryOpenRouter, enabled: !!process.env.OPENROUTER_API_KEY },
+      ].filter((p) => p.enabled);
 
       const results = await Promise.allSettled(
         providers.map(async (provider) => {
