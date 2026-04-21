@@ -2,35 +2,22 @@
 
 import { getDb, firms, brandTruthVersions } from '@ai-edge/db';
 import { brandTruthSchema, type BrandTruth, validateClaims } from '@ai-edge/shared';
-import { eq, desc, and, sql } from 'drizzle-orm';
+import { eq, desc, sql } from 'drizzle-orm';
 
-const DOGFOOD_FIRM_SLUG = 'clixsy';
-
-// Ensure the dogfood firm exists; return its id
-async function ensureFirm(): Promise<string> {
+/** Resolve firm id from URL slug. Throws if the slug doesn't match a firm. */
+async function resolveFirmId(slug: string): Promise<string> {
   const db = getDb();
-  const existing = await db
+  const [firm] = await db
     .select({ id: firms.id })
     .from(firms)
-    .where(eq(firms.slug, DOGFOOD_FIRM_SLUG))
+    .where(eq(firms.slug, slug))
     .limit(1);
-
-  if (existing.length > 0) return existing[0]!.id;
-
-  const [created] = await db
-    .insert(firms)
-    .values({
-      slug: DOGFOOD_FIRM_SLUG,
-      name: 'CLIXSY',
-      firm_type: 'marketing_agency',
-    })
-    .returning({ id: firms.id });
-
-  return created!.id;
+  if (!firm) throw new Error(`Firm not found: ${slug}`);
+  return firm.id;
 }
 
-// Get the latest Brand Truth version for the dogfood firm
-export async function getLatestBrandTruth(): Promise<{
+// Get the latest Brand Truth version for a specific client.
+export async function getLatestBrandTruth(firmSlug: string): Promise<{
   firmId: string;
   version: number;
   versionId: string;
@@ -38,7 +25,7 @@ export async function getLatestBrandTruth(): Promise<{
   createdAt: Date;
 } | null> {
   const db = getDb();
-  const firmId = await ensureFirm();
+  const firmId = await resolveFirmId(firmSlug);
 
   const rows = await db
     .select()
@@ -59,12 +46,12 @@ export async function getLatestBrandTruth(): Promise<{
   };
 }
 
-// Get all versions (for history sidebar)
-export async function getBrandTruthVersions(): Promise<
-  Array<{ id: string; version: number; createdAt: Date }>
-> {
+// Get all versions (for history sidebar).
+export async function getBrandTruthVersions(
+  firmSlug: string,
+): Promise<Array<{ id: string; version: number; createdAt: Date }>> {
   const db = getDb();
-  const firmId = await ensureFirm();
+  const firmId = await resolveFirmId(firmSlug);
 
   return db
     .select({
@@ -77,7 +64,7 @@ export async function getBrandTruthVersions(): Promise<
     .orderBy(desc(brandTruthVersions.version));
 }
 
-// Get a specific version by id
+// Get a specific version by id. Version id is globally unique, no firm scope needed.
 export async function getBrandTruthVersion(versionId: string): Promise<{
   version: number;
   payload: BrandTruth;
@@ -99,13 +86,22 @@ export async function getBrandTruthVersion(versionId: string): Promise<{
   };
 }
 
-// Save a new Brand Truth version
+// Save a new Brand Truth version for a specific client.
 export async function saveBrandTruth(
+  firmSlug: string,
   rawPayload: unknown,
 ): Promise<
   | { success: true; version: number }
   | { success: false; error: string }
-  | { success: false; error: string; complianceViolations: Array<{ jurisdiction: string; match: string; reason: string }> }
+  | {
+      success: false;
+      error: string;
+      complianceViolations: Array<{
+        jurisdiction: string;
+        match: string;
+        reason: string;
+      }>;
+    }
 > {
   // Validate against Zod schema
   const parsed = brandTruthSchema.safeParse(rawPayload);
@@ -127,8 +123,8 @@ export async function saveBrandTruth(
     if (hits.length > 0) {
       return {
         success: false,
-        error: `Compliance violations found: ${hits.map(h => h.match).join(', ')}`,
-        complianceViolations: hits.map(h => ({
+        error: `Compliance violations found: ${hits.map((h) => h.match).join(', ')}`,
+        complianceViolations: hits.map((h) => ({
           jurisdiction: h.jurisdiction,
           match: h.match,
           reason: h.pattern.reason,
@@ -138,11 +134,13 @@ export async function saveBrandTruth(
   }
 
   const db = getDb();
-  const firmId = await ensureFirm();
+  const firmId = await resolveFirmId(firmSlug);
 
   // Get the next version number for this firm
   const maxVersionResult = await db
-    .select({ maxVersion: sql<number>`coalesce(max(${brandTruthVersions.version}), 0)` })
+    .select({
+      maxVersion: sql<number>`coalesce(max(${brandTruthVersions.version}), 0)`,
+    })
     .from(brandTruthVersions)
     .where(eq(brandTruthVersions.firm_id, firmId));
 
