@@ -7,7 +7,7 @@ import {
   startRedditScan,
   getRedditScanStatus,
   type RedditMentionRow,
-} from '../../actions/reddit-actions';
+} from '../../../actions/reddit-actions';
 
 type LatestRun = {
   id: string;
@@ -18,9 +18,11 @@ type LatestRun = {
 } | null;
 
 export function RedditListClient({
+  firmSlug,
   initialMentions,
   initialLatestRun,
 }: {
+  firmSlug: string;
   initialMentions: RedditMentionRow[];
   initialLatestRun: LatestRun;
 }) {
@@ -48,7 +50,7 @@ export function RedditListClient({
   const handleStartScan = () => {
     setError(null);
     startTransition(async () => {
-      const result = await startRedditScan();
+      const result = await startRedditScan(firmSlug);
       if ('error' in result) {
         setError(result.error);
       } else {

@@ -11,27 +11,28 @@ import {
   modelResponses,
   brandTruthVersions,
 } from '@ai-edge/db';
-import { eq, desc, and, sql } from 'drizzle-orm';
+import { eq, desc } from 'drizzle-orm';
 import { runAudit } from '../lib/audit/run-audit';
 
-const DOGFOOD_FIRM_SLUG = 'clixsy';
-
-async function getFirmId(): Promise<string> {
+/** Resolve firm id from URL slug. Throws if the slug doesn't match a firm. */
+async function resolveFirmId(slug: string): Promise<string> {
   const db = getDb();
   const [firm] = await db
     .select({ id: firms.id })
     .from(firms)
-    .where(eq(firms.slug, DOGFOOD_FIRM_SLUG))
+    .where(eq(firms.slug, slug))
     .limit(1);
-  if (!firm) throw new Error('Dogfood firm not found — save a Brand Truth first');
+  if (!firm) throw new Error(`Firm not found: ${slug}`);
   return firm.id;
 }
 
-// Start a new audit
-export async function startAudit(): Promise<{ auditRunId: string } | { error: string }> {
+// Start a new audit for a specific client.
+export async function startAudit(
+  firmSlug: string,
+): Promise<{ auditRunId: string } | { error: string }> {
   try {
     const db = getDb();
-    const firmId = await getFirmId();
+    const firmId = await resolveFirmId(firmSlug);
 
     // Get latest brand truth version
     const [btv] = await db
@@ -51,7 +52,7 @@ export async function startAudit(): Promise<{ auditRunId: string } | { error: st
 }
 
 // Get all audit runs for the firm
-export async function getAuditRuns(): Promise<
+export async function getAuditRuns(firmSlug: string): Promise<
   Array<{
     id: string;
     status: string;
@@ -62,7 +63,7 @@ export async function getAuditRuns(): Promise<
   }>
 > {
   const db = getDb();
-  const firmId = await getFirmId();
+  const firmId = await resolveFirmId(firmSlug);
 
   return db
     .select({
@@ -78,7 +79,7 @@ export async function getAuditRuns(): Promise<
     .orderBy(desc(auditRuns.started_at));
 }
 
-// Get audit run status (for polling)
+// Get audit run status (for polling). Audit-run id is globally unique, no firm scope needed.
 export async function getAuditRunStatus(auditRunId: string): Promise<{
   status: string;
   error: string | null;
@@ -92,7 +93,7 @@ export async function getAuditRunStatus(auditRunId: string): Promise<{
   return run ?? { status: 'unknown', error: null };
 }
 
-// Get audit detail with all results
+// Get audit detail with all results. Audit-run id is globally unique.
 export async function getAuditDetail(auditRunId: string): Promise<{
   run: {
     id: string;

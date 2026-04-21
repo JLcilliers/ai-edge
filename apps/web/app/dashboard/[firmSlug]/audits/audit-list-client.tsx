@@ -4,7 +4,7 @@ import { useState, useTransition, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { BarChart3 } from 'lucide-react';
-import { startAudit, getAuditRunStatus } from '../../actions/audit-actions';
+import { startAudit, getAuditRunStatus } from '../../../actions/audit-actions';
 
 type Run = {
   id: string;
@@ -15,7 +15,13 @@ type Run = {
   error: string | null;
 };
 
-export function AuditListClient({ initialRuns }: { initialRuns: Run[] }) {
+export function AuditListClient({
+  firmSlug,
+  initialRuns,
+}: {
+  firmSlug: string;
+  initialRuns: Run[];
+}) {
   const [runs, setRuns] = useState(initialRuns);
   const [isPending, startTransition] = useTransition();
   const [runningId, setRunningId] = useState<string | null>(null);
@@ -38,7 +44,7 @@ export function AuditListClient({ initialRuns }: { initialRuns: Run[] }) {
   const handleStartAudit = () => {
     setError(null);
     startTransition(async () => {
-      const result = await startAudit();
+      const result = await startAudit(firmSlug);
       if ('error' in result) {
         setError(result.error);
       } else {
@@ -85,7 +91,7 @@ export function AuditListClient({ initialRuns }: { initialRuns: Run[] }) {
         {runs.map((run) => (
           <Link
             key={run.id}
-            href={`/dashboard/audits/${run.id}`}
+            href={`/dashboard/${firmSlug}/audits/${run.id}`}
             className="flex items-center justify-between rounded-xl border border-white/10 bg-[--bg-secondary] px-5 py-4 transition-colors hover:border-white/20"
           >
             <div className="flex items-center gap-3">

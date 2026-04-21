@@ -1,12 +1,12 @@
-import { getAuditDetail } from '../../../actions/audit-actions';
+import { getAuditDetail } from '../../../../actions/audit-actions';
 import { AuditDetailClient } from './audit-detail-client';
 
 export default async function AuditDetailPage({
   params,
 }: {
-  params: Promise<{ auditId: string }>;
+  params: Promise<{ firmSlug: string; auditId: string }>;
 }) {
-  const { auditId } = await params;
+  const { firmSlug, auditId } = await params;
 
   let detail;
   try {
@@ -20,5 +20,7 @@ export default async function AuditDetailPage({
     );
   }
 
-  return <AuditDetailClient detail={detail} auditId={auditId} />;
+  return (
+    <AuditDetailClient firmSlug={firmSlug} detail={detail} auditId={auditId} />
+  );
 }

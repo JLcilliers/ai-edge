@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import type { BrandTruth } from '@ai-edge/shared';
-import { saveBrandTruth, getBrandTruthVersion } from '../../actions/brand-truth-actions';
+import { saveBrandTruth, getBrandTruthVersion } from '../../../actions/brand-truth-actions';
 
 // ── Collapsible Section ───────────────────────────────────
 function Section({
@@ -95,10 +95,12 @@ function StringArray({
 
 // ── Main Editor ───────────────────────────────────────────
 export function BrandTruthEditor({
+  firmSlug,
   initialPayload,
   currentVersion,
   versions,
 }: {
+  firmSlug: string;
   initialPayload: BrandTruth;
   currentVersion: number;
   versions: Array<{ id: string; version: number; createdAt: Date }>;
@@ -134,7 +136,7 @@ export function BrandTruthEditor({
     setSaveResult(null);
     setComplianceViolations([]);
     startTransition(async () => {
-      const result = await saveBrandTruth(data);
+      const result = await saveBrandTruth(firmSlug, data);
       if (result.success) {
         setSaveResult(`Saved as version ${result.version}`);
         router.refresh();

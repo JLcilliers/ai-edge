@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Download, ChevronDown } from 'lucide-react';
-import { exportAuditCsv } from '../../../actions/audit-actions';
+import { exportAuditCsv } from '../../../../actions/audit-actions';
 
 type Result = {
   queryText: string;
@@ -36,7 +36,15 @@ const RAG_BADGE: Record<string, string> = {
   green: 'bg-[--rag-green-bg] text-[--rag-green]',
 };
 
-export function AuditDetailClient({ detail, auditId }: { detail: Detail; auditId: string }) {
+export function AuditDetailClient({
+  firmSlug,
+  detail,
+  auditId,
+}: {
+  firmSlug: string;
+  detail: Detail;
+  auditId: string;
+}) {
   const { run, results, summary } = detail;
   const [filter, setFilter] = useState<'all' | 'red' | 'yellow' | 'green'>('all');
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
@@ -66,7 +74,7 @@ export function AuditDetailClient({ detail, auditId }: { detail: Detail; auditId
   return (
     <div>
       {/* Back + header */}
-      <Link href="/dashboard/audits" className="mb-4 inline-flex items-center gap-1.5 text-xs text-white/40 transition hover:text-white/70">
+      <Link href={`/dashboard/${firmSlug}/audits`} className="mb-4 inline-flex items-center gap-1.5 text-xs text-white/40 transition hover:text-white/70">
         <ArrowLeft size={14} /> Back to audits
       </Link>
 
