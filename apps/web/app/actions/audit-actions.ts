@@ -11,7 +11,7 @@ import {
   modelResponses,
   brandTruthVersions,
 } from '@ai-edge/db';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, inArray } from 'drizzle-orm';
 import { runAudit } from '../lib/audit/run-audit';
 
 /** Resolve firm id from URL slug. Throws if the slug doesn't match a firm. */
@@ -93,7 +93,37 @@ export async function getAuditRunStatus(auditRunId: string): Promise<{
   return run ?? { status: 'unknown', error: null };
 }
 
-// Get audit detail with all results. Audit-run id is globally unique.
+/**
+ * Get audit detail with all results. Audit-run id is globally unique.
+ *
+ * Query plan:
+ *   1. run (1 query)
+ *   2. queries for run (1 query)
+ *   3. In parallel, batched by query_id / consensus_id:
+ *      - model_responses (1 query)
+ *      - consensus_responses (1 query)
+ *   4. In parallel, batched by consensus_id:
+ *      - alignment_scores (1 query)
+ *      - citations (1 query)
+ *
+ * Total: 6 queries, constant w.r.t. run size. Previous implementation was
+ * 1 + 4·N (run + queries + per-query model_responses + per-query
+ * consensus_responses + per-consensus alignment_score + per-consensus
+ * citations) which for a 20-query × 4-provider audit hit ~200 serial
+ * round-trips. For a large audit this is the difference between a
+ * sub-second and a multi-second detail-page load.
+ *
+ * Provider/model mapping note: `consensus_response` doesn't store a
+ * provider column — the run-audit writer inserts one consensus row per
+ * (query, provider) in iteration order. The old implementation matched
+ * consensus rows to `model_responses[idx]` by raw row index, which only
+ * worked at k=1 — at k=3 self-consistency (3 model_responses per
+ * (query, provider)), the indexes desync and every consensus after the
+ * first attributes to the wrong provider. We now build a per-query list
+ * of distinct providers (preserving first-seen insertion order) and
+ * match consensus[i] → distinctProviders[i]. That's correct at any k
+ * and still preserves the existing behaviour at k=1.
+ */
 export async function getAuditDetail(auditRunId: string): Promise<{
   run: {
     id: string;
@@ -118,7 +148,7 @@ export async function getAuditDetail(auditRunId: string): Promise<{
 }> {
   const db = getDb();
 
-  // Get the run
+  // 1. Run — needed before we can bail out on missing run.
   const [run] = await db
     .select({
       id: auditRuns.id,
@@ -132,11 +162,90 @@ export async function getAuditDetail(auditRunId: string): Promise<{
 
   if (!run) throw new Error('Audit run not found');
 
-  // Get all queries for this run
+  // 2. Queries for this run.
   const queryRows = await db
     .select()
     .from(queriesTable)
     .where(eq(queriesTable.audit_run_id, auditRunId));
+
+  if (queryRows.length === 0) {
+    return { run, results: [], summary: { red: 0, yellow: 0, green: 0 } };
+  }
+
+  const queryIds = queryRows.map((q) => q.id);
+
+  // 3. model_responses + consensus_responses, batched by query_id.
+  const [mrRows, consensusRows] = await Promise.all([
+    db
+      .select({
+        query_id: modelResponses.query_id,
+        provider: modelResponses.provider,
+        model: modelResponses.model,
+      })
+      .from(modelResponses)
+      .where(inArray(modelResponses.query_id, queryIds)),
+    db
+      .select()
+      .from(consensusResponses)
+      .where(inArray(consensusResponses.query_id, queryIds)),
+  ]);
+
+  const consensusIds = consensusRows.map((c) => c.id);
+
+  // 4. alignment_scores + citations, batched by consensus_id.
+  // Guard on empty consensusIds — inArray with [] rejects on some drivers.
+  const [scoreRows, citeRows] = consensusIds.length > 0
+    ? await Promise.all([
+        db
+          .select()
+          .from(alignmentScores)
+          .where(inArray(alignmentScores.consensus_response_id, consensusIds)),
+        db
+          .select({
+            consensus_response_id: citationsTable.consensus_response_id,
+            url: citationsTable.url,
+          })
+          .from(citationsTable)
+          .where(inArray(citationsTable.consensus_response_id, consensusIds)),
+      ])
+    : [[], []];
+
+  // Indexes for O(1) lookups during the stitch pass.
+  const consensusByQuery = new Map<string, typeof consensusRows>();
+  for (const cr of consensusRows) {
+    const list = consensusByQuery.get(cr.query_id);
+    if (list) list.push(cr);
+    else consensusByQuery.set(cr.query_id, [cr]);
+  }
+
+  // Per-query list of distinct providers in insertion order. Used to map
+  // consensus[i] → the i'th distinct provider for that query. Correct at
+  // any k (including k=1 legacy and k=3 self-consistency).
+  const providersByQuery = new Map<
+    string,
+    Array<{ provider: string; model: string }>
+  >();
+  for (const mr of mrRows) {
+    let list = providersByQuery.get(mr.query_id);
+    if (!list) {
+      list = [];
+      providersByQuery.set(mr.query_id, list);
+    }
+    if (!list.some((p) => p.provider === mr.provider)) {
+      list.push({ provider: mr.provider, model: mr.model });
+    }
+  }
+
+  const scoreByConsensus = new Map(
+    scoreRows.map((s) => [s.consensus_response_id, s]),
+  );
+
+  const citesByConsensus = new Map<string, string[]>();
+  for (const c of citeRows) {
+    const list = citesByConsensus.get(c.consensus_response_id);
+    if (list) list.push(c.url);
+    else citesByConsensus.set(c.consensus_response_id, [c.url]);
+  }
 
   const results: Array<{
     queryText: string;
@@ -153,48 +262,29 @@ export async function getAuditDetail(auditRunId: string): Promise<{
   }> = [];
 
   for (const q of queryRows) {
-    // Get all model responses for this query (ordered by creation = insertion order)
-    const mrRows = await db
-      .select()
-      .from(modelResponses)
-      .where(eq(modelResponses.query_id, q.id));
+    const consensusForQuery = consensusByQuery.get(q.id) ?? [];
+    const distinctProviders = providersByQuery.get(q.id) ?? [];
 
-    // Get all consensus responses for this query (same insertion order as providers)
-    const consensusRows = await db
-      .select()
-      .from(consensusResponses)
-      .where(eq(consensusResponses.query_id, q.id));
-
-    // Match consensus to model_response by index (both inserted per-provider in same order)
-    for (let idx = 0; idx < consensusRows.length; idx++) {
-      const cr = consensusRows[idx]!;
-      const matchedMr = mrRows[idx]; // direct index match — both created in provider loop order
-
-      // Get alignment score
-      const [score] = await db
-        .select()
-        .from(alignmentScores)
-        .where(eq(alignmentScores.consensus_response_id, cr.id))
-        .limit(1);
-
-      // Get citations
-      const cites = await db
-        .select({ url: citationsTable.url })
-        .from(citationsTable)
-        .where(eq(citationsTable.consensus_response_id, cr.id));
-
+    for (let i = 0; i < consensusForQuery.length; i++) {
+      const cr = consensusForQuery[i]!;
+      const provMeta = distinctProviders[i] ?? {
+        provider: 'unknown',
+        model: 'unknown',
+      };
+      const score = scoreByConsensus.get(cr.id);
+      const cites = citesByConsensus.get(cr.id) ?? [];
       const fullResponse = cr.majority_answer ?? '';
 
       results.push({
         queryText: q.text,
-        provider: matchedMr?.provider ?? 'unknown',
-        model: matchedMr?.model ?? 'unknown',
+        provider: provMeta.provider,
+        model: provMeta.model,
         mentioned: score?.mentioned ?? false,
         toneScore: score?.tone_1_10 ?? null,
         ragLabel: score?.rag_label ?? 'red',
         gapReasons: (score?.gap_reasons as string[]) ?? [],
         factualErrors: (score?.factual_errors as string[]) ?? [],
-        citationUrls: cites.map((c) => c.url),
+        citationUrls: cites,
         responsePreview: fullResponse.slice(0, 200),
         fullResponse,
       });
