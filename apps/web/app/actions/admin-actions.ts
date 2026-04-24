@@ -435,9 +435,12 @@ export async function getFirmHealthSnapshot(): Promise<FirmHealthRow[]> {
         gte(auditRuns.started_at, thirtyDaysAgo),
       ))
       .groupBy(auditRuns.firm_id),
-    // Negative-sentiment mention count per firm. The schema doesn't
-    // carry a "dismissed" flag so this is a raw count; the admin UI
-    // uses it as a "needs triage" signal, not an open-queue size.
+    // Open-complaint mention count per firm. `sentiment='complaint'` is
+    // what the Reddit classifier actually writes (the old `'negative'`
+    // filter here was always 0 — the classifier has never emitted that
+    // label). `triage_status='open'` narrows this to the actionable
+    // subset: complaints the operator hasn't acknowledged, dismissed,
+    // or escalated. This is the exact queue the admin UI links to.
     db
       .select({
         firm_id: redditMentions.firm_id,
@@ -446,7 +449,8 @@ export async function getFirmHealthSnapshot(): Promise<FirmHealthRow[]> {
       .from(redditMentions)
       .where(and(
         inArray(redditMentions.firm_id, firmIds),
-        eq(redditMentions.sentiment, 'negative'),
+        eq(redditMentions.sentiment, 'complaint'),
+        eq(redditMentions.triage_status, 'open'),
       ))
       .groupBy(redditMentions.firm_id),
     // Current month's report (if generated)

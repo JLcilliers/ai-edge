@@ -57,6 +57,13 @@
       "when": 1777400000000,
       "tag": "0007_legal_purifiers",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1777500000000,
+      "tag": "0008_reddit_triage",
+      "breakpoints": true
     }
   ]
 }

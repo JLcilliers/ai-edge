@@ -150,6 +150,17 @@ export const remediationTickets = pgTable('remediation_ticket', {
 });
 
 // ── Reddit ──────────────────────────────────────────────────
+// `triage_status` turns the raw mention feed into an operator queue:
+//   - `open`          = untouched, still needs a look
+//   - `acknowledged`  = operator saw it, watching but no action
+//   - `dismissed`     = false positive / off-brand / wrong firm / resolved
+//   - `escalated`     = a real problem; also opens/keeps a remediation ticket
+//
+// Default `open` means a fresh scan drops new mentions straight into the
+// operator queue. The admin dashboard's "open complaints" count is driven
+// by `sentiment='complaint' AND triage_status='open'`, so triaging a row
+// removes it from the "needs attention" signal without mutating the
+// sentiment field (which is model output, not operator intent).
 export const redditMentions = pgTable('reddit_mention', {
   id: uuid('id').primaryKey().defaultRandom(),
   firm_id: uuid('firm_id').notNull().references(() => firms.id, { onDelete: 'cascade' }),
@@ -163,9 +174,14 @@ export const redditMentions = pgTable('reddit_mention', {
   url: text('url').notNull(),
   posted_at: timestamp('posted_at', { withTimezone: true }),
   ingested_at: timestamp('ingested_at', { withTimezone: true }).defaultNow().notNull(),
+  triage_status: text('triage_status').notNull().default('open'),
+  triage_note: text('triage_note'),
+  triaged_at: timestamp('triaged_at', { withTimezone: true }),
 }, (t) => ({
   firmPostIdx: uniqueIndex('reddit_firm_post')
     .on(t.firm_id, t.post_id, t.comment_id),
+  firmTriageIdx: index('reddit_firm_triage_idx')
+    .on(t.firm_id, t.triage_status),
 }));
 
 // ── Competitive ─────────────────────────────────────────────

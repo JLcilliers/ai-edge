@@ -303,7 +303,7 @@ function FirmHealthSection({ rows }: { rows: FirmHealthRow[] }) {
                 <th className="px-4 py-3 font-medium">Firm</th>
                 <th className="px-4 py-3 font-medium">Last audit</th>
                 <th className="px-4 py-3 font-medium">BT</th>
-                <th className="px-4 py-3 font-medium">Neg. mentions</th>
+                <th className="px-4 py-3 font-medium" title="Reddit complaints still in the open triage bucket">Open complaints</th>
                 <th className="px-4 py-3 font-medium">This month report</th>
                 <th className="px-4 py-3 font-medium">Budget (MTD)</th>
                 <th className="px-4 py-3 font-medium">30d err</th>
@@ -375,15 +375,17 @@ function FirmRow({ row }: { row: FirmHealthRow }) {
         )}
       </td>
       <td className="px-4 py-3">
-        <span
-          className={
-            row.openMentionCount > 0
-              ? 'font-semibold text-amber-300'
-              : 'text-white/70'
-          }
-        >
-          {row.openMentionCount}
-        </span>
+        {row.openMentionCount > 0 ? (
+          <Link
+            href={`/dashboard/${row.slug}/reddit?status=open`}
+            className="font-semibold text-amber-300 underline-offset-2 hover:underline"
+            title="Open the triage queue for this firm"
+          >
+            {row.openMentionCount}
+          </Link>
+        ) : (
+          <span className="text-white/70">0</span>
+        )}
       </td>
       <td className="px-4 py-3">
         {row.monthlyReportGenerated ? (
