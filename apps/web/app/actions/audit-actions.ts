@@ -13,6 +13,7 @@ import {
 } from '@ai-edge/db';
 import { eq, desc, inArray } from 'drizzle-orm';
 import { runAudit } from '../lib/audit/run-audit';
+import { getFirmBudgetStatus } from '../lib/audit/budget';
 
 /** Resolve firm id from URL slug. Throws if the slug doesn't match a firm. */
 async function resolveFirmId(slug: string): Promise<string> {
@@ -27,6 +28,13 @@ async function resolveFirmId(slug: string): Promise<string> {
 }
 
 // Start a new audit for a specific client.
+//
+// Pre-flight checks (match the cron pattern in api/cron/audit-{daily,weekly}):
+//   1. firm has a Brand Truth — otherwise there's nothing to audit against.
+//   2. firm is under monthly budget cap — otherwise the in-flight gate would
+//      fire after the first query's cost was recorded, burning money + leaving
+//      a `completed_budget_truncated` row. Skipping up front keeps the audit
+//      log clean and gives the operator a readable error pointing at Settings.
 export async function startAudit(
   firmSlug: string,
 ): Promise<{ auditRunId: string } | { error: string }> {
@@ -43,6 +51,20 @@ export async function startAudit(
       .limit(1);
 
     if (!btv) return { error: 'No Brand Truth saved — create one first' };
+
+    // Pre-flight budget gate. The dashboard "Run audit" button was the one
+    // path into runAudit that skipped this check — both audit crons have
+    // had it for a while. Returning a readable error so the UI banner tells
+    // the operator exactly why the run was refused and where to adjust it.
+    const budget = await getFirmBudgetStatus(firmId);
+    if (budget.overBudget) {
+      return {
+        error:
+          `Over monthly budget ($${budget.spentThisMonthUsd.toFixed(2)} / ` +
+          `$${budget.monthlyCapUsd.toFixed(2)} spent). ` +
+          `Adjust the cap in Settings to run another audit.`,
+      };
+    }
 
     const auditRunId = await runAudit(firmId, btv.id);
     return { auditRunId };
@@ -323,29 +345,11 @@ export async function getAuditDetail(auditRunId: string): Promise<{
   return { run, results, summary };
 }
 
-// CSV export
-export async function exportAuditCsv(auditRunId: string): Promise<string> {
-  const { results } = await getAuditDetail(auditRunId);
-
-  const header = 'query,provider,model,mentioned,tone_score,rag_label,k,variance_pct,gap_reasons,citations,factual_errors,response_preview';
-  const rows = results.map((r) => {
-    const escape = (s: string) => `"${s.replace(/"/g, '""')}"`;
-    return [
-      escape(r.queryText),
-      escape(r.provider),
-      escape(r.model),
-      r.mentioned ? 'Y' : 'N',
-      r.toneScore?.toString() ?? '',
-      r.ragLabel,
-      r.k.toString(),
-      // Variance as percentage with one decimal — '0.0' for unanimous.
-      (r.variance * 100).toFixed(1),
-      escape(r.gapReasons.join('|')),
-      escape(r.citationUrls.join('|')),
-      escape(r.factualErrors.join('|')),
-      escape(r.responsePreview),
-    ].join(',');
-  });
-
-  return [header, ...rows].join('\n');
-}
+// NOTE: the previous `exportAuditCsv` server action lived here. It's been
+// replaced by the shareable HTTP endpoint at
+// `/api/audits/[auditRunId]/export.csv/route.ts`, which emits the same
+// columns with RFC-4180-compliant CRLF line endings + a
+// `Content-Disposition: attachment` header so the browser's native save
+// dialog fires. The dashboard's "Export CSV" button is a plain `<a href>`
+// pointing at that route — no callers of the server action remain, so it's
+// been removed to keep the action surface minimal.
