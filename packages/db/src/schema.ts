@@ -237,3 +237,24 @@ export const scenarioRuns = pgTable('scenario_run', {
   confidence: real('confidence'),
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
+
+// ── Monthly reports ─────────────────────────────────────────
+// One row per firm per calendar month. The JSON payload is generated
+// from audit-runs, reddit mentions, competitor mentions, suppression
+// findings, and entity signals. The payload is also mirrored as a JSON
+// file in Vercel Blob so reviewers can download the raw artifact.
+//
+// Uniqueness: (firm_id, month_key) — `month_key` is a YYYY-MM string
+// keyed off UTC. A re-run in the same month overwrites the existing row
+// (upsert by unique index) so the dashboard always shows the freshest
+// snapshot.
+export const monthlyReports = pgTable('monthly_report', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  firm_id: uuid('firm_id').notNull().references(() => firms.id, { onDelete: 'cascade' }),
+  month_key: text('month_key').notNull(), // 'YYYY-MM' UTC
+  payload: jsonb('payload').notNull(),
+  blob_url: text('blob_url'), // Vercel Blob download URL (public)
+  generated_at: timestamp('generated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  firmMonthIdx: uniqueIndex('monthly_report_firm_month').on(t.firm_id, t.month_key),
+}));

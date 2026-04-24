@@ -1,9 +1,8 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Download, ChevronDown } from 'lucide-react';
-import { exportAuditCsv } from '../../../../actions/audit-actions';
 
 type Result = {
   queryText: string;
@@ -48,23 +47,14 @@ export function AuditDetailClient({
   const { run, results, summary } = detail;
   const [filter, setFilter] = useState<'all' | 'red' | 'yellow' | 'green'>('all');
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
-  const [isExporting, startExport] = useTransition();
 
   const filtered = filter === 'all' ? results : results.filter((r) => r.ragLabel === filter);
   const total = summary.red + summary.yellow + summary.green;
 
-  const handleExport = () => {
-    startExport(async () => {
-      const csv = await exportAuditCsv(auditId);
-      const blob = new Blob([csv], { type: 'text/csv' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `audit-${auditId.slice(0, 8)}-${new Date().toISOString().slice(0, 10)}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-    });
-  };
+  // CSV download is a plain GET against the public-shape /api route —
+  // no client-side conversion, Content-Disposition triggers the
+  // browser's native save dialog, and operators can share the URL.
+  const csvHref = `/api/audits/${auditId}/export.csv`;
 
   const dateStr = run.startedAt ? new Date(run.startedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
   const durationSec = run.finishedAt && run.startedAt
@@ -92,14 +82,13 @@ export function AuditDetailClient({
             <span>{total} results</span>
           </div>
         </div>
-        <button
-          onClick={handleExport}
-          disabled={isExporting}
-          className="flex items-center gap-2 rounded-full border border-white/10 bg-transparent px-5 py-2.5 text-sm text-white transition-colors hover:border-[--accent] disabled:opacity-50"
+        <a
+          href={csvHref}
+          className="flex items-center gap-2 rounded-full border border-white/10 bg-transparent px-5 py-2.5 text-sm text-white transition-colors hover:border-[--accent]"
         >
           <Download size={16} strokeWidth={1.5} />
-          {isExporting ? 'Exporting...' : 'Export CSV'}
-        </button>
+          Export CSV
+        </a>
       </div>
 
       {/* RAG summary stats */}

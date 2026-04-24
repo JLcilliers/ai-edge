@@ -13,6 +13,9 @@ export const config: VercelConfig = {
     { path: '/api/cron/reddit-poll', schedule: '0 7 * * *' },
     // Citation diff nightly (04:00 UTC)
     { path: '/api/cron/citation-diff', schedule: '0 4 * * *' },
+    // Monthly report generator — 05:00 UTC on the 1st, builds the
+    // previous calendar month's roll-up and pushes JSON to Vercel Blob.
+    { path: '/api/cron/report-monthly', schedule: '0 5 1 * *' },
   ],
   headers: [
     routes.cacheControl('/_next/static/(.*)', {

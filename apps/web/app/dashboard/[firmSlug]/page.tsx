@@ -13,6 +13,8 @@ import {
   Users,
   FileX,
   Database,
+  ShieldCheck,
+  FileBarChart,
 } from 'lucide-react';
 import {
   getFirmBySlug,
@@ -163,6 +165,20 @@ export default async function FirmOverviewPage({
           title="Entity & Schema"
           description="Check schema.org coverage + Wikidata / Google KG presence. Generate copy-paste JSON-LD patches for gaps."
           cta="Run entity scan"
+        />
+        <ModuleCard
+          href={`/dashboard/${firmSlug}/compliance`}
+          icon={ShieldCheck}
+          title="Compliance Check"
+          description="Paste remediation copy, an ad, or an email and flag banned claims from the jurisdictional rulebook + firm's own banned phrases."
+          cta="Validate copy"
+        />
+        <ModuleCard
+          href={`/dashboard/${firmSlug}/reports`}
+          icon={FileBarChart}
+          title="Monthly Reports"
+          description="Per-firm month-in-review: audit RAG totals, reddit sentiment, competitor share, suppression queue, entity divergences. Downloadable JSON."
+          cta="View & rebuild"
         />
       </div>
     </div>
