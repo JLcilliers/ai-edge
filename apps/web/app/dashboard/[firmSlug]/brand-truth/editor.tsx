@@ -193,7 +193,351 @@ export function BrandTruthEditor({
         </div>
       </Section>
 
-      {/* Service Offerings (marketing_agency) */}
+      {/* Practice Areas (law_firm / dental_practice — required, min 1) */}
+      {(data.firm_type === 'law_firm' || data.firm_type === 'dental_practice') && (
+        <Section title="Practice Areas" defaultOpen>
+          <StringArray
+            label="Practice Areas"
+            items={data.practice_areas ?? []}
+            onChange={(v) => set('practice_areas', v)}
+          />
+        </Section>
+      )}
+
+      {/* Geographies Served (law_firm / dental_practice — required, min 1) */}
+      {(data.firm_type === 'law_firm' || data.firm_type === 'dental_practice') && (
+        <Section title="Geographies Served" defaultOpen>
+          <p className="mb-3 text-xs text-white/55">
+            Each entry must have a city and 2–3 letter state. Radius is a positive integer in miles (max 500).
+          </p>
+          {(data.geographies_served ?? []).map((g: any, i: number) => (
+            <div key={i} className="mb-3 rounded border border-white/10 p-3">
+              <div className="grid gap-2 sm:grid-cols-4">
+                <input
+                  placeholder="City"
+                  value={g.city ?? ''}
+                  onChange={(e) => {
+                    const copy = [...(data.geographies_served ?? [])];
+                    copy[i] = { ...copy[i], city: e.target.value };
+                    set('geographies_served', copy);
+                  }}
+                  className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+                />
+                <input
+                  placeholder="State (e.g. FL)"
+                  value={g.state ?? ''}
+                  onChange={(e) => {
+                    const copy = [...(data.geographies_served ?? [])];
+                    copy[i] = { ...copy[i], state: e.target.value };
+                    set('geographies_served', copy);
+                  }}
+                  className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+                />
+                <input
+                  placeholder="Country (2-letter)"
+                  value={g.country ?? 'US'}
+                  onChange={(e) => {
+                    const copy = [...(data.geographies_served ?? [])];
+                    copy[i] = { ...copy[i], country: e.target.value };
+                    set('geographies_served', copy);
+                  }}
+                  className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+                />
+                <input
+                  type="number"
+                  placeholder="Radius (mi)"
+                  value={g.radius_mi ?? ''}
+                  onChange={(e) => {
+                    const copy = [...(data.geographies_served ?? [])];
+                    const n = Number(e.target.value);
+                    copy[i] = { ...copy[i], radius_mi: Number.isFinite(n) && n > 0 ? n : undefined };
+                    set('geographies_served', copy);
+                  }}
+                  className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  set(
+                    'geographies_served',
+                    (data.geographies_served ?? []).filter((_: any, j: number) => j !== i),
+                  )
+                }
+                className="mt-2 text-xs text-red-400 hover:text-red-300"
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() =>
+              set('geographies_served', [
+                ...(data.geographies_served ?? []),
+                { city: '', state: '', country: 'US', radius_mi: 25 },
+              ])
+            }
+            className="rounded-lg border border-dashed border-white/10 px-3 py-1 text-xs text-white/55 hover:border-white/20 hover:text-white"
+          >
+            + Add Geography
+          </button>
+        </Section>
+      )}
+
+      {/* Attorney Bios (law_firm) */}
+      {data.firm_type === 'law_firm' && (
+        <Section title="Attorney Bios">
+          {(data.attorney_bios ?? []).map((ab: any, i: number) => (
+            <div key={i} className="mb-3 rounded border border-white/10 p-3">
+              <div className="grid gap-2 sm:grid-cols-2">
+                <input
+                  placeholder="Name"
+                  value={ab.name ?? ''}
+                  onChange={(e) => {
+                    const copy = [...(data.attorney_bios ?? [])];
+                    copy[i] = { ...copy[i], name: e.target.value };
+                    set('attorney_bios', copy);
+                  }}
+                  className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+                />
+                <input
+                  placeholder="Role"
+                  value={ab.role ?? ''}
+                  onChange={(e) => {
+                    const copy = [...(data.attorney_bios ?? [])];
+                    copy[i] = { ...copy[i], role: e.target.value };
+                    set('attorney_bios', copy);
+                  }}
+                  className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+                />
+                <input
+                  placeholder="Bar Number"
+                  value={ab.bar_number ?? ''}
+                  onChange={(e) => {
+                    const copy = [...(data.attorney_bios ?? [])];
+                    copy[i] = { ...copy[i], bar_number: e.target.value };
+                    set('attorney_bios', copy);
+                  }}
+                  className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+                />
+                <input
+                  placeholder="Photo URL"
+                  value={ab.photo_url ?? ''}
+                  onChange={(e) => {
+                    const copy = [...(data.attorney_bios ?? [])];
+                    copy[i] = { ...copy[i], photo_url: e.target.value };
+                    set('attorney_bios', copy);
+                  }}
+                  className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+                />
+              </div>
+              <textarea
+                placeholder="Bio"
+                value={ab.bio ?? ''}
+                onChange={(e) => {
+                  const copy = [...(data.attorney_bios ?? [])];
+                  copy[i] = { ...copy[i], bio: e.target.value };
+                  set('attorney_bios', copy);
+                }}
+                rows={2}
+                className="mt-2 w-full rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={() =>
+                  set(
+                    'attorney_bios',
+                    (data.attorney_bios ?? []).filter((_: any, j: number) => j !== i),
+                  )
+                }
+                className="mt-1 text-xs text-red-400 hover:text-red-300"
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() =>
+              set('attorney_bios', [
+                ...(data.attorney_bios ?? []),
+                { name: '', role: '', credentials: [], bio: '', bar_number: '', photo_url: '' },
+              ])
+            }
+            className="rounded-lg border border-dashed border-white/10 px-3 py-1 text-xs text-white/55 hover:border-white/20 hover:text-white"
+          >
+            + Add Attorney
+          </button>
+        </Section>
+      )}
+
+      {/* Notable Cases (law_firm) */}
+      {data.firm_type === 'law_firm' && (
+        <Section title="Notable Cases">
+          {(data.notable_cases ?? []).map((nc: any, i: number) => (
+            <div key={i} className="mb-3 rounded border border-white/10 p-3">
+              <textarea
+                placeholder="Summary"
+                value={nc.summary ?? ''}
+                onChange={(e) => {
+                  const copy = [...(data.notable_cases ?? [])];
+                  copy[i] = { ...copy[i], summary: e.target.value };
+                  set('notable_cases', copy);
+                }}
+                rows={2}
+                className="w-full rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+              />
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                <input
+                  placeholder="Outcome"
+                  value={nc.outcome ?? ''}
+                  onChange={(e) => {
+                    const copy = [...(data.notable_cases ?? [])];
+                    copy[i] = { ...copy[i], outcome: e.target.value };
+                    set('notable_cases', copy);
+                  }}
+                  className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+                />
+                <input
+                  placeholder="Jurisdiction"
+                  value={nc.jurisdiction ?? ''}
+                  onChange={(e) => {
+                    const copy = [...(data.notable_cases ?? [])];
+                    copy[i] = { ...copy[i], jurisdiction: e.target.value };
+                    set('notable_cases', copy);
+                  }}
+                  className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+                />
+                <input
+                  placeholder="Source URL"
+                  value={nc.source_url ?? ''}
+                  onChange={(e) => {
+                    const copy = [...(data.notable_cases ?? [])];
+                    copy[i] = { ...copy[i], source_url: e.target.value };
+                    set('notable_cases', copy);
+                  }}
+                  className="col-span-2 rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  set(
+                    'notable_cases',
+                    (data.notable_cases ?? []).filter((_: any, j: number) => j !== i),
+                  )
+                }
+                className="mt-1 text-xs text-red-400 hover:text-red-300"
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() =>
+              set('notable_cases', [
+                ...(data.notable_cases ?? []),
+                { summary: '', outcome: '', jurisdiction: '', source_url: '' },
+              ])
+            }
+            className="rounded-lg border border-dashed border-white/10 px-3 py-1 text-xs text-white/55 hover:border-white/20 hover:text-white"
+          >
+            + Add Notable Case
+          </button>
+        </Section>
+      )}
+
+      {/* Provider Bios (dental_practice) */}
+      {data.firm_type === 'dental_practice' && (
+        <Section title="Provider Bios">
+          {(data.provider_bios ?? []).map((pb: any, i: number) => (
+            <div key={i} className="mb-3 rounded border border-white/10 p-3">
+              <div className="grid gap-2 sm:grid-cols-2">
+                <input
+                  placeholder="Name"
+                  value={pb.name ?? ''}
+                  onChange={(e) => {
+                    const copy = [...(data.provider_bios ?? [])];
+                    copy[i] = { ...copy[i], name: e.target.value };
+                    set('provider_bios', copy);
+                  }}
+                  className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+                />
+                <input
+                  placeholder="Role"
+                  value={pb.role ?? ''}
+                  onChange={(e) => {
+                    const copy = [...(data.provider_bios ?? [])];
+                    copy[i] = { ...copy[i], role: e.target.value };
+                    set('provider_bios', copy);
+                  }}
+                  className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+                />
+                <input
+                  placeholder="License Number"
+                  value={pb.license_number ?? ''}
+                  onChange={(e) => {
+                    const copy = [...(data.provider_bios ?? [])];
+                    copy[i] = { ...copy[i], license_number: e.target.value };
+                    set('provider_bios', copy);
+                  }}
+                  className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+                />
+                <input
+                  placeholder="Photo URL"
+                  value={pb.photo_url ?? ''}
+                  onChange={(e) => {
+                    const copy = [...(data.provider_bios ?? [])];
+                    copy[i] = { ...copy[i], photo_url: e.target.value };
+                    set('provider_bios', copy);
+                  }}
+                  className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+                />
+              </div>
+              <textarea
+                placeholder="Bio"
+                value={pb.bio ?? ''}
+                onChange={(e) => {
+                  const copy = [...(data.provider_bios ?? [])];
+                  copy[i] = { ...copy[i], bio: e.target.value };
+                  set('provider_bios', copy);
+                }}
+                rows={2}
+                className="mt-2 w-full rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={() =>
+                  set(
+                    'provider_bios',
+                    (data.provider_bios ?? []).filter((_: any, j: number) => j !== i),
+                  )
+                }
+                className="mt-1 text-xs text-red-400 hover:text-red-300"
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() =>
+              set('provider_bios', [
+                ...(data.provider_bios ?? []),
+                { name: '', role: '', credentials: [], bio: '', license_number: '', photo_url: '' },
+              ])
+            }
+            className="rounded-lg border border-dashed border-white/10 px-3 py-1 text-xs text-white/55 hover:border-white/20 hover:text-white"
+          >
+            + Add Provider
+          </button>
+        </Section>
+      )}
+
+      {/* Service Offerings (marketing_agency / other) */}
+      {(data.firm_type === 'marketing_agency' || data.firm_type === 'other') && (
       <Section title="Service Offerings">
         {(data.service_offerings ?? []).map((so: any, i: number) => (
           <div key={i} className="mb-3 flex gap-2">
@@ -234,6 +578,7 @@ export function BrandTruthEditor({
           + Add Service Offering
         </button>
       </Section>
+      )}
 
       {/* Positioning */}
       <Section title="Positioning & Differentiators">
@@ -331,7 +676,8 @@ export function BrandTruthEditor({
         </div>
       </Section>
 
-      {/* Key Clients (Public) */}
+      {/* Key Clients (Public) — marketing_agency only */}
+      {data.firm_type === 'marketing_agency' && (
       <Section title="Key Clients (Public)">
         {(data.key_clients_public ?? []).map((kc: any, i: number) => (
           <div key={i} className="mb-3 rounded border border-white/10 p-3">
@@ -348,6 +694,7 @@ export function BrandTruthEditor({
         ))}
         <button type="button" onClick={() => set('key_clients_public', [...(data.key_clients_public ?? []), { name: '', vertical: '', location: '', testimonial_quote: '', attribution: '', source_url: '' }])} className="rounded-lg border border-dashed border-white/10 px-3 py-1 text-xs text-white/55 hover:border-white/20 hover:text-white">+ Add Client</button>
       </Section>
+      )}
 
       {/* Awards & Badges */}
       <Section title="Awards & Badges">
@@ -373,10 +720,14 @@ export function BrandTruthEditor({
         <button type="button" onClick={() => set('awards', [...(data.awards ?? []), { name: '', source_url: '', source_required: true, verification_status: 'unverified_at_ingestion', notes: '' }])} className="rounded-lg border border-dashed border-white/10 px-3 py-1 text-xs text-white/55 hover:border-white/20 hover:text-white">+ Add Award</button>
       </Section>
 
-      {/* Service Areas */}
+      {/* Service Areas + Compliance
+          - Service Areas (strings) only live on marketing_agency / other schemas.
+          - Compliance Jurisdictions is a base field and always available. */}
       <Section title="Service Areas & Compliance">
-        <StringArray label="Service Areas" items={data.service_areas ?? []} onChange={(v) => set('service_areas', v)} />
-        <div className="mt-4">
+        {(data.firm_type === 'marketing_agency' || data.firm_type === 'other') && (
+          <StringArray label="Service Areas" items={data.service_areas ?? []} onChange={(v) => set('service_areas', v)} />
+        )}
+        <div className={(data.firm_type === 'marketing_agency' || data.firm_type === 'other') ? 'mt-4' : ''}>
           <StringArray label="Compliance Jurisdictions" items={data.compliance_jurisdictions ?? []} onChange={(v) => set('compliance_jurisdictions', v)} />
         </div>
       </Section>
