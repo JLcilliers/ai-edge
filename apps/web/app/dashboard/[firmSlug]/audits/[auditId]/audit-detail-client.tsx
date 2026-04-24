@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Download, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Download, ChevronDown, GitCompare } from 'lucide-react';
 
 type Result = {
   queryText: string;
@@ -82,13 +82,22 @@ export function AuditDetailClient({
             <span>{total} results</span>
           </div>
         </div>
-        <a
-          href={csvHref}
-          className="flex items-center gap-2 rounded-full border border-white/10 bg-transparent px-5 py-2.5 text-sm text-white transition-colors hover:border-[--accent]"
-        >
-          <Download size={16} strokeWidth={1.5} />
-          Export CSV
-        </a>
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/dashboard/${firmSlug}/audits/${auditId}/diff`}
+            className="flex items-center gap-2 rounded-full border border-white/10 bg-transparent px-5 py-2.5 text-sm text-white transition-colors hover:border-[--accent]"
+          >
+            <GitCompare size={16} strokeWidth={1.5} />
+            Compare to previous
+          </Link>
+          <a
+            href={csvHref}
+            className="flex items-center gap-2 rounded-full border border-white/10 bg-transparent px-5 py-2.5 text-sm text-white transition-colors hover:border-[--accent]"
+          >
+            <Download size={16} strokeWidth={1.5} />
+            Export CSV
+          </a>
+        </div>
       </div>
 
       {/* RAG summary stats */}

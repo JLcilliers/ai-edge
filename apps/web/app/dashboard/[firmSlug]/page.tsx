@@ -29,6 +29,11 @@ import {
   getAlignmentRegression,
   type AlignmentRegression,
 } from '../../actions/visibility-actions';
+import {
+  getAlignmentTrend,
+  getLatestScoringRunPair,
+  type AlignmentTrendPoint,
+} from '../../actions/audit-diff-actions';
 import type { FirmBudgetStatus } from '../../lib/audit/budget';
 
 export const dynamic = 'force-dynamic';
@@ -65,9 +70,14 @@ export default async function FirmOverviewPage({
   const firm = await getFirmBySlug(firmSlug);
   if (!firm) notFound();
 
-  const [summary, regression] = await Promise.all([
+  const [summary, regression, trend, runPair] = await Promise.all([
     getFirmSummary(firmSlug).catch(() => null),
     getAlignmentRegression(firmSlug).catch(() => null),
+    getAlignmentTrend(firmSlug, { limit: 10 }).catch(() => [] as AlignmentTrendPoint[]),
+    getLatestScoringRunPair(firmSlug).catch(() => ({
+      latestRunId: null,
+      previousRunId: null,
+    })),
   ]);
   const Icon = FIRM_TYPE_ICON[firm.firm_type];
 
@@ -95,7 +105,17 @@ export default async function FirmOverviewPage({
 
       {/* Alignment regression banner — only when red% moved ≥5pp in either direction. */}
       {regression ? (
-        <OverviewRegressionBanner firmSlug={firmSlug} regression={regression} />
+        <OverviewRegressionBanner
+          firmSlug={firmSlug}
+          regression={regression}
+          latestRunId={runPair.latestRunId}
+          previousRunId={runPair.previousRunId}
+        />
+      ) : null}
+
+      {/* Alignment trend sparkline — last 10 scoring runs */}
+      {trend.length > 0 ? (
+        <AlignmentTrendStrip firmSlug={firmSlug} trend={trend} />
       ) : null}
 
       {/* Headline stats */}
@@ -311,9 +331,13 @@ function BudgetTile({ budget }: { budget: FirmBudgetStatus | null }) {
 function OverviewRegressionBanner({
   firmSlug,
   regression,
+  latestRunId,
+  previousRunId,
 }: {
   firmSlug: string;
   regression: AlignmentRegression;
+  latestRunId: string | null;
+  previousRunId: string | null;
 }) {
   if (regression.severity === 'stable' || regression.severity === 'insufficient_data') {
     return null;
@@ -350,9 +374,22 @@ function OverviewRegressionBanner({
       ? `${Math.abs(delta).toFixed(1)}pp lower red`
       : `${delta.toFixed(1)}pp higher red`;
 
+  // Prefer a direct link to the diff view when we have both run IDs — that's
+  // the fastest path from "something regressed" to "here's what regressed".
+  // When only one run exists, fall back to Visibility (which also surfaces
+  // the severity banner + citation drift context).
+  const diffHref =
+    latestRunId && previousRunId
+      ? `/dashboard/${firmSlug}/audits/${latestRunId}/diff`
+      : `/dashboard/${firmSlug}/visibility`;
+  const ctaLabel =
+    latestRunId && previousRunId
+      ? 'See which queries moved →'
+      : 'Open Visibility →';
+
   return (
     <Link
-      href={`/dashboard/${firmSlug}/visibility`}
+      href={diffHref}
       className={`mb-8 flex items-start gap-4 rounded-xl border p-4 transition-colors hover:brightness-110 ${config.border} ${config.bg}`}
     >
       <config.Icon size={20} strokeWidth={2} className={config.text} />
@@ -366,11 +403,84 @@ function OverviewRegressionBanner({
           {regression.latestRunStartedAt
             ? ` (${formatDate(regression.latestRunStartedAt)})`
             : ''}
-          . View drift detail in Visibility.
+          . {ctaLabel}
         </div>
       </div>
       <ArrowRight size={16} strokeWidth={2} className={config.text} />
     </Link>
+  );
+}
+
+/**
+ * Last-N-runs RAG mix strip. Each bar is one completed scoring run. Heights
+ * are always full — we're communicating *mix*, not volume — and the three
+ * segments (green/yellow/red) stack top-to-bottom. Click a bar to drill into
+ * that run.
+ *
+ * We render inline via <div> stacks (not an SVG lib) because:
+ *  - 10 bars, three segments each = 30 divs — trivial rendering cost
+ *  - preserves the dashboard's Tailwind color tokens without theming a chart lib
+ *  - keeps the overview server-component-only (no 'use client' tax)
+ */
+function AlignmentTrendStrip({
+  firmSlug,
+  trend,
+}: {
+  firmSlug: string;
+  trend: AlignmentTrendPoint[];
+}) {
+  return (
+    <div className="mb-8 rounded-xl border border-white/10 bg-[--bg-secondary] p-5">
+      <div className="mb-3 flex items-center justify-between">
+        <div>
+          <div className="text-[10px] font-medium uppercase tracking-widest text-white/40">
+            Alignment Trend
+          </div>
+          <div className="mt-1 text-xs text-white/55">
+            Last {trend.length} scoring run{trend.length === 1 ? '' : 's'} — left = oldest.
+          </div>
+        </div>
+        <div className="flex items-center gap-3 text-[10px] text-white/40">
+          <LegendSwatch className="bg-[--rag-green]" label="green" />
+          <LegendSwatch className="bg-[--rag-yellow]" label="yellow" />
+          <LegendSwatch className="bg-[--rag-red]" label="red" />
+        </div>
+      </div>
+      <div className="flex items-end gap-1.5" style={{ height: 80 }}>
+        {trend.map((point) => (
+          <Link
+            key={point.runId}
+            href={`/dashboard/${firmSlug}/audits/${point.runId}`}
+            title={`${formatDate(point.startedAt)} · ${point.total} scored · ${point.redPct.toFixed(1)}% red`}
+            className="group flex flex-1 flex-col overflow-hidden rounded transition-transform hover:-translate-y-0.5"
+            style={{ height: '100%' }}
+          >
+            {/* green (top), yellow (middle), red (bottom) so "more red" visually weighs down */}
+            <div
+              className="w-full bg-[--rag-green] opacity-80 group-hover:opacity-100"
+              style={{ height: `${point.greenPct}%` }}
+            />
+            <div
+              className="w-full bg-[--rag-yellow] opacity-80 group-hover:opacity-100"
+              style={{ height: `${point.yellowPct}%` }}
+            />
+            <div
+              className="w-full bg-[--rag-red] opacity-80 group-hover:opacity-100"
+              style={{ height: `${point.redPct}%` }}
+            />
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function LegendSwatch({ className, label }: { className: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span className={`inline-block h-2 w-2 rounded-sm ${className}`} />
+      {label}
+    </span>
   );
 }
 
