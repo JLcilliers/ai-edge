@@ -1,8 +1,16 @@
 'use client';
 
 import { useState, useTransition, useEffect } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { FileX, ExternalLink, FileText, CheckCircle2 } from 'lucide-react';
+import {
+  ArrowRight,
+  CheckCircle2,
+  ExternalLink,
+  FileText,
+  FileX,
+  Wand2,
+} from 'lucide-react';
 import {
   startSuppressionScan,
   getSuppressionScanStatus,
@@ -139,16 +147,28 @@ export function SuppressionClient({
           initialSummary.totalPages > 0 && <AllAligned count={initialSummary.totalPages} />}
 
         {initialFindings.map((f) => (
-          <FindingRow key={f.findingId} finding={f} />
+          <FindingRow key={f.findingId} firmSlug={firmSlug} finding={f} />
         ))}
       </div>
     </div>
   );
 }
 
-function FindingRow({ finding }: { finding: SuppressionFindingRow }) {
+function FindingRow({
+  firmSlug,
+  finding,
+}: {
+  firmSlug: string;
+  finding: SuppressionFindingRow;
+}) {
+  // Whole row links to the detail page. The external-page link uses
+  // stopPropagation so clicking it opens the live page without also
+  // navigating into the detail view.
   return (
-    <div className="flex items-start justify-between gap-4 rounded-xl border border-white/10 bg-[--bg-secondary] px-5 py-4 transition-colors hover:border-white/20">
+    <Link
+      href={`/dashboard/${firmSlug}/suppression/${finding.findingId}`}
+      className="group flex items-start justify-between gap-4 rounded-xl border border-white/10 bg-[--bg-secondary] px-5 py-4 transition-colors hover:border-[--accent]/30"
+    >
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <ActionBadge action={finding.action} />
@@ -171,20 +191,32 @@ function FindingRow({ finding }: { finding: SuppressionFindingRow }) {
             </span>
           )}
         </div>
-        <a
-          href={finding.url}
-          target="_blank"
-          rel="noreferrer"
-          className="mt-2 inline-flex items-center gap-1 break-all text-sm font-medium text-white/90 hover:text-white"
-        >
-          {finding.title ?? finding.url}
-          <ExternalLink size={12} strokeWidth={1.5} className="shrink-0 text-white/40" />
-        </a>
+        <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+          <span className="break-all text-sm font-medium text-white/90 group-hover:text-white">
+            {finding.title ?? finding.url}
+          </span>
+          <a
+            href={finding.url}
+            target="_blank"
+            rel="noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="inline-flex items-center gap-1 text-xs text-white/40 hover:text-white/70"
+          >
+            open page
+            <ExternalLink size={10} strokeWidth={1.5} />
+          </a>
+        </div>
         {finding.rationale && (
           <p className="mt-1 line-clamp-2 text-xs text-white/55">{finding.rationale}</p>
         )}
       </div>
-    </div>
+      <div className="flex shrink-0 items-center gap-2 pl-2 pt-1 text-[--accent]/70 group-hover:text-[--accent]">
+        {finding.action === 'rewrite' ? (
+          <Wand2 size={14} strokeWidth={1.5} />
+        ) : null}
+        <ArrowRight size={16} strokeWidth={1.5} />
+      </div>
+    </Link>
   );
 }
 

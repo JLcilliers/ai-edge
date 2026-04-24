@@ -287,3 +287,52 @@ export const monthlyReports = pgTable('monthly_report', {
 }, (t) => ({
   firmMonthIdx: uniqueIndex('monthly_report_firm_month').on(t.firm_id, t.month_key),
 }));
+
+// ── Legacy rewrite drafts ──────────────────────────────────
+// PLAN §5.3: for borderline-drift pages (semantic_distance ∈ (0.30, 0.45]),
+// generate an AI-assisted rewrite that:
+//   • preserves named entities (people, places, awards)
+//   • matches Brand Truth tone_guidelines
+//   • weaves in required_positioning_phrases where natural
+//   • never uses banned_claims
+//
+// Shape:
+//   One draft per finding — regeneration replaces the current draft in place
+//   via the unique index on legacy_finding_id. Historic drafts are not
+//   retained; if that becomes a review requirement we'll flip the schema to
+//   append-only with a latest-flag.
+//
+// brand_truth_version_id ties the draft to the exact Brand Truth in force at
+// generation time. If the operator later edits Brand Truth and re-reviews a
+// draft, the UI can surface "this draft was aligned to v3; you're now on v5".
+export const legacyRewriteDrafts = pgTable('legacy_rewrite_draft', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  legacy_finding_id: uuid('legacy_finding_id').notNull()
+    .references(() => legacyFindings.id, { onDelete: 'cascade' }),
+  brand_truth_version_id: uuid('brand_truth_version_id')
+    .references(() => brandTruthVersions.id, { onDelete: 'set null' }),
+  // Snapshot of the current on-page content at generation time — lets the UI
+  // render a stable diff even if the crawler re-fetches the page and mutates
+  // `pages.main_content`.
+  current_title: text('current_title'),
+  current_excerpt: text('current_excerpt'),
+  // Generated copy.
+  proposed_title: text('proposed_title').notNull(),
+  proposed_body: text('proposed_body').notNull(),
+  // Plain-English summary of what changed and why.
+  change_summary: text('change_summary'),
+  // Review aids — arrays of strings the model reports back in its JSON
+  // response. `entities_preserved` is the canary for fabrication regressions.
+  entities_preserved: jsonb('entities_preserved').$type<string[]>().notNull().default([]),
+  positioning_fixes: jsonb('positioning_fixes').$type<string[]>().notNull().default([]),
+  banned_claims_avoided: jsonb('banned_claims_avoided').$type<string[]>().notNull().default([]),
+  // Generation provenance.
+  generated_by_model: text('generated_by_model').notNull(),
+  cost_usd: real('cost_usd'),
+  // Workflow: 'draft' → 'accepted' (operator endorses) | 'rejected' (regenerate)
+  status: text('status').notNull().default('draft'),
+  generated_at: timestamp('generated_at', { withTimezone: true }).defaultNow().notNull(),
+  reviewed_at: timestamp('reviewed_at', { withTimezone: true }),
+}, (t) => ({
+  findingIdx: uniqueIndex('legacy_rewrite_draft_finding').on(t.legacy_finding_id),
+}));
