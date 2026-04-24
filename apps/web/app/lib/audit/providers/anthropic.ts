@@ -1,6 +1,9 @@
 import Anthropic from '@anthropic-ai/sdk';
+import type { ProviderQueryOptions, ProviderQueryResult } from './openai';
 
-const SYSTEM_PROMPT =
+export const PROVIDER_NAME = 'anthropic' as const;
+export const DEFAULT_MODEL = 'claude-sonnet-4-20250514';
+export const SYSTEM_PROMPT =
   'You are a helpful assistant answering questions about marketing agencies and law firms. Provide detailed, factual answers. Always cite your sources when possible.';
 
 let _client: Anthropic | null = null;
@@ -11,19 +14,17 @@ function getClient(): Anthropic {
   return _client;
 }
 
-export async function queryAnthropic(queryText: string): Promise<{
-  text: string;
-  model: string;
-  latencyMs: number;
-  raw: unknown;
-}> {
+export async function queryAnthropic(
+  queryText: string,
+  options: ProviderQueryOptions = {},
+): Promise<ProviderQueryResult> {
   const client = getClient();
   const start = Date.now();
 
   const response = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: DEFAULT_MODEL,
     max_tokens: 4096,
-    temperature: 0,
+    temperature: options.temperature ?? 0,
     system: SYSTEM_PROMPT,
     messages: [{ role: 'user', content: queryText }],
   });

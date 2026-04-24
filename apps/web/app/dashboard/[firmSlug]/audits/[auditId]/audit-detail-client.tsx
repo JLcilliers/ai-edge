@@ -1,9 +1,8 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Download, ChevronDown } from 'lucide-react';
-import { exportAuditCsv } from '../../../../actions/audit-actions';
+import { ArrowLeft, Download, ChevronDown, GitCompare, AlertTriangle } from 'lucide-react';
 
 type Result = {
   queryText: string;
@@ -17,6 +16,11 @@ type Result = {
   citationUrls: string[];
   responsePreview: string;
   fullResponse: string;
+  // Self-consistency: k samples per (query, provider), variance = fraction
+  // of samples whose `mentioned` vote disagreed with the majority.
+  // Surfaced only when k > 1 so legacy k=1 rows stay visually unchanged.
+  k: number;
+  variance: number;
 };
 
 type Detail = {
@@ -48,23 +52,14 @@ export function AuditDetailClient({
   const { run, results, summary } = detail;
   const [filter, setFilter] = useState<'all' | 'red' | 'yellow' | 'green'>('all');
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
-  const [isExporting, startExport] = useTransition();
 
   const filtered = filter === 'all' ? results : results.filter((r) => r.ragLabel === filter);
   const total = summary.red + summary.yellow + summary.green;
 
-  const handleExport = () => {
-    startExport(async () => {
-      const csv = await exportAuditCsv(auditId);
-      const blob = new Blob([csv], { type: 'text/csv' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `audit-${auditId.slice(0, 8)}-${new Date().toISOString().slice(0, 10)}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-    });
-  };
+  // CSV download is a plain GET against the public-shape /api route —
+  // no client-side conversion, Content-Disposition triggers the
+  // browser's native save dialog, and operators can share the URL.
+  const csvHref = `/api/audits/${auditId}/export.csv`;
 
   const dateStr = run.startedAt ? new Date(run.startedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
   const durationSec = run.finishedAt && run.startedAt
@@ -92,14 +87,22 @@ export function AuditDetailClient({
             <span>{total} results</span>
           </div>
         </div>
-        <button
-          onClick={handleExport}
-          disabled={isExporting}
-          className="flex items-center gap-2 rounded-full border border-white/10 bg-transparent px-5 py-2.5 text-sm text-white transition-colors hover:border-[--accent] disabled:opacity-50"
-        >
-          <Download size={16} strokeWidth={1.5} />
-          {isExporting ? 'Exporting...' : 'Export CSV'}
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/dashboard/${firmSlug}/audits/${auditId}/diff`}
+            className="flex items-center gap-2 rounded-full border border-white/10 bg-transparent px-5 py-2.5 text-sm text-white transition-colors hover:border-[--accent]"
+          >
+            <GitCompare size={16} strokeWidth={1.5} />
+            Compare to previous
+          </Link>
+          <a
+            href={csvHref}
+            className="flex items-center gap-2 rounded-full border border-white/10 bg-transparent px-5 py-2.5 text-sm text-white transition-colors hover:border-[--accent]"
+          >
+            <Download size={16} strokeWidth={1.5} />
+            Export CSV
+          </a>
+        </div>
       </div>
 
       {/* RAG summary stats */}
@@ -159,7 +162,14 @@ export function AuditDetailClient({
           <p className="py-12 text-center text-sm text-white/30">No results for this filter.</p>
         )}
 
-        {filtered.map((r, i) => (
+        {filtered.map((r, i) => {
+          // Variance > 0 at k=3 means at least one sample disagreed with
+          // the majority `mentioned` vote — a reliability warning the
+          // operator wants to see before trusting the row.
+          const showVariance = r.k > 1;
+          const variancePct = Math.round(r.variance * 100);
+          const hasDissent = showVariance && r.variance > 0;
+          return (
           <div key={i} className="border-t border-white/5">
             <button
               type="button"
@@ -169,7 +179,18 @@ export function AuditDetailClient({
               <span className={`w-16 rounded-full px-3 py-1 text-center text-xs font-medium uppercase tracking-wider ${RAG_BADGE[r.ragLabel] ?? 'bg-white/10 text-white/55'}`}>
                 {r.ragLabel}
               </span>
-              <span className="flex-1 truncate text-white/80">{r.queryText}</span>
+              <span className="flex-1 truncate text-white/80">
+                {r.queryText}
+                {hasDissent && (
+                  <span
+                    className="ml-2 inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 align-middle text-[10px] font-medium uppercase tracking-wider text-amber-300"
+                    title={`Provider samples disagreed — ${variancePct}% variance across k=${r.k} samples`}
+                  >
+                    <AlertTriangle size={10} strokeWidth={2} />
+                    {variancePct}%
+                  </span>
+                )}
+              </span>
               <span className="w-24 font-[family-name:var(--font-geist-mono)] text-xs text-white/40">{r.provider}</span>
               <span className="w-20 text-right font-[family-name:var(--font-geist-mono)] text-sm text-white/60">
                 {r.toneScore !== null ? `${r.toneScore}/10` : '—'}
@@ -179,11 +200,19 @@ export function AuditDetailClient({
 
             {expandedRow === i && (
               <div className="border-t border-white/5 bg-[--bg-tertiary] p-6">
-                <div className="mb-4 flex gap-4 text-xs text-white/40">
+                <div className="mb-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/40">
                   <span>{r.mentioned ? '✓ Mentioned' : '✗ Not mentioned'}</span>
                   <span>Provider: {r.provider}</span>
                   <span>Model: {r.model}</span>
                   <span>{r.citationUrls.length} citations</span>
+                  {showVariance && (
+                    <span
+                      className={hasDissent ? 'text-amber-300' : undefined}
+                      title="Self-consistency: multiple samples drawn from each provider and majority-voted. Variance = fraction of samples that disagreed with the majority."
+                    >
+                      Self-consistency: k={r.k}{hasDissent ? `, ${variancePct}% dissent` : ', unanimous'}
+                    </span>
+                  )}
                 </div>
 
                 <div className="mb-4">
@@ -226,7 +255,8 @@ export function AuditDetailClient({
               </div>
             )}
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

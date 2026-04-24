@@ -9,6 +9,11 @@ import {
 } from '@ai-edge/db';
 import { eq, desc, sql, and, ne } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
+import {
+  getFirmBudgetStatus,
+  setFirmMonthlyCap,
+  type FirmBudgetStatus,
+} from '../lib/audit/budget';
 
 export type FirmType =
   | 'law_firm'
@@ -77,6 +82,8 @@ export type FirmSummary = {
     | { id: string; status: string; startedAt: Date }
     | null;
   redditMentionCount: number;
+  /** Current-month LLM spend vs. cap (for the budget tile). */
+  budget: FirmBudgetStatus;
 };
 
 /** Headline stats for the client profile page + client-list cards. */
@@ -87,7 +94,7 @@ export async function getFirmSummary(
   const firm = await getFirmBySlug(slug);
   if (!firm) return null;
 
-  const [btv, lastAudit, lastReddit, mentionCount] = await Promise.all([
+  const [btv, lastAudit, lastReddit, mentionCount, budget] = await Promise.all([
     db
       .select({
         version: brandTruthVersions.version,
@@ -125,6 +132,7 @@ export async function getFirmSummary(
       .select({ count: sql<number>`count(*)::int` })
       .from(redditMentions)
       .where(eq(redditMentions.firm_id, firm.id)),
+    getFirmBudgetStatus(firm.id),
   ]);
 
   return {
@@ -147,7 +155,29 @@ export async function getFirmSummary(
           }
         : null,
     redditMentionCount: mentionCount[0]?.count ?? 0,
+    budget,
   };
+}
+
+/**
+ * Set (or clear with null) the monthly LLM spend cap for a firm. Used by
+ * the overview budget panel; returns the fresh status so the caller can
+ * re-render without a second round trip.
+ */
+export async function setFirmBudget(
+  slug: string,
+  capUsd: number | null,
+  note?: string | null,
+): Promise<{ ok: true; budget: FirmBudgetStatus } | { ok: false; error: string }> {
+  const firm = await getFirmBySlug(slug);
+  if (!firm) return { ok: false, error: 'Firm not found' };
+  try {
+    await setFirmMonthlyCap(firm.id, capUsd, note);
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+  revalidatePath(`/dashboard/${slug}`);
+  return { ok: true, budget: await getFirmBudgetStatus(firm.id) };
 }
 
 function toSlug(name: string): string {

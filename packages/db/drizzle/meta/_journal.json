@@ -15,6 +15,55 @@
       "when": 1776429512236,
       "tag": "0001_sharp_inhumans",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1777025784900,
+      "tag": "0002_first_wind_dancer",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1777027750646,
+      "tag": "0003_natural_wiccan",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1777111233000,
+      "tag": "0004_narrow_spyke",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1777200000000,
+      "tag": "0005_friendly_maggott",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1777300000000,
+      "tag": "0006_legacy_rewrite_draft",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1777400000000,
+      "tag": "0007_legal_purifiers",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1777500000000,
+      "tag": "0008_reddit_triage",
+      "breakpoints": true
     }
   ]
 }
