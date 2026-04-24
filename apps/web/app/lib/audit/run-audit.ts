@@ -162,9 +162,21 @@ export async function runAudit(
         })),
       );
 
-      // Persist each sample + score majority.
-      for (let pi = 0; pi < providers.length; pi++) {
-        const provider = providers[pi]!;
+      // Persist each sample + score majority, in parallel across providers.
+      //
+      // Each provider's post-response block is independent:
+      //   - writes target disjoint rows (one consensus_response + one
+      //     alignment_score per provider, and citation / competitor rows
+      //     scoped by (query, provider) or (query, competitor))
+      //   - recordRunCost is SQL-side atomic (`coalesce + add`) so the
+      //     shared audit_run.cost_usd row serializes cleanly via row-lock
+      //   - scoreAlignment calls its own LLM endpoint and has no shared
+      //     in-memory state between invocations
+      //
+      // Previously serial (for-loop), which at 4 providers made the per-
+      // query wall-clock ~4× the single-provider time. Parallel Promise.all
+      // collapses that to max-of-providers instead of sum-of-providers.
+      await Promise.all(providers.map(async (provider, pi) => {
         const settled = perProviderResults[pi]!;
 
         if (settled.status === 'rejected') {
@@ -178,11 +190,11 @@ export async function runAudit(
             latency_ms: 0,
             cost_usd: 0,
           });
-          continue;
+          return;
         }
 
         const samples = settled.value;
-        if (samples.length === 0) continue;
+        if (samples.length === 0) return;
 
         // Persist every sample with its attempt index (1-based for legibility).
         await db.insert(modelResponses).values(
@@ -291,7 +303,7 @@ export async function runAudit(
             );
           }
         }
-      }
+      }));
     }
 
     // Mark completed (or budget-truncated).
