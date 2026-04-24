@@ -238,6 +238,35 @@ export const scenarioRuns = pgTable('scenario_run', {
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+// ── Citation drift (§5.2) ───────────────────────────────────
+// One row per pair of consecutive audit runs for a firm — records which
+// cited domains were newly gained (in latest, not in previous) and which
+// were lost (in previous, not in latest). Populated by the nightly
+// citation-diff cron; read by the visibility dashboard.
+//
+// `latest_run_id` is unique per firm because every nightly run re-diffs
+// against whatever "the most recent completed run" is — the cron is
+// idempotent by that pair, so we upsert if it already exists.
+export const citationDiffs = pgTable('citation_diff', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  firm_id: uuid('firm_id').notNull().references(() => firms.id, { onDelete: 'cascade' }),
+  latest_run_id: uuid('latest_run_id').notNull()
+    .references(() => auditRuns.id, { onDelete: 'cascade' }),
+  previous_run_id: uuid('previous_run_id').notNull()
+    .references(() => auditRuns.id, { onDelete: 'cascade' }),
+  // Arrays of lowercased domains. Bounded — top-N only would be fine but
+  // citation corpora are small (dozens of domains per run) so we store
+  // them whole for UI display.
+  gained: jsonb('gained').$type<string[]>().notNull().default([]),
+  lost: jsonb('lost').$type<string[]>().notNull().default([]),
+  gained_count: integer('gained_count').notNull().default(0),
+  lost_count: integer('lost_count').notNull().default(0),
+  detected_at: timestamp('detected_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  firmLatestIdx: uniqueIndex('citation_diff_firm_latest').on(t.firm_id, t.latest_run_id),
+  firmDetectedIdx: index('citation_diff_firm_detected').on(t.firm_id, t.detected_at),
+}));
+
 // ── Monthly reports ─────────────────────────────────────────
 // One row per firm per calendar month. The JSON payload is generated
 // from audit-runs, reddit mentions, competitor mentions, suppression

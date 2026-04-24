@@ -15,12 +15,20 @@ import {
   Database,
   ShieldCheck,
   FileBarChart,
+  Eye,
+  TrendingUp,
+  TrendingDown,
+  AlertTriangle,
 } from 'lucide-react';
 import {
   getFirmBySlug,
   getFirmSummary,
   type FirmType,
 } from '../../actions/firm-actions';
+import {
+  getAlignmentRegression,
+  type AlignmentRegression,
+} from '../../actions/visibility-actions';
 import type { FirmBudgetStatus } from '../../lib/audit/budget';
 
 export const dynamic = 'force-dynamic';
@@ -57,7 +65,10 @@ export default async function FirmOverviewPage({
   const firm = await getFirmBySlug(firmSlug);
   if (!firm) notFound();
 
-  const summary = await getFirmSummary(firmSlug).catch(() => null);
+  const [summary, regression] = await Promise.all([
+    getFirmSummary(firmSlug).catch(() => null),
+    getAlignmentRegression(firmSlug).catch(() => null),
+  ]);
   const Icon = FIRM_TYPE_ICON[firm.firm_type];
 
   return (
@@ -81,6 +92,11 @@ export default async function FirmOverviewPage({
           </p>
         </div>
       </div>
+
+      {/* Alignment regression banner — only when red% moved ≥5pp in either direction. */}
+      {regression ? (
+        <OverviewRegressionBanner firmSlug={firmSlug} regression={regression} />
+      ) : null}
 
       {/* Headline stats */}
       <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
@@ -137,6 +153,13 @@ export default async function FirmOverviewPage({
           title="Trust Alignment Audits"
           description="Run LLM prompts across GPT / Claude / Gemini and score how they describe this client vs Brand Truth."
           cta="Run & review audits"
+        />
+        <ModuleCard
+          href={`/dashboard/${firmSlug}/visibility`}
+          icon={Eye}
+          title="Brand Visibility"
+          description="Share-of-voice vs competitors, the domains LLMs cite as sources, and how citation sets drift between runs."
+          cta="Explore visibility"
         />
         <ModuleCard
           href={`/dashboard/${firmSlug}/reddit`}
@@ -271,6 +294,83 @@ function BudgetTile({ budget }: { budget: FirmBudgetStatus | null }) {
       </div>
       <div className="mt-1 text-xs text-white/40">{detailText}</div>
     </div>
+  );
+}
+
+/**
+ * Alignment-gap regression banner.
+ *
+ * Surfaces material movement in the red% of the last two completed scoring
+ * runs (full or daily-priority). Hidden when severity is 'stable' or
+ * 'insufficient_data' — no banner is better than a noisy banner.
+ *
+ * 'critical' (≥10pp worse) → red tone
+ * 'warning'  (≥5pp worse)  → amber tone
+ * 'improving' (≥5pp better) → green tone
+ */
+function OverviewRegressionBanner({
+  firmSlug,
+  regression,
+}: {
+  firmSlug: string;
+  regression: AlignmentRegression;
+}) {
+  if (regression.severity === 'stable' || regression.severity === 'insufficient_data') {
+    return null;
+  }
+
+  const config =
+    regression.severity === 'critical'
+      ? {
+          border: 'border-red-500/40',
+          bg: 'bg-red-500/10',
+          text: 'text-red-200',
+          label: 'Critical regression',
+          Icon: AlertTriangle,
+        }
+      : regression.severity === 'warning'
+        ? {
+            border: 'border-amber-500/40',
+            bg: 'bg-amber-500/10',
+            text: 'text-amber-200',
+            label: 'Alignment regression',
+            Icon: TrendingUp,
+          }
+        : {
+            border: 'border-emerald-500/40',
+            bg: 'bg-emerald-500/10',
+            text: 'text-emerald-200',
+            label: 'Alignment improving',
+            Icon: TrendingDown,
+          };
+
+  const delta = regression.redDeltaPp;
+  const deltaLabel =
+    regression.severity === 'improving'
+      ? `${Math.abs(delta).toFixed(1)}pp lower red`
+      : `${delta.toFixed(1)}pp higher red`;
+
+  return (
+    <Link
+      href={`/dashboard/${firmSlug}/visibility`}
+      className={`mb-8 flex items-start gap-4 rounded-xl border p-4 transition-colors hover:brightness-110 ${config.border} ${config.bg}`}
+    >
+      <config.Icon size={20} strokeWidth={2} className={config.text} />
+      <div className="flex-1">
+        <div className={`text-sm font-semibold ${config.text}`}>
+          {config.label} · {deltaLabel}
+        </div>
+        <div className="mt-1 text-xs text-white/55">
+          Latest run {regression.latestRedPct.toFixed(1)}% red vs previous{' '}
+          {regression.previousRedPct.toFixed(1)}% red
+          {regression.latestRunStartedAt
+            ? ` (${formatDate(regression.latestRunStartedAt)})`
+            : ''}
+          . View drift detail in Visibility.
+        </div>
+      </div>
+      <ArrowRight size={16} strokeWidth={2} className={config.text} />
+    </Link>
   );
 }
 

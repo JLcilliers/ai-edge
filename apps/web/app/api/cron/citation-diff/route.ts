@@ -5,8 +5,9 @@ import {
   queries as queriesTable,
   consensusResponses,
   citations,
+  citationDiffs,
 } from '@ai-edge/db';
-import { eq, desc, and, inArray } from 'drizzle-orm';
+import { eq, desc, and, inArray, sql } from 'drizzle-orm';
 import { isAuthorizedCronRequest, unauthorizedResponse } from '../../../lib/cron/auth';
 
 export const dynamic = 'force-dynamic';
@@ -20,10 +21,13 @@ export const maxDuration = 300;
  * dropped out) are the signal we care about — individual URLs churn too much
  * to be useful directly.
  *
- * Results are logged to stdout (picked up by Vercel Logs) and also recorded as
- * a no-op `auditRuns` row with `kind='citation-diff'` so the UI can detect
- * that the cron is healthy. A proper `citation_diff` table is deferred until
- * we build the UI surface — no point in schema churn before there's a reader.
+ * Persists gained/lost into `citation_diff` keyed by (firm_id, latest_run_id)
+ * so the Visibility dashboard can surface drift over time. Also records a
+ * no-op `audit_run` row with `kind='citation-diff'` as a cron heartbeat.
+ *
+ * The (firm_id, latest_run_id) upsert is idempotent — re-running the cron for
+ * the same pair of runs refreshes the row in place rather than creating a
+ * duplicate.
  */
 export async function GET(request: Request) {
   if (!isAuthorizedCronRequest(request)) return unauthorizedResponse();
@@ -76,6 +80,31 @@ export async function GET(request: Request) {
 
       const gained = [...latestDomains].filter((d) => !previousDomains.has(d)).sort();
       const lost = [...previousDomains].filter((d) => !latestDomains.has(d)).sort();
+
+      // Persist the diff. Upsert on (firm_id, latest_run_id) so re-running
+      // the cron for the same pair refreshes counts/arrays idempotently.
+      await db
+        .insert(citationDiffs)
+        .values({
+          firm_id: firm.id,
+          latest_run_id: latest!.id,
+          previous_run_id: previous!.id,
+          gained,
+          lost,
+          gained_count: gained.length,
+          lost_count: lost.length,
+        })
+        .onConflictDoUpdate({
+          target: [citationDiffs.firm_id, citationDiffs.latest_run_id],
+          set: {
+            previous_run_id: previous!.id,
+            gained,
+            lost,
+            gained_count: gained.length,
+            lost_count: lost.length,
+            detected_at: sql`now()`,
+          },
+        });
 
       // Record a healthy-cron heartbeat run.
       await db.insert(auditRuns).values({
