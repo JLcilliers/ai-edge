@@ -14,6 +14,7 @@ import { eq } from 'drizzle-orm';
 import { queryOpenAI } from './providers/openai';
 import { queryAnthropic } from './providers/anthropic';
 import { queryOpenRouter } from './providers/openrouter';
+import { queryPerplexity } from './providers/perplexity';
 import { scoreAlignment } from './scoring/alignment-scorer';
 
 /**
@@ -87,12 +88,15 @@ export async function runAudit(
 
       const queryId = queryRow!.id;
 
-      // Fan out to providers in parallel. OpenRouter adds Gemini (and future
-      // models) without another SDK — opt in by setting OPENROUTER_API_KEY.
+      // Fan out to providers in parallel. Each is gated on its env key so
+      // we never pay for an unkeyed provider. OpenRouter covers Gemini /
+      // Llama / DeepSeek / Mistral under one key; Perplexity Sonar runs live
+      // web search and brings back its own citations.
       const providers = [
         { name: 'openai', fn: queryOpenAI, enabled: !!process.env.OPENAI_API_KEY },
         { name: 'anthropic', fn: queryAnthropic, enabled: !!process.env.ANTHROPIC_API_KEY },
         { name: 'openrouter', fn: queryOpenRouter, enabled: !!process.env.OPENROUTER_API_KEY },
+        { name: 'perplexity', fn: queryPerplexity, enabled: !!process.env.PERPLEXITY_API_KEY },
       ].filter((p) => p.enabled);
 
       const results = await Promise.allSettled(
