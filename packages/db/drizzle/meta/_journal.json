@@ -15,6 +15,13 @@
       "when": 1776429512236,
       "tag": "0001_sharp_inhumans",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1777025784900,
+      "tag": "0002_first_wind_dancer",
+      "breakpoints": true
     }
   ]
 }

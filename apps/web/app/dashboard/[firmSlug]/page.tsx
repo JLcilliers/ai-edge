@@ -11,6 +11,7 @@ import {
   HelpCircle,
   Building2,
   Users,
+  FileX,
 } from 'lucide-react';
 import {
   getFirmBySlug,
@@ -145,6 +146,13 @@ export default async function FirmOverviewPage({
           title="Competitors"
           description="Track rival firms across audits — share-of-mention, praise asymmetry, and whose websites the LLMs cite instead of ours."
           cta="Manage roster"
+        />
+        <ModuleCard
+          href={`/dashboard/${firmSlug}/suppression`}
+          icon={FileX}
+          title="Legacy Suppression"
+          description="Find site pages that drift from the Brand Truth and queue them for rewrite or noindex. Drifting pages poison LLM alignment."
+          cta="Scan & triage pages"
         />
       </div>
     </div>

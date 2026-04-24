@@ -108,7 +108,20 @@ export const pages = pgTable('page', {
   url: text('url').notNull(),
   title: text('title'),
   content_hash: text('content_hash'),
-  embedding_id: text('embedding_id'), // Pinecone vector id
+  // Extracted main content (readability-style). Stored inline so we can
+  // re-score without re-crawling; truncated at ~20k chars before insert
+  // to keep rows bounded.
+  main_content: text('main_content'),
+  // Word count on the extracted content — used to decide whether a page
+  // has enough signal to be worth scoring.
+  word_count: integer('word_count'),
+  // Embedding vector as jsonb array — keeps infra simple (no pgvector,
+  // no separate Pinecone round-trip for V1). text-embedding-3-large
+  // output is 3072 floats ≈ 25KB per row, acceptable for sub-1000-page
+  // firms. Swap to Pinecone when a firm grows past that bound.
+  embedding: jsonb('embedding').$type<number[]>(),
+  embedding_model: text('embedding_model'),
+  embedding_id: text('embedding_id'), // Pinecone vector id (future)
   fetched_at: timestamp('fetched_at', { withTimezone: true }),
 }, (t) => ({
   firmUrlIdx: uniqueIndex('page_firm_url').on(t.firm_id, t.url),
