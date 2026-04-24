@@ -16,8 +16,29 @@ import { queryAnthropic } from './providers/anthropic';
 import { queryOpenRouter } from './providers/openrouter';
 import { scoreAlignment } from './scoring/alignment-scorer';
 
-export async function runAudit(firmId: string, brandTruthVersionId: string): Promise<string> {
+/**
+ * Options for an audit run.
+ *
+ * `kind='full'` runs every seed query in the Brand Truth — the weekly cadence.
+ * `kind='daily-priority'` runs only the top N queries (default 20) — cheap
+ *   daily cadence for the high-value prospect-intent queries.
+ */
+export type AuditKind = 'full' | 'daily-priority';
+
+export interface RunAuditOptions {
+  kind?: AuditKind;
+  /** Max number of seed queries to run. Only applied when kind='daily-priority'. */
+  queryLimit?: number;
+}
+
+export async function runAudit(
+  firmId: string,
+  brandTruthVersionId: string,
+  options: RunAuditOptions = {},
+): Promise<string> {
   const db = getDb();
+  const kind = options.kind ?? 'full';
+  const queryLimit = options.queryLimit ?? 20;
 
   // Create audit run
   const [run] = await db
@@ -25,7 +46,7 @@ export async function runAudit(firmId: string, brandTruthVersionId: string): Pro
     .values({
       firm_id: firmId,
       brand_truth_version_id: brandTruthVersionId,
-      kind: 'full',
+      kind,
       status: 'running',
       started_at: new Date(),
     })
@@ -44,9 +65,13 @@ export async function runAudit(firmId: string, brandTruthVersionId: string): Pro
     if (!btVersion) throw new Error('Brand Truth version not found');
     const brandTruth = btVersion.payload as BrandTruth;
 
-    // Get seed queries from the Brand Truth
-    const seedQueries = (brandTruth as any).seed_query_intents ?? [];
-    if (seedQueries.length === 0) throw new Error('No seed queries in Brand Truth');
+    // Get seed queries from the Brand Truth, sliced for daily-priority
+    const allSeedQueries = (brandTruth as any).seed_query_intents ?? [];
+    if (allSeedQueries.length === 0) throw new Error('No seed queries in Brand Truth');
+    const seedQueries: string[] =
+      kind === 'daily-priority'
+        ? allSeedQueries.slice(0, queryLimit)
+        : allSeedQueries;
 
     // Process each query
     for (const queryText of seedQueries) {
@@ -56,7 +81,7 @@ export async function runAudit(firmId: string, brandTruthVersionId: string): Pro
         .values({
           audit_run_id: auditRunId,
           text: queryText,
-          priority: 'standard',
+          priority: kind === 'daily-priority' ? 'top20' : 'standard',
         })
         .returning({ id: queriesTable.id });
 
