@@ -10,6 +10,7 @@ import {
   Megaphone,
   HelpCircle,
   Building2,
+  Users,
 } from 'lucide-react';
 import {
   getFirmBySlug,
@@ -137,6 +138,13 @@ export default async function FirmOverviewPage({
           title="Reddit Sentiment"
           description="What Redditors say about this client, and what prospects are asking. High-weight LLM citation source."
           cta="Scan & review mentions"
+        />
+        <ModuleCard
+          href={`/dashboard/${firmSlug}/competitors`}
+          icon={Users}
+          title="Competitors"
+          description="Track rival firms across audits — share-of-mention, praise asymmetry, and whose websites the LLMs cite instead of ours."
+          cta="Manage roster"
         />
       </div>
     </div>

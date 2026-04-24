@@ -8,6 +8,8 @@ import {
   citations as citationsTable,
   brandTruthVersions,
   remediationTickets,
+  competitors as competitorsTable,
+  competitorMentions,
 } from '@ai-edge/db';
 import type { BrandTruth } from '@ai-edge/shared';
 import { eq } from 'drizzle-orm';
@@ -16,6 +18,7 @@ import { queryAnthropic } from './providers/anthropic';
 import { queryOpenRouter } from './providers/openrouter';
 import { queryPerplexity } from './providers/perplexity';
 import { scoreAlignment } from './scoring/alignment-scorer';
+import { detectCompetitorMentions } from '../competitors/detect';
 
 /**
  * Options for an audit run.
@@ -65,6 +68,17 @@ export async function runAudit(
 
     if (!btVersion) throw new Error('Brand Truth version not found');
     const brandTruth = btVersion.payload as BrandTruth;
+
+    // Load competitor roster once for the whole run — detection only needs
+    // name + website, and the roster doesn't change mid-run.
+    const competitorRoster = await db
+      .select({
+        id: competitorsTable.id,
+        name: competitorsTable.name,
+        website: competitorsTable.website,
+      })
+      .from(competitorsTable)
+      .where(eq(competitorsTable.firm_id, firmId));
 
     // Get seed queries from the Brand Truth, sliced for daily-priority
     const allSeedQueries = (brandTruth as any).seed_query_intents ?? [];
@@ -169,6 +183,32 @@ export async function runAudit(
                   rank,
                 })),
               );
+            }
+
+            // Detect competitor mentions in the response. Deterministic +
+            // local — no extra LLM call — so we run it for every provider.
+            // The table is scoped by (firm_id, competitor_id, query_id), not
+            // per-provider; if multiple providers mention competitor X for
+            // the same query we currently write one row per provider. That
+            // gives us more signal than dedup'd rows and matches the per-
+            // provider-per-query shape of consensus_responses.
+            if (competitorRoster.length > 0) {
+              const detected = detectCompetitorMentions({
+                brandTruth,
+                competitors: competitorRoster,
+                responseText: result.text,
+              });
+              if (detected.length > 0) {
+                await db.insert(competitorMentions).values(
+                  detected.map((d) => ({
+                    firm_id: firmId,
+                    competitor_id: d.competitorId,
+                    query_id: queryId,
+                    share: d.share,
+                    praise_flag: d.praiseFlag,
+                  })),
+                );
+              }
             }
 
             return { provider: provider.name, success: true };

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, FileText, ClipboardCheck, MessageSquare } from 'lucide-react';
+import { LayoutDashboard, FileText, ClipboardCheck, MessageSquare, Users } from 'lucide-react';
 
 type NavItem = {
   label: string;
@@ -35,6 +35,12 @@ const ITEMS: NavItem[] = [
     label: 'Reddit',
     href: (slug) => `/dashboard/${slug}/reddit`,
     icon: MessageSquare,
+    match: 'prefix',
+  },
+  {
+    label: 'Competitors',
+    href: (slug) => `/dashboard/${slug}/competitors`,
+    icon: Users,
     match: 'prefix',
   },
 ];
