@@ -11,7 +11,7 @@ import {
   modelResponses,
   brandTruthVersions,
 } from '@ai-edge/db';
-import { eq, desc, inArray, sql } from 'drizzle-orm';
+import { eq, desc, inArray, sql, and } from 'drizzle-orm';
 import { runAudit } from '../lib/audit/run-audit';
 import { getFirmBudgetStatus } from '../lib/audit/budget';
 
@@ -99,6 +99,48 @@ export async function getAuditRuns(firmSlug: string): Promise<
     .from(auditRuns)
     .where(eq(auditRuns.firm_id, firmId))
     .orderBy(desc(auditRuns.started_at));
+}
+
+/**
+ * Cancel an in-flight audit run. Flips status from 'running' → 'cancelled'
+ * atomically using a conditional UPDATE — if the run already finished (or
+ * was cancelled by someone else) the UPDATE matches zero rows and we
+ * return `{ ok: false, reason: 'not_running' }` so the UI can distinguish
+ * "too late" from a real failure.
+ *
+ * The in-flight loop in `runAudit` re-reads `audit_run.status` at the top
+ * of each query iteration and breaks out if it's no longer 'running'.
+ * That means cancellation latency is bounded by one query's duration —
+ * the current query finishes, then the loop bails. That's an accepted
+ * tradeoff: interrupting a mid-flight provider call would leak an HTTP
+ * request and risk a half-written consensus row; letting the current
+ * iteration finish keeps the data consistent.
+ *
+ * The final status update in runAudit is also guarded on `status='running'`
+ * so this cancellation survives — the run won't be overwritten to
+ * 'completed' when the (truncated) loop exits.
+ */
+export async function cancelAudit(
+  auditRunId: string,
+): Promise<{ ok: true } | { ok: false; reason: 'not_running' | 'error'; message?: string }> {
+  try {
+    const db = getDb();
+    const updated = await db
+      .update(auditRuns)
+      .set({
+        status: 'cancelled',
+        finished_at: new Date(),
+        error: 'Cancelled by operator',
+      })
+      .where(and(eq(auditRuns.id, auditRunId), eq(auditRuns.status, 'running')))
+      .returning({ id: auditRuns.id });
+    if (updated.length === 0) {
+      return { ok: false, reason: 'not_running' };
+    }
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, reason: 'error', message: String(err) };
+  }
 }
 
 /**

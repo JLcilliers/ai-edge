@@ -12,7 +12,7 @@ import {
   competitorMentions,
 } from '@ai-edge/db';
 import type { BrandTruth } from '@ai-edge/shared';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { scoreAlignment } from './scoring/alignment-scorer';
 import { detectCompetitorMentions } from '../competitors/detect';
 import { getEnabledProviders, runProviderQuery, type ProviderDescriptor } from './run-provider';
@@ -121,8 +121,26 @@ export async function runAudit(
 
     const providers = getEnabledProviders();
     let budgetHit = false;
+    let cancelled = false;
 
     for (let qi = 0; qi < seedQueries.length; qi++) {
+      // Cancellation gate. `cancelAudit` (server action) flips status to
+      // 'cancelled' directly in the DB; we re-read here so the loop can
+      // notice out-of-process intent without any shared memory. Latency
+      // is bounded by one query's duration — we let the current iteration
+      // finish rather than abort a live provider call mid-flight, which
+      // would leak HTTP requests + risk half-written consensus rows.
+      const [runState] = await db
+        .select({ status: auditRuns.status })
+        .from(auditRuns)
+        .where(eq(auditRuns.id, auditRunId))
+        .limit(1);
+      if (runState && runState.status !== 'running') {
+        cancelled = true;
+        console.log(`[audit] firm ${firmId} run ${auditRunId} no longer running (status=${runState.status}); exiting loop at query ${qi}`);
+        break;
+      }
+
       // Mid-run budget gate. Also catches the case where the firm was *just*
       // below cap at kickoff and crossed over after a few expensive queries.
       if (await isFirmOverBudget(firmId)) {
@@ -306,18 +324,30 @@ export async function runAudit(
       }));
     }
 
-    // Mark completed (or budget-truncated).
-    const finalStatus = budgetHit ? 'completed_budget_truncated' : 'completed';
-    await db
-      .update(auditRuns)
-      .set({ status: finalStatus, finished_at: new Date() })
-      .where(eq(auditRuns.id, auditRunId));
+    // Mark completed (or budget-truncated). If the loop exited because the
+    // run was cancelled (status already flipped to 'cancelled' by the server
+    // action), skip the final write entirely — the cancel already set
+    // status + finished_at + error in a single atomic UPDATE.
+    //
+    // The `status='running'` WHERE clause is the belt-and-braces guard in
+    // case a race happens between the cancellation gate reading 'running'
+    // and this final UPDATE firing: if something else flipped status in
+    // the window, we won't overwrite it.
+    if (!cancelled) {
+      const finalStatus = budgetHit ? 'completed_budget_truncated' : 'completed';
+      await db
+        .update(auditRuns)
+        .set({ status: finalStatus, finished_at: new Date() })
+        .where(and(eq(auditRuns.id, auditRunId), eq(auditRuns.status, 'running')));
+    }
   } catch (err) {
-    // Mark failed
+    // Mark failed — but only if still 'running'. A cancellation-in-progress
+    // that races with a thrown error should keep the operator-intent
+    // 'cancelled' label rather than getting clobbered to 'failed'.
     await db
       .update(auditRuns)
       .set({ status: 'failed', finished_at: new Date(), error: String(err) })
-      .where(eq(auditRuns.id, auditRunId));
+      .where(and(eq(auditRuns.id, auditRunId), eq(auditRuns.status, 'running')));
   }
 
   return auditRunId;

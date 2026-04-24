@@ -4,7 +4,7 @@ import { useState, useTransition, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { BarChart3, AlertCircle } from 'lucide-react';
-import { startAudit, getAuditRunStatus } from '../../../actions/audit-actions';
+import { startAudit, getAuditRunStatus, cancelAudit } from '../../../actions/audit-actions';
 import type { FirmBudgetStatus } from '../../../lib/audit/budget';
 
 type Run = {
@@ -77,6 +77,34 @@ export function AuditListClient({
     });
   };
 
+  // Cancel the in-flight audit. The server action flips audit_run.status
+  // to 'cancelled' immediately (atomic UPDATE gated on status='running');
+  // the run-audit loop picks that up at the top of the next iteration
+  // and exits without writing a completion row. Latency: bounded by one
+  // query's duration, because we let the current iteration finish rather
+  // than interrupt a live provider call mid-flight.
+  const [cancelPending, setCancelPending] = useState(false);
+  const handleCancelAudit = async () => {
+    if (!runningId || cancelPending) return;
+    setCancelPending(true);
+    setError(null);
+    try {
+      const result = await cancelAudit(runningId);
+      if (!result.ok) {
+        if (result.reason === 'not_running') {
+          // Race: run finished before we could cancel it. Harmless — the
+          // poll loop will pick up the terminal status next tick. Don't
+          // show an error; just let the natural flow play out.
+        } else {
+          setError(result.message ?? 'Could not cancel audit');
+        }
+      }
+      router.refresh();
+    } finally {
+      setCancelPending(false);
+    }
+  };
+
   // Pre-emptively disable the button when the server-side pre-flight gate
   // in startAudit would refuse it. We duplicate the check client-side so
   // the UI state matches reality without a round trip — the server-side
@@ -104,28 +132,39 @@ export function AuditListClient({
       )}
 
       {runningId && (
-        <div className="mt-4 flex items-center gap-3 rounded-xl border border-[--accent]/30 bg-[--accent]/10 px-4 py-3">
-          <div className="h-3 w-3 animate-pulse rounded-full bg-[--accent]" />
-          <span className="text-sm text-[--accent]">
-            Audit in progress
-            {progress && progress.queriesCompleted > 0 && (
-              <>
-                {' · '}
-                <span className="font-[family-name:var(--font-geist-mono)]">
-                  {progress.queriesCompleted} {progress.queriesCompleted === 1 ? 'query' : 'queries'}
-                </span>
-                {progress.spentUsd > 0 && (
-                  <>
-                    {' · '}
-                    <span className="font-[family-name:var(--font-geist-mono)]">
-                      ${progress.spentUsd.toFixed(2)} spent
-                    </span>
-                  </>
-                )}
-              </>
-            )}
-            <span className="ml-2 text-[--accent]/70">polling every 5s</span>
-          </span>
+        <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-[--accent]/30 bg-[--accent]/10 px-4 py-3">
+          <div className="flex items-center gap-3">
+            <div className="h-3 w-3 animate-pulse rounded-full bg-[--accent]" />
+            <span className="text-sm text-[--accent]">
+              Audit in progress
+              {progress && progress.queriesCompleted > 0 && (
+                <>
+                  {' · '}
+                  <span className="font-[family-name:var(--font-geist-mono)]">
+                    {progress.queriesCompleted} {progress.queriesCompleted === 1 ? 'query' : 'queries'}
+                  </span>
+                  {progress.spentUsd > 0 && (
+                    <>
+                      {' · '}
+                      <span className="font-[family-name:var(--font-geist-mono)]">
+                        ${progress.spentUsd.toFixed(2)} spent
+                      </span>
+                    </>
+                  )}
+                </>
+              )}
+              <span className="ml-2 text-[--accent]/70">polling every 5s</span>
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={handleCancelAudit}
+            disabled={cancelPending}
+            title="Stop the audit at the end of the current query. Already-scored queries are kept."
+            className="rounded-full border border-red-500/30 px-3 py-1 text-xs font-medium uppercase tracking-wider text-red-400 transition-colors hover:border-red-500/60 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {cancelPending ? 'Cancelling...' : 'Cancel'}
+          </button>
         </div>
       )}
 
@@ -173,13 +212,17 @@ export function AuditListClient({
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
     completed: 'bg-[--rag-green-bg] text-[--rag-green]',
+    completed_budget_truncated: 'bg-amber-500/15 text-amber-300',
     running: 'bg-[--accent]/15 text-[--accent] animate-pulse',
     failed: 'bg-[--rag-red-bg] text-[--rag-red]',
+    cancelled: 'bg-white/10 text-white/60',
     pending: 'bg-white/10 text-white/55',
   };
+  // The DB stores snake_case status strings; render with spaces for UX.
+  const label = status.replaceAll('_', ' ');
   return (
     <span className={`rounded-full px-3 py-1 text-xs font-medium uppercase tracking-wider ${styles[status] ?? 'bg-white/10 text-white/55'}`}>
-      {status}
+      {label}
     </span>
   );
 }
