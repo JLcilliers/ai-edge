@@ -140,7 +140,11 @@ export const legacyFindings = pgTable('legacy_finding', {
 export const remediationTickets = pgTable('remediation_ticket', {
   id: uuid('id').primaryKey().defaultRandom(),
   firm_id: uuid('firm_id').notNull().references(() => firms.id, { onDelete: 'cascade' }),
-  source_type: text('source_type').notNull(), // 'alignment' | 'legacy' | 'entity' | 'reddit'
+  // 'audit' | 'legacy' | 'entity' | 'reddit' — matches what each scanner
+  // actually writes. `run-audit.ts` uses 'audit' (source_id = alignment_score
+  // id) for Red consensus rows; the earlier spec said 'alignment' but that
+  // label was never emitted. The tickets UI resolves context off this tag.
+  source_type: text('source_type').notNull(),
   source_id: uuid('source_id').notNull(),
   status: text('status').notNull().default('open'),
   owner: text('owner'),

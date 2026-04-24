@@ -12,6 +12,7 @@ import {
   pages,
   monthlyReports,
   redditMentions,
+  remediationTickets,
 } from '@ai-edge/db';
 import { and, desc, eq, gte, lt, sql, inArray } from 'drizzle-orm';
 
@@ -334,6 +335,12 @@ export interface FirmHealthRow {
   lastAudit: { id: string; kind: string; status: string; startedAt: Date | null } | null;
   lastAuditErrorCount30d: number;
   openMentionCount: number;
+  /**
+   * Unified remediation queue — count of tickets with status in
+   * ('open','in_progress'). Links into `/dashboard/{slug}/tickets?status=open`
+   * so the operator can triage from the admin surface.
+   */
+  openTicketCount: number;
   monthlyReportGenerated: boolean;
   budget: {
     monthlyCapUsd: number;
@@ -384,6 +391,7 @@ export async function getFirmHealthSnapshot(): Promise<FirmHealthRow[]> {
     latestAudits,
     errorCounts,
     mentionCounts,
+    ticketCounts,
     reportRows,
     budgetRows,
     spendRows,
@@ -453,6 +461,20 @@ export async function getFirmHealthSnapshot(): Promise<FirmHealthRow[]> {
         eq(redditMentions.triage_status, 'open'),
       ))
       .groupBy(redditMentions.firm_id),
+    // Open + in-progress remediation tickets per firm. This is the
+    // unified queue — audit red rows, legacy findings, entity gaps,
+    // and high-karma Reddit complaints all fold into one number.
+    db
+      .select({
+        firm_id: remediationTickets.firm_id,
+        count: sql<number>`count(*)`,
+      })
+      .from(remediationTickets)
+      .where(and(
+        inArray(remediationTickets.firm_id, firmIds),
+        inArray(remediationTickets.status, ['open', 'in_progress']),
+      ))
+      .groupBy(remediationTickets.firm_id),
     // Current month's report (if generated)
     db
       .select({ firm_id: monthlyReports.firm_id })
@@ -505,6 +527,9 @@ export async function getFirmHealthSnapshot(): Promise<FirmHealthRow[]> {
   const mentionMap = new Map<string, number>();
   for (const r of mentionCounts) mentionMap.set(r.firm_id, Number(r.count));
 
+  const ticketMap = new Map<string, number>();
+  for (const r of ticketCounts) ticketMap.set(r.firm_id, Number(r.count));
+
   const reportSet = new Set<string>(reportRows.map((r) => r.firm_id));
 
   const budgetMap = new Map<string, number>();
@@ -530,6 +555,7 @@ export async function getFirmHealthSnapshot(): Promise<FirmHealthRow[]> {
       lastAudit: auditMap.get(f.id) ?? null,
       lastAuditErrorCount30d: errorMap.get(f.id) ?? 0,
       openMentionCount: mentionMap.get(f.id) ?? 0,
+      openTicketCount: ticketMap.get(f.id) ?? 0,
       monthlyReportGenerated: reportSet.has(f.id),
       budget: {
         monthlyCapUsd: cap,

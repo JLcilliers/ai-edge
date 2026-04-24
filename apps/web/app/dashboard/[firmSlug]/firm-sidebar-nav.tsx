@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, FileText, ClipboardCheck, MessageSquare, Users, FileX, Database, ShieldCheck, FileBarChart, Eye, Settings } from 'lucide-react';
+import { LayoutDashboard, FileText, ClipboardCheck, MessageSquare, Users, FileX, Database, ShieldCheck, FileBarChart, Eye, Settings, Inbox } from 'lucide-react';
 
 type NavItem = {
   label: string;
@@ -10,6 +10,9 @@ type NavItem = {
   icon: typeof LayoutDashboard;
   // Match mode: "exact" only matches the exact href; "prefix" matches the href or any child path.
   match: 'exact' | 'prefix';
+  // Optional numeric badge key (sidebar-owned, not per-item flag). The nav
+  // decides how to render it from the label.
+  badge?: 'openTicketCount';
 };
 
 const ITEMS: NavItem[] = [
@@ -42,6 +45,13 @@ const ITEMS: NavItem[] = [
     href: (slug) => `/dashboard/${slug}/reddit`,
     icon: MessageSquare,
     match: 'prefix',
+  },
+  {
+    label: 'Tickets',
+    href: (slug) => `/dashboard/${slug}/tickets`,
+    icon: Inbox,
+    match: 'prefix',
+    badge: 'openTicketCount',
   },
   {
     label: 'Competitors',
@@ -81,7 +91,13 @@ const ITEMS: NavItem[] = [
   },
 ];
 
-export function FirmSidebarNav({ firmSlug }: { firmSlug: string }) {
+export function FirmSidebarNav({
+  firmSlug,
+  openTicketCount = 0,
+}: {
+  firmSlug: string;
+  openTicketCount?: number;
+}) {
   const pathname = usePathname();
   return (
     <nav className="flex flex-col gap-1">
@@ -92,6 +108,10 @@ export function FirmSidebarNav({ firmSlug }: { firmSlug: string }) {
             ? pathname === href
             : pathname === href || pathname.startsWith(`${href}/`);
         const Icon = item.icon;
+        const badgeValue =
+          item.badge === 'openTicketCount' && openTicketCount > 0
+            ? openTicketCount
+            : null;
         return (
           <Link
             key={item.label}
@@ -103,7 +123,18 @@ export function FirmSidebarNav({ firmSlug }: { firmSlug: string }) {
             }`}
           >
             <Icon size={16} strokeWidth={1.5} />
-            {item.label}
+            <span className="flex-1">{item.label}</span>
+            {badgeValue !== null && (
+              <span
+                className={`rounded-full px-2 py-0.5 font-[family-name:var(--font-geist-mono)] text-[10px] font-semibold ${
+                  active
+                    ? 'bg-[--accent]/20 text-[--accent]'
+                    : 'bg-[--accent]/15 text-[--accent]/90'
+                }`}
+              >
+                {badgeValue > 99 ? '99+' : badgeValue}
+              </span>
+            )}
           </Link>
         );
       })}

@@ -303,6 +303,7 @@ function FirmHealthSection({ rows }: { rows: FirmHealthRow[] }) {
                 <th className="px-4 py-3 font-medium">Firm</th>
                 <th className="px-4 py-3 font-medium">Last audit</th>
                 <th className="px-4 py-3 font-medium">BT</th>
+                <th className="px-4 py-3 font-medium" title="Unified remediation queue — audit, legacy, entity, reddit combined">Open tickets</th>
                 <th className="px-4 py-3 font-medium" title="Reddit complaints still in the open triage bucket">Open complaints</th>
                 <th className="px-4 py-3 font-medium">This month report</th>
                 <th className="px-4 py-3 font-medium">Budget (MTD)</th>
@@ -372,6 +373,19 @@ function FirmRow({ row }: { row: FirmHealthRow }) {
           <span className="text-white/80">v{row.brandTruthVersion}</span>
         ) : (
           <span className="text-amber-300">unset</span>
+        )}
+      </td>
+      <td className="px-4 py-3">
+        {row.openTicketCount > 0 ? (
+          <Link
+            href={`/dashboard/${row.slug}/tickets?status=open`}
+            className="inline-flex items-center gap-1.5 rounded-full bg-[--accent]/15 px-2.5 py-0.5 font-semibold text-[--accent] underline-offset-2 hover:underline"
+            title="Open the unified remediation queue for this firm"
+          >
+            {row.openTicketCount}
+          </Link>
+        ) : (
+          <span className="text-white/70">0</span>
         )}
       </td>
       <td className="px-4 py-3">
