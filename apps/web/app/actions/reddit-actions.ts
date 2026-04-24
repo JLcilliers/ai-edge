@@ -10,6 +10,10 @@ import {
 import { eq, desc, and, inArray } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { runRedditScan } from '../lib/reddit/scan';
+// Triage vocabulary lives in a sibling non-'use-server' module so client
+// components can import the runtime tuple for filter pills without
+// tripping Next 16's async-only export rule.
+import { TRIAGE_STATUSES, type TriageStatus } from './reddit-constants';
 
 /** Resolve firm id from URL slug. Throws if the slug doesn't match a firm. */
 async function resolveFirmId(slug: string): Promise<string> {
@@ -50,16 +54,8 @@ export async function getRedditScanStatus(runId: string): Promise<{
   return run ?? { status: 'unknown', error: null };
 }
 
-// The full triage vocabulary. Kept as a const tuple so it doubles as the
-// runtime validator for `updateRedditMentionTriage` and the TS union. Order
-// matters — the UI renders filter pills in this order.
-export const TRIAGE_STATUSES = [
-  'open',
-  'acknowledged',
-  'dismissed',
-  'escalated',
-] as const;
-export type TriageStatus = (typeof TRIAGE_STATUSES)[number];
+// TRIAGE_STATUSES + TriageStatus moved to ./reddit-constants.ts (Next 16
+// "use server" export restriction — async functions only).
 
 export type RedditMentionRow = {
   id: string;

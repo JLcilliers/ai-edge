@@ -16,10 +16,12 @@ import {
   getRedditScanStatus,
   updateRedditMentionTriage,
   bulkDismissOpenBySentiment,
-  TRIAGE_STATUSES,
   type RedditMentionRow,
-  type TriageStatus,
 } from '../../../actions/reddit-actions';
+import {
+  TRIAGE_STATUSES,
+  type TriageStatus,
+} from '../../../actions/reddit-constants';
 
 type LatestRun = {
   id: string;

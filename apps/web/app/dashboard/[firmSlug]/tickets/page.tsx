@@ -2,11 +2,13 @@ import { notFound } from 'next/navigation';
 import {
   listRemediationTickets,
   getTicketStats,
+} from '../../../actions/remediation-actions';
+import {
   TICKET_SOURCES,
   TICKET_STATUSES,
   type TicketSource,
   type TicketStatus,
-} from '../../../actions/remediation-actions';
+} from '../../../actions/remediation-constants';
 import { getFirmBySlug } from '../../../actions/firm-actions';
 import { TicketsClient } from './tickets-client';
 

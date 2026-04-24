@@ -13,6 +13,17 @@ import {
 } from '@ai-edge/db';
 import { and, eq, inArray, desc, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
+// Runtime consts + type unions live in a sibling module so they can be
+// shared with client components without violating Next 16's "use server"
+// export rule (async functions only). Imports here are used for runtime
+// validation in updateTicketStatus; re-exports to clients are at
+// app/actions/remediation-constants.ts.
+import {
+  TICKET_SOURCES,
+  TICKET_STATUSES,
+  type TicketSource,
+  type TicketStatus,
+} from './remediation-constants';
 
 /**
  * Unified remediation queue.
@@ -33,12 +44,8 @@ import { revalidatePath } from 'next/cache';
  *                                     playbook_step string itself)
  */
 
-/** Canonical order for filter pills + badge ordering. */
-export const TICKET_SOURCES = ['audit', 'legacy', 'reddit', 'entity'] as const;
-export type TicketSource = (typeof TICKET_SOURCES)[number];
-
-export const TICKET_STATUSES = ['open', 'in_progress', 'closed'] as const;
-export type TicketStatus = (typeof TICKET_STATUSES)[number];
+// TICKET_SOURCES, TICKET_STATUSES, TicketSource, TicketStatus moved to
+// ./remediation-constants.ts (Next 16 "use server" export restriction).
 
 export type RemediationTicketRow = {
   id: string;

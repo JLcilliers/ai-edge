@@ -3,9 +3,11 @@ import {
   getRedditMentions,
   getRedditTriageCounts,
   getLatestRedditRun,
+} from '../../../actions/reddit-actions';
+import {
   TRIAGE_STATUSES,
   type TriageStatus,
-} from '../../../actions/reddit-actions';
+} from '../../../actions/reddit-constants';
 import { getFirmBySlug } from '../../../actions/firm-actions';
 import { RedditListClient } from './reddit-list-client';
 

@@ -19,13 +19,15 @@ import {
 import {
   updateTicketStatus,
   bulkCloseBySource,
-  TICKET_SOURCES,
-  TICKET_STATUSES,
   type RemediationTicketRow,
-  type TicketSource,
-  type TicketStatus,
   type TicketStats,
 } from '../../../actions/remediation-actions';
+import {
+  TICKET_SOURCES,
+  TICKET_STATUSES,
+  type TicketSource,
+  type TicketStatus,
+} from '../../../actions/remediation-constants';
 
 export function TicketsClient({
   firmSlug,
