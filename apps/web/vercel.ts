@@ -16,6 +16,9 @@ export const config: VercelConfig = {
     // Monthly report generator — 05:00 UTC on the 1st, builds the
     // previous calendar month's roll-up and pushes JSON to Vercel Blob.
     { path: '/api/cron/report-monthly', schedule: '0 5 1 * *' },
+    // Stale audit-run sweeper — hourly at :15, marks any audit_run stuck
+    // in 'running' for >60 min as failed (process crash / deploy cycle).
+    { path: '/api/cron/audit-sweep', schedule: '15 * * * *' },
   ],
   headers: [
     routes.cacheControl('/_next/static/(.*)', {
