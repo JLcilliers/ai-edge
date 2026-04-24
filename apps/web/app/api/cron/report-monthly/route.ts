@@ -5,6 +5,7 @@ import {
   isAuthorizedCronRequest,
   unauthorizedResponse,
 } from '../../../lib/cron/auth';
+import { recordCronRun } from '../../../lib/cron/log';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -24,50 +25,49 @@ export const maxDuration = 300;
 export async function GET(request: Request) {
   if (!isAuthorizedCronRequest(request)) return unauthorizedResponse();
 
-  const startedAt = Date.now();
   const url = new URL(request.url);
   const monthOverride = url.searchParams.get('month');
   const monthKey = monthOverride ?? previousMonthKey(new Date());
 
-  console.log('[cron:report-monthly] start', { monthKey });
+  return recordCronRun('report-monthly', async () => {
+    console.log('[cron:report-monthly] start', { monthKey });
 
-  const db = getDb();
-  const allFirms = await db.select({ id: firms.id, slug: firms.slug }).from(firms);
+    const db = getDb();
+    const allFirms = await db.select({ id: firms.id, slug: firms.slug }).from(firms);
 
-  const results: Array<{
-    firmSlug: string;
-    status: 'ok' | 'error';
-    reportId?: string;
-    blobUrl?: string | null;
-    reason?: string;
-  }> = [];
+    const results: Array<{
+      firmSlug: string;
+      status: 'ok' | 'error';
+      reportId?: string;
+      blobUrl?: string | null;
+      reason?: string;
+    }> = [];
 
-  for (const firm of allFirms) {
-    try {
-      const { reportId, blobUrl } = await generateAndPersistMonthlyReport({
-        firmId: firm.id,
-        firmSlug: firm.slug,
-        monthKey,
-      });
-      console.log(
-        `[cron:report-monthly] ok ${firm.slug} → report=${reportId} blob=${blobUrl ?? 'skipped'}`,
-      );
-      results.push({ firmSlug: firm.slug, status: 'ok', reportId, blobUrl });
-    } catch (err) {
-      console.error(`[cron:report-monthly] error ${firm.slug}:`, err);
-      results.push({ firmSlug: firm.slug, status: 'error', reason: String(err) });
+    for (const firm of allFirms) {
+      try {
+        const { reportId, blobUrl } = await generateAndPersistMonthlyReport({
+          firmId: firm.id,
+          firmSlug: firm.slug,
+          monthKey,
+        });
+        console.log(
+          `[cron:report-monthly] ok ${firm.slug} → report=${reportId} blob=${blobUrl ?? 'skipped'}`,
+        );
+        results.push({ firmSlug: firm.slug, status: 'ok', reportId, blobUrl });
+      } catch (err) {
+        console.error(`[cron:report-monthly] error ${firm.slug}:`, err);
+        results.push({ firmSlug: firm.slug, status: 'error', reason: String(err) });
+      }
     }
-  }
 
-  const durationMs = Date.now() - startedAt;
-  const summary = {
-    monthKey,
-    ran: results.length,
-    ok: results.filter((r) => r.status === 'ok').length,
-    errored: results.filter((r) => r.status === 'error').length,
-    durationMs,
-  };
-  console.log('[cron:report-monthly] done', summary);
+    const summary = {
+      monthKey,
+      ran: results.length,
+      ok: results.filter((r) => r.status === 'ok').length,
+      errored: results.filter((r) => r.status === 'error').length,
+    };
+    console.log('[cron:report-monthly] done', summary);
 
-  return Response.json({ ...summary, results });
+    return { body: { ...summary, results }, summary };
+  });
 }

@@ -207,6 +207,36 @@ export const firmBudgets = pgTable('firm_budget', {
   updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+// ── Cron observability ──────────────────────────────────────
+// One row per cron execution. Populated by the `recordCronRun` wrapper
+// around every route in `/api/cron/*`. Lets the admin page show cron
+// health (last N executions per cron, duration, success counts, error
+// strings) without having to dig through platform logs.
+//
+// `summary` is freeform JSON — each cron shapes it differently (weekly
+// audit reports `{ ran, ok, skipped, errored }`; reddit-poll reports
+// `{ firmsScanned, mentionsFound }`). The admin page renders it as
+// pretty JSON when the user expands a row.
+//
+// Housekeeping: rows are retained forever for now. If the table grows
+// unwieldy we'll TRUNCATE WHERE started_at < now() - interval '180d'
+// from a separate cleanup cron; 5 crons × 1/day × 180d ≈ 900 rows, well
+// under anything worth paging.
+export const cronRuns = pgTable('cron_run', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  cron_name: text('cron_name').notNull(), // 'audit-weekly' | 'audit-daily' | 'reddit-poll' | 'citation-diff' | 'report-monthly'
+  started_at: timestamp('started_at', { withTimezone: true }).defaultNow().notNull(),
+  finished_at: timestamp('finished_at', { withTimezone: true }),
+  // 'running' → 'ok' | 'error'. Runs that never finish (process kill) stay 'running' forever;
+  // the admin UI surfaces them as "stalled" based on started_at age.
+  status: text('status').notNull().default('running'),
+  duration_ms: integer('duration_ms'),
+  summary: jsonb('summary'),
+  error: text('error'),
+}, (t) => ({
+  nameStartedIdx: index('cron_run_name_started_idx').on(t.cron_name, t.started_at),
+}));
+
 // 24h response cache keyed by (provider, model, system_prompt, user_prompt).
 // Cache keys are sha256 hex digests so the lookup column is a fixed-length
 // text. We keep the response text inline for zero-copy reuse; the raw

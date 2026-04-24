@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import { Plus, Building2, Scale, Stethoscope, Megaphone, HelpCircle } from 'lucide-react';
+import { Plus, Building2, Scale, Stethoscope, Megaphone, HelpCircle, Shield } from 'lucide-react';
 import { listFirms, getFirmSummary, type FirmType } from '../actions/firm-actions';
 
 export const dynamic = 'force-dynamic';
@@ -44,13 +44,23 @@ export default async function ClientListPage() {
             Intercept
           </span>
         </div>
-        <Link
-          href="/dashboard/new-client"
-          className="inline-flex items-center gap-2 rounded-full bg-[--accent] px-5 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-[--accent-hover]"
-        >
-          <Plus size={16} strokeWidth={2} />
-          Add Client
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/dashboard/admin"
+            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-[--bg-secondary] px-4 py-2.5 text-sm font-medium text-white/75 transition-colors hover:border-white/20 hover:text-white"
+            title="Workspace observability — cron health, firm triage, workspace spend"
+          >
+            <Shield size={16} strokeWidth={2} />
+            Admin
+          </Link>
+          <Link
+            href="/dashboard/new-client"
+            className="inline-flex items-center gap-2 rounded-full bg-[--accent] px-5 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-[--accent-hover]"
+          >
+            <Plus size={16} strokeWidth={2} />
+            Add Client
+          </Link>
+        </div>
       </div>
 
       <div className="mb-8">
