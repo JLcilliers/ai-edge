@@ -11,7 +11,7 @@ import {
   modelResponses,
   brandTruthVersions,
 } from '@ai-edge/db';
-import { eq, desc, inArray } from 'drizzle-orm';
+import { eq, desc, inArray, sql } from 'drizzle-orm';
 import { runAudit } from '../lib/audit/run-audit';
 import { getFirmBudgetStatus } from '../lib/audit/budget';
 
@@ -101,18 +101,61 @@ export async function getAuditRuns(firmSlug: string): Promise<
     .orderBy(desc(auditRuns.started_at));
 }
 
-// Get audit run status (for polling). Audit-run id is globally unique, no firm scope needed.
+/**
+ * Get audit run status (for polling). Audit-run id is globally unique, no
+ * firm scope needed.
+ *
+ * Returns live-progress fields alongside the terminal-state status so the
+ * "Audit in progress" banner in audit-list-client can show real motion
+ * ("12 queries complete, $0.48 spent") instead of the old timeless dot.
+ *
+ *   - `spentUsd` reads `audit_run.cost_usd`, which run-audit atomically
+ *     accumulates via `recordRunCost` after every provider response.
+ *   - `queriesCompleted` counts rows in the `query` table for this run.
+ *     run-audit inserts the query row at the *top* of each iteration,
+ *     before the provider fan-out, so this undercounts a touch vs "done"
+ *     — but that undercount matches the operator's intuition of "started
+ *     N, waiting on them to finish" better than a retroactive count.
+ *
+ * Both sub-queries run in parallel — indexed single-row / COUNT lookups,
+ * cheap enough that polling at 5s stays comfortable even with dozens of
+ * concurrent runs open across tabs.
+ */
 export async function getAuditRunStatus(auditRunId: string): Promise<{
   status: string;
   error: string | null;
+  spentUsd: number;
+  queriesCompleted: number;
 }> {
   const db = getDb();
-  const [run] = await db
-    .select({ status: auditRuns.status, error: auditRuns.error })
-    .from(auditRuns)
-    .where(eq(auditRuns.id, auditRunId))
-    .limit(1);
-  return run ?? { status: 'unknown', error: null };
+  const [run, countRow] = await Promise.all([
+    db
+      .select({
+        status: auditRuns.status,
+        error: auditRuns.error,
+        cost_usd: auditRuns.cost_usd,
+      })
+      .from(auditRuns)
+      .where(eq(auditRuns.id, auditRunId))
+      .limit(1)
+      .then((rows) => rows[0]),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(queriesTable)
+      .where(eq(queriesTable.audit_run_id, auditRunId))
+      .then((rows) => rows[0]),
+  ]);
+
+  if (!run) {
+    return { status: 'unknown', error: null, spentUsd: 0, queriesCompleted: 0 };
+  }
+
+  return {
+    status: run.status,
+    error: run.error,
+    spentUsd: Number(run.cost_usd ?? 0),
+    queriesCompleted: Number(countRow?.count ?? 0),
+  };
 }
 
 /**

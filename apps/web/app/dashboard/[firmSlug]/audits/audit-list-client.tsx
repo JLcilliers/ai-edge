@@ -32,15 +32,31 @@ export function AuditListClient({
   const [runs, setRuns] = useState(initialRuns);
   const [isPending, startTransition] = useTransition();
   const [runningId, setRunningId] = useState<string | null>(null);
+  // Live-progress snapshot from the poll loop so the running banner can
+  // render real motion ("12 queries · $0.48 spent") rather than a timeless
+  // spinner. Reset to null when runningId clears.
+  const [progress, setProgress] = useState<{
+    queriesCompleted: number;
+    spentUsd: number;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
-    if (!runningId) return;
+    if (!runningId) {
+      setProgress(null);
+      return;
+    }
     const interval = setInterval(async () => {
       const status = await getAuditRunStatus(runningId);
+      // Capture progress every tick so the banner updates in flight.
+      setProgress({
+        queriesCompleted: status.queriesCompleted,
+        spentUsd: status.spentUsd,
+      });
       if (status.status !== 'running') {
         setRunningId(null);
+        setProgress(null);
         router.refresh();
         clearInterval(interval);
       }
@@ -90,7 +106,26 @@ export function AuditListClient({
       {runningId && (
         <div className="mt-4 flex items-center gap-3 rounded-xl border border-[--accent]/30 bg-[--accent]/10 px-4 py-3">
           <div className="h-3 w-3 animate-pulse rounded-full bg-[--accent]" />
-          <span className="text-sm text-[--accent]">Audit in progress... polling every 5s</span>
+          <span className="text-sm text-[--accent]">
+            Audit in progress
+            {progress && progress.queriesCompleted > 0 && (
+              <>
+                {' · '}
+                <span className="font-[family-name:var(--font-geist-mono)]">
+                  {progress.queriesCompleted} {progress.queriesCompleted === 1 ? 'query' : 'queries'}
+                </span>
+                {progress.spentUsd > 0 && (
+                  <>
+                    {' · '}
+                    <span className="font-[family-name:var(--font-geist-mono)]">
+                      ${progress.spentUsd.toFixed(2)} spent
+                    </span>
+                  </>
+                )}
+              </>
+            )}
+            <span className="ml-2 text-[--accent]/70">polling every 5s</span>
+          </span>
         </div>
       )}
 
