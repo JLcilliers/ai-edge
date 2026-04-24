@@ -25,7 +25,7 @@ Ordered by what blocks downstream work. 🟢 = user action. 🔵 = Claude Code a
 - [ ] 🟢 Reddit commercial-tier app → `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`
 - [ ] 🟢 Bright Data residential-proxy zone (US + UK + DE gateways) → `BRIGHT_DATA_*`
 - [ ] 🟢 DataForSEO account (SERP + Keywords + Backlinks + On-Page under one contract) → `DATAFORSEO_LOGIN`, `DATAFORSEO_PASSWORD`
-- [ ] 🟢 Google Search Console service accounts per client (reuse existing N8N workflow)
+- [ ] 🟢 Google Search Console service accounts per client
 
 ## Compliance & brand
 

@@ -215,7 +215,7 @@ Pages: Overview (RAG mix over time), Audits (per-run drilldown), Citations (sour
 
 ## 6. Non-functional design
 
-- **Scheduling.** Weekly full audit per firm; **daily audit on top 10–20 priority queries** per firm; Reddit polled **every 24h**; citation diff nightly. Vercel Cron → API → job queue. Monthly client-facing report generated from the audit archive and handed to the **existing N8N monthly SEO reporting pipeline** for delivery — not a second report pipeline.
+- **Scheduling.** Weekly full audit per firm; **daily audit on top 10–20 priority queries** per firm; Reddit polled **every 24h**; citation diff nightly. Vercel Cron → API → job queue. Monthly client-facing report generated from the audit archive.
 - **Cost control.** Per-firm monthly LLM budget cap; queries cached 24h; k=3 only on high-priority queries, k=1 elsewhere.
 - **Observability.** OpenTelemetry traces from worker into Vercel's observability; structured run logs per job; alerting on Alignment Gap regressions.
 - **Security / compliance.** Brand Truth JSON + raw LLM outputs are firm-confidential — stored in private Blob + row-level Postgres policies per firm. Legal-review the TOS for Reddit, Perplexity scraping. Use Perplexity's Sonar API where possible (official, avoids scraping).
@@ -231,7 +231,7 @@ Pages: Overview (RAG mix over time), Audits (per-run drilldown), Citations (sour
 | **0. Scaffolding** | 1 wk | Monorepo, CI, infra (Fly + Vercel Marketplace: Clerk/Neon/Upstash/Pinecone/Blob), Brand Truth schema + form editor, procurement checklist complete | `npm run dev` + worker Docker boots; firm + Brand Truth can be created end-to-end |
 | **1. Diagnostic MVP** | 2–3 wk | §5.1 Audit + §5.2 Visibility (OpenAI + Anthropic via direct APIs; Gemini + Claude via Vertex Model Garden), CSV export per framework §5.1 | Dental pilot firm run end-to-end, RAG scores + citations visible |
 | **2. Monitoring** | 2 wk | Add Perplexity Sonar + Google AIO capture (SerpAPI/DataForSEO primary, Playwright fallback) + Reddit + scheduling | Weekly auto-run + daily top-20; Reddit mentions streaming |
-| **3. Optimization** | 2–3 wk | §5.3 Suppression + §5.6 Entity + **monthly client report generation into existing N8N pipeline** + designer pass on dashboard + bar/dental-board ethics counsel review | Remediation queue actionable; schema patches exported; first client-facing report delivered |
+| **3. Optimization** | 2–3 wk | §5.3 Suppression + §5.6 Entity + **monthly client report generation** + designer pass on dashboard + bar/dental-board ethics counsel review | Remediation queue actionable; schema patches exported; first client-facing report delivered |
 | **4. Competitive** | 1 wk | §5.5 — reuse pipeline with competitor roster | Share-of-voice + praise asymmetry report |
 | **5. Hardening** | ongoing | Cost caps per firm, SLOs, audit logs, self-serve onboarding, compliance posture | Client-self-serve onboarding flow live |
 | **Post-v1 R&D: Scenario Lab** | 3–4 wk | §5.7 end-to-end; validation dashboard | Scenario sim w/ documented hit-rate vs. hold-out — gated on Phase 1–4 revenue |
@@ -253,12 +253,12 @@ Pages: Overview (RAG mix over time), Audits (per-run drilldown), Citations (sour
 
 **Decisions locked (2026-04-16)**
 1. **Tenancy.** Multi-tenant from day 1; dogfood tenant + one named dental pilot as first real client. PI is v2.
-2. **APIs — have:** OpenAI, Anthropic. **Procure in Phase 0:** GCP project + Vertex AI billing (Gemini 3.1 Pro + Claude Sonnet 4.6 consolidated through Vertex Model Garden), Perplexity Sonar, Reddit commercial tier, Bright Data or Oxylabs residential proxies, SerpAPI *or* DataForSEO, per-client GSC service accounts (reuse existing N8N workflow).
+2. **APIs — have:** OpenAI, Anthropic. **Procure in Phase 0:** GCP project + Vertex AI billing (Gemini 3.1 Pro + Claude Sonnet 4.6 consolidated through Vertex Model Garden), Perplexity Sonar, Reddit commercial tier, Bright Data or Oxylabs residential proxies, SerpAPI *or* DataForSEO, per-client GSC service accounts.
 3. **Infra.** Fly.io Python workers + Vercel Next.js + Marketplace (Clerk/Neon/Upstash/Pinecone/Blob).
 4. **Frontend.** Next.js 16.2.3 LTS (current stable as of 2026-04-08; Next.js 14 EOL Oct 2025). Streamlit internal-only if needed.
 5. **MarketBrew.** Renamed **Scenario Lab**; descoped to post-v1 R&D. No existing code.
 6. **Brand Truth.** Schema defined above (§5.1). JSON + form-based editor in dashboard; versioned.
-7. **Cadence.** Weekly full audit; daily top 10–20 priority queries; Reddit 24h; monthly client report via existing N8N pipeline.
+7. **Cadence.** Weekly full audit; daily top 10–20 priority queries; Reddit 24h; monthly client report.
 8. **Team.** Solo + Claude Code. Designer pass at Phase 3. Ethics counsel review before client launch.
 
 **Still-open items**

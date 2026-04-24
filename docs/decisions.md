@@ -48,11 +48,11 @@ Architecture Decision Records. Append-only. Reference decisions by ID from PRs a
 **Decision.** Every edit to Brand Truth creates a new `brand_truth_version` row; `audit_run.brand_truth_version_id` pins which version was in effect. No in-place edits.
 **Why.** Alignment scores are only interpretable against the exact truth at run time. In-place edits would retroactively invalidate historical RAG trends.
 
-## ADR-0008: Monthly reporting hands off to existing N8N pipeline
+## ADR-0008: Monthly reporting is a report-generation feature only (delivery deferred)
 
 **Status**: Accepted.
-**Decision.** Clixsy Intercept generates monthly client-facing report payloads (PPTX or structured JSON) and hands off to the existing N8N monthly SEO reporting pipeline for delivery. No new delivery infrastructure (email, Slack, PDF-renderer) in v1.
-**Why.** Consolidates with existing workflow; avoids parallel delivery infra. Aligns agency ops.
+**Decision.** AI Edge generates monthly client-facing report payloads (structured JSON, with an optional PPTX renderer in Phase 3) from the audit archive and writes them to Vercel Blob + surfaces a download link in the dashboard. No email, Slack, or push-delivery infrastructure in v1 — consumers of the report (internal ops, direct-to-client dashboard download, or a future delivery integration) pull from Blob.
+**Why.** Report generation and report delivery are separable concerns. Keeping v1 scoped to generation avoids building an email/notification stack before the report format is even validated with a real client. Delivery can be added later as a thin consumer of the generated payload.
 
 ## ADR-0009: SERP capture via DataForSEO, AIO fallback via Playwright
 
