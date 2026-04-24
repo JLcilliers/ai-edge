@@ -12,6 +12,7 @@ import {
   Building2,
   Users,
   FileX,
+  Database,
 } from 'lucide-react';
 import {
   getFirmBySlug,
@@ -153,6 +154,13 @@ export default async function FirmOverviewPage({
           title="Legacy Suppression"
           description="Find site pages that drift from the Brand Truth and queue them for rewrite or noindex. Drifting pages poison LLM alignment."
           cta="Scan & triage pages"
+        />
+        <ModuleCard
+          href={`/dashboard/${firmSlug}/entity`}
+          icon={Database}
+          title="Entity & Schema"
+          description="Check schema.org coverage + Wikidata / Google KG presence. Generate copy-paste JSON-LD patches for gaps."
+          cta="Run entity scan"
         />
       </div>
     </div>

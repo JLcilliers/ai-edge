@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, FileText, ClipboardCheck, MessageSquare, Users, FileX } from 'lucide-react';
+import { LayoutDashboard, FileText, ClipboardCheck, MessageSquare, Users, FileX, Database } from 'lucide-react';
 
 type NavItem = {
   label: string;
@@ -47,6 +47,12 @@ const ITEMS: NavItem[] = [
     label: 'Suppression',
     href: (slug) => `/dashboard/${slug}/suppression`,
     icon: FileX,
+    match: 'prefix',
+  },
+  {
+    label: 'Entity',
+    href: (slug) => `/dashboard/${slug}/entity`,
+    icon: Database,
     match: 'prefix',
   },
 ];
