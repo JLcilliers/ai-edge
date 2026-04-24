@@ -41,6 +41,11 @@ export async function GET(
     'Mention',
     'Score',
     'RAG',
+    // k = self-consistency sample count (1 for standard, 3 for top-priority).
+    // variance = fraction of samples disagreeing with the majority vote,
+    // surfaced as a percentage so '0.0' means unanimous.
+    'k',
+    'Variance %',
     'Citations',
     'Gap Reasons',
     'Factual Errors',
@@ -63,6 +68,8 @@ export async function GET(
         r.mentioned ? 'Y' : 'N',
         r.toneScore != null ? r.toneScore.toFixed(1) : '',
         r.ragLabel,
+        r.k.toString(),
+        (r.variance * 100).toFixed(1),
         escape(r.citationUrls.join(' | ')),
         escape(r.gapReasons.join(' | ')),
         escape(r.factualErrors.join(' | ')),

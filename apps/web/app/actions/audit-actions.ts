@@ -143,6 +143,21 @@ export async function getAuditDetail(auditRunId: string): Promise<{
     citationUrls: string[];
     responsePreview: string;
     fullResponse: string;
+    /**
+     * Number of samples the consensus row was built from. At k=1 (standard
+     * queries) this is just 1 and the UI can elide the detail. At k=3
+     * (top-priority queries, self-consistency tier) the operator wants to
+     * see both k and `variance` so they can tell "all 3 providers agreed"
+     * apart from "2 said yes, 1 said no."
+     */
+    k: number;
+    /**
+     * Fraction of samples whose `mentioned` vote disagreed with the
+     * majority. 0 = unanimous, 0.33 = one dissent at k=3, etc. At k=1 this
+     * is always 0. Surfaced to the UI as a percentage and as a warning
+     * chip when > 0.
+     */
+    variance: number;
   }>;
   summary: { red: number; yellow: number; green: number };
 }> {
@@ -259,6 +274,8 @@ export async function getAuditDetail(auditRunId: string): Promise<{
     citationUrls: string[];
     responsePreview: string;
     fullResponse: string;
+    k: number;
+    variance: number;
   }> = [];
 
   for (const q of queryRows) {
@@ -287,6 +304,12 @@ export async function getAuditDetail(auditRunId: string): Promise<{
         citationUrls: cites,
         responsePreview: fullResponse.slice(0, 200),
         fullResponse,
+        // `variance` is stored as 0..1 in the DB — clamp + default to 0 in
+        // case a legacy row left it null or NaN before we enforced NOT NULL.
+        k: cr.self_consistency_k ?? 1,
+        variance: Number.isFinite(cr.variance)
+          ? Math.max(0, Math.min(1, Number(cr.variance)))
+          : 0,
       });
     }
   }
@@ -304,7 +327,7 @@ export async function getAuditDetail(auditRunId: string): Promise<{
 export async function exportAuditCsv(auditRunId: string): Promise<string> {
   const { results } = await getAuditDetail(auditRunId);
 
-  const header = 'query,provider,model,mentioned,tone_score,rag_label,gap_reasons,citations,factual_errors,response_preview';
+  const header = 'query,provider,model,mentioned,tone_score,rag_label,k,variance_pct,gap_reasons,citations,factual_errors,response_preview';
   const rows = results.map((r) => {
     const escape = (s: string) => `"${s.replace(/"/g, '""')}"`;
     return [
@@ -314,6 +337,9 @@ export async function exportAuditCsv(auditRunId: string): Promise<string> {
       r.mentioned ? 'Y' : 'N',
       r.toneScore?.toString() ?? '',
       r.ragLabel,
+      r.k.toString(),
+      // Variance as percentage with one decimal — '0.0' for unanimous.
+      (r.variance * 100).toFixed(1),
       escape(r.gapReasons.join('|')),
       escape(r.citationUrls.join('|')),
       escape(r.factualErrors.join('|')),
