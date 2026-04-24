@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { getAuditRuns } from '../../../actions/audit-actions';
 import { getFirmBySlug } from '../../../actions/firm-actions';
+import { getFirmBudgetStatus } from '../../../lib/audit/budget';
 import { AuditListClient } from './audit-list-client';
 
 export const dynamic = 'force-dynamic';
@@ -14,7 +15,15 @@ export default async function AuditsPage({
   const firm = await getFirmBySlug(firmSlug);
   if (!firm) notFound();
 
-  const runs = await getAuditRuns(firmSlug).catch(() => []);
+  // Fetch runs + budget in parallel — both are read-only server-side reads
+  // and serializing them would just add a round-trip for no benefit. Budget
+  // is rendered as context above the Run Audit button so operators see
+  // their current-month spend before clicking (matches the server-side
+  // gate in startAudit — batch 15 — so the disabled state lines up).
+  const [runs, budget] = await Promise.all([
+    getAuditRuns(firmSlug).catch(() => []),
+    getFirmBudgetStatus(firm.id).catch(() => null),
+  ]);
 
   return (
     <div>
@@ -26,7 +35,7 @@ export default async function AuditsPage({
           How LLMs actually describe {firm.name} vs how you want them to
         </p>
       </div>
-      <AuditListClient firmSlug={firmSlug} initialRuns={runs} />
+      <AuditListClient firmSlug={firmSlug} initialRuns={runs} budget={budget} />
     </div>
   );
 }
