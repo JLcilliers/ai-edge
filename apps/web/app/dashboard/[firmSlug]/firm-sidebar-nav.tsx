@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, FileText, ClipboardCheck, MessageSquare, Users, FileX, Database, ShieldCheck, FileBarChart, Eye } from 'lucide-react';
+import { LayoutDashboard, FileText, ClipboardCheck, MessageSquare, Users, FileX, Database, ShieldCheck, FileBarChart, Eye, Settings } from 'lucide-react';
 
 type NavItem = {
   label: string;
@@ -71,6 +71,12 @@ const ITEMS: NavItem[] = [
     label: 'Reports',
     href: (slug) => `/dashboard/${slug}/reports`,
     icon: FileBarChart,
+    match: 'prefix',
+  },
+  {
+    label: 'Settings',
+    href: (slug) => `/dashboard/${slug}/settings`,
+    icon: Settings,
     match: 'prefix',
   },
 ];
