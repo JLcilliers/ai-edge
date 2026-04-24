@@ -192,6 +192,41 @@ export const entitySignals = pgTable('entity_signal', {
   divergence_flags: jsonb('divergence_flags').$type<string[]>().default([]),
 });
 
+// ── Cost control ────────────────────────────────────────────
+// Per-firm monthly LLM budget ceiling. Set by an operator on the firm
+// settings page; checked before every audit run (and again mid-run once
+// costs cross the cap). If a firm doesn't have a row here, the default
+// cap from env (`DEFAULT_FIRM_MONTHLY_CAP_USD`) applies — keeping "no
+// configuration" as a safe default rather than "unlimited spend."
+export const firmBudgets = pgTable('firm_budget', {
+  firm_id: uuid('firm_id').primaryKey()
+    .references(() => firms.id, { onDelete: 'cascade' }),
+  monthly_cap_usd: real('monthly_cap_usd').notNull(),
+  // Optional operator note — who set the cap and why.
+  note: text('note'),
+  updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// 24h response cache keyed by (provider, model, system_prompt, user_prompt).
+// Cache keys are sha256 hex digests so the lookup column is a fixed-length
+// text. We keep the response text inline for zero-copy reuse; the raw
+// payload is retained for audit trail but is not required on the hit path.
+// Expired rows are left in place — the query filters on `expires_at` and a
+// nightly cleanup can TRUNCATE WHERE expires_at < now() - interval '7d'.
+export const queryResponseCache = pgTable('query_response_cache', {
+  cache_key: text('cache_key').primaryKey(),
+  provider: text('provider').notNull(),
+  model: text('model').notNull(),
+  response_text: text('response_text').notNull(),
+  raw_response: jsonb('raw_response'),
+  latency_ms: integer('latency_ms'),
+  cost_usd: real('cost_usd'),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  expires_at: timestamp('expires_at', { withTimezone: true }).notNull(),
+}, (t) => ({
+  expiresIdx: index('query_cache_expires_idx').on(t.expires_at),
+}));
+
 // ── Scenario Lab (post-v1 R&D; schema reserved) ─────────────
 export const scenarioRuns = pgTable('scenario_run', {
   id: uuid('id').primaryKey().defaultRandom(),

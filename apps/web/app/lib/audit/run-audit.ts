@@ -13,12 +13,14 @@ import {
 } from '@ai-edge/db';
 import type { BrandTruth } from '@ai-edge/shared';
 import { eq } from 'drizzle-orm';
-import { queryOpenAI } from './providers/openai';
-import { queryAnthropic } from './providers/anthropic';
-import { queryOpenRouter } from './providers/openrouter';
-import { queryPerplexity } from './providers/perplexity';
 import { scoreAlignment } from './scoring/alignment-scorer';
 import { detectCompetitorMentions } from '../competitors/detect';
+import { getEnabledProviders, runProviderQuery, type ProviderDescriptor } from './run-provider';
+import {
+  getFirmBudgetStatus,
+  isFirmOverBudget,
+  recordRunCost,
+} from './budget';
 
 /**
  * Options for an audit run.
@@ -26,6 +28,18 @@ import { detectCompetitorMentions } from '../competitors/detect';
  * `kind='full'` runs every seed query in the Brand Truth — the weekly cadence.
  * `kind='daily-priority'` runs only the top N queries (default 20) — cheap
  *   daily cadence for the high-value prospect-intent queries.
+ *
+ * Self-consistency (k):
+ *   - Queries tagged 'top20' run k=3 at temperature=0.7 — majority-vote
+ *     mentioned-ness, variance surfaces disagreement.
+ *   - 'standard' queries run k=1 at temperature=0 (deterministic).
+ *
+ * Budget gate:
+ *   - Pre-flight: `isFirmOverBudget` is checked before the run starts; if
+ *     over, the caller (cron route or server action) skips with
+ *     `status='skipped_budget_exceeded'` rather than creating a run.
+ *   - In-flight: after each query we re-check and break out of the query
+ *     loop if costs crossed the cap mid-run.
  */
 export type AuditKind = 'full' | 'daily-priority';
 
@@ -33,6 +47,23 @@ export interface RunAuditOptions {
   kind?: AuditKind;
   /** Max number of seed queries to run. Only applied when kind='daily-priority'. */
   queryLimit?: number;
+}
+
+const K_HIGH_PRIORITY = 3;
+const K_STANDARD = 1;
+const TEMPERATURE_HIGH_PRIORITY = 0.7;
+const TEMPERATURE_STANDARD = 0;
+const TOP_PRIORITY_COUNT = 20;
+
+interface SampleResult {
+  providerName: string;
+  model: string;
+  attempt: number;
+  text: string;
+  raw: unknown;
+  latencyMs: number;
+  costUsd: number;
+  cached: boolean;
 }
 
 export async function runAudit(
@@ -69,8 +100,7 @@ export async function runAudit(
     if (!btVersion) throw new Error('Brand Truth version not found');
     const brandTruth = btVersion.payload as BrandTruth;
 
-    // Load competitor roster once for the whole run — detection only needs
-    // name + website, and the roster doesn't change mid-run.
+    // Competitor roster snapshot — detection is local + deterministic.
     const competitorRoster = await db
       .select({
         id: competitorsTable.id,
@@ -80,158 +110,195 @@ export async function runAudit(
       .from(competitorsTable)
       .where(eq(competitorsTable.firm_id, firmId));
 
-    // Get seed queries from the Brand Truth, sliced for daily-priority
-    const allSeedQueries = (brandTruth as any).seed_query_intents ?? [];
+    // Seed queries: sliced to queryLimit for daily-priority, full list otherwise.
+    const allSeedQueries = ((brandTruth as unknown) as { seed_query_intents?: string[] })
+      .seed_query_intents ?? [];
     if (allSeedQueries.length === 0) throw new Error('No seed queries in Brand Truth');
     const seedQueries: string[] =
       kind === 'daily-priority'
         ? allSeedQueries.slice(0, queryLimit)
         : allSeedQueries;
 
-    // Process each query
-    for (const queryText of seedQueries) {
-      // Create query row
+    const providers = getEnabledProviders();
+    let budgetHit = false;
+
+    for (let qi = 0; qi < seedQueries.length; qi++) {
+      // Mid-run budget gate. Also catches the case where the firm was *just*
+      // below cap at kickoff and crossed over after a few expensive queries.
+      if (await isFirmOverBudget(firmId)) {
+        budgetHit = true;
+        console.log(`[audit] firm ${firmId} over budget at query ${qi}; aborting remaining queries`);
+        break;
+      }
+
+      const queryText = seedQueries[qi]!;
+      // Top-N queries are the "high-priority" tier (PLAN §6) regardless of kind.
+      // Daily-priority runs hit the top-N subset; weekly full runs see them
+      // first in the seed list and still get k=3 treatment.
+      const priority = qi < TOP_PRIORITY_COUNT ? 'top20' : 'standard';
+      const k = priority === 'top20' ? K_HIGH_PRIORITY : K_STANDARD;
+      const temperature = priority === 'top20' ? TEMPERATURE_HIGH_PRIORITY : TEMPERATURE_STANDARD;
+
+      // Row for this query.
       const [queryRow] = await db
         .insert(queriesTable)
         .values({
           audit_run_id: auditRunId,
           text: queryText,
-          priority: kind === 'daily-priority' ? 'top20' : 'standard',
+          priority,
         })
         .returning({ id: queriesTable.id });
-
       const queryId = queryRow!.id;
 
-      // Fan out to providers in parallel. Each is gated on its env key so
-      // we never pay for an unkeyed provider. OpenRouter covers Gemini /
-      // Llama / DeepSeek / Mistral under one key; Perplexity Sonar runs live
-      // web search and brings back its own citations.
-      const providers = [
-        { name: 'openai', fn: queryOpenAI, enabled: !!process.env.OPENAI_API_KEY },
-        { name: 'anthropic', fn: queryAnthropic, enabled: !!process.env.ANTHROPIC_API_KEY },
-        { name: 'openrouter', fn: queryOpenRouter, enabled: !!process.env.OPENROUTER_API_KEY },
-        { name: 'perplexity', fn: queryPerplexity, enabled: !!process.env.PERPLEXITY_API_KEY },
-      ].filter((p) => p.enabled);
-
-      const results = await Promise.allSettled(
-        providers.map(async (provider) => {
-          try {
-            const result = await provider.fn(queryText);
-
-            // Store model response
-            const [modelResp] = await db
-              .insert(modelResponses)
-              .values({
-                query_id: queryId,
-                provider: provider.name,
-                model: result.model,
-                attempt: 1,
-                raw_response: result.raw as any,
-                latency_ms: result.latencyMs,
-              })
-              .returning({ id: modelResponses.id });
-
-            // Score alignment
-            const score = await scoreAlignment(brandTruth, queryText, result.text);
-
-            // Create consensus response (k=1 for Phase 1)
-            const [consensus] = await db
-              .insert(consensusResponses)
-              .values({
-                query_id: queryId,
-                self_consistency_k: 1,
-                majority_answer: result.text.slice(0, 10000), // cap storage
-                variance: 0,
-                mentioned: score.mentioned,
-              })
-              .returning({ id: consensusResponses.id });
-
-            const consensusId = consensus!.id;
-
-            // Store alignment score (including factual errors from the judge)
-            const [alignmentRow] = await db.insert(alignmentScores).values({
-              consensus_response_id: consensusId,
-              mentioned: score.mentioned,
-              tone_1_10: score.tone_score,
-              rag_label: score.remediation_priority,
-              gap_reasons: score.gap_reasons,
-              factual_errors: score.factual_accuracy?.errors ?? [],
-              remediation_priority:
-                score.remediation_priority === 'red' ? 1 :
-                score.remediation_priority === 'yellow' ? 2 : 3,
-            }).returning({ id: alignmentScores.id });
-
-            // Create remediation ticket for Red results
-            if (score.remediation_priority === 'red' && alignmentRow) {
-              await db.insert(remediationTickets).values({
-                firm_id: firmId,
-                source_type: 'audit',
-                source_id: alignmentRow.id,
-                status: 'open',
-                playbook_step: 'initial_triage',
-                due_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
-              });
-            }
-
-            // Store citations
-            if (score.citations.length > 0) {
-              await db.insert(citationsTable).values(
-                score.citations.map((url, rank) => ({
-                  consensus_response_id: consensusId,
-                  url,
-                  domain: extractDomain(url),
-                  rank,
-                })),
-              );
-            }
-
-            // Detect competitor mentions in the response. Deterministic +
-            // local — no extra LLM call — so we run it for every provider.
-            // The table is scoped by (firm_id, competitor_id, query_id), not
-            // per-provider; if multiple providers mention competitor X for
-            // the same query we currently write one row per provider. That
-            // gives us more signal than dedup'd rows and matches the per-
-            // provider-per-query shape of consensus_responses.
-            if (competitorRoster.length > 0) {
-              const detected = detectCompetitorMentions({
-                brandTruth,
-                competitors: competitorRoster,
-                responseText: result.text,
-              });
-              if (detected.length > 0) {
-                await db.insert(competitorMentions).values(
-                  detected.map((d) => ({
-                    firm_id: firmId,
-                    competitor_id: d.competitorId,
-                    query_id: queryId,
-                    share: d.share,
-                    praise_flag: d.praiseFlag,
-                  })),
-                );
-              }
-            }
-
-            return { provider: provider.name, success: true };
-          } catch (err) {
-            // Store the failure — don't kill the whole audit
-            await db.insert(modelResponses).values({
-              query_id: queryId,
-              provider: provider.name,
-              model: 'error',
-              attempt: 1,
-              raw_response: { error: String(err) },
-              latency_ms: 0,
-            });
-            return { provider: provider.name, success: false, error: String(err) };
-          }
-        }),
+      // Fan out: for each provider, run k samples in parallel. At k=1 this
+      // collapses to the old behaviour; at k=3 we get three samples per
+      // provider to vote over.
+      const perProviderResults = await Promise.allSettled(
+        providers.map((provider) => runProviderWithSamples({
+          provider,
+          userPrompt: queryText,
+          temperature,
+          k,
+        })),
       );
+
+      // Persist each sample + score majority.
+      for (let pi = 0; pi < providers.length; pi++) {
+        const provider = providers[pi]!;
+        const settled = perProviderResults[pi]!;
+
+        if (settled.status === 'rejected') {
+          // Record failure — don't kill the rest of the audit.
+          await db.insert(modelResponses).values({
+            query_id: queryId,
+            provider: provider.name,
+            model: 'error',
+            attempt: 1,
+            raw_response: { error: String(settled.reason) } as never,
+            latency_ms: 0,
+            cost_usd: 0,
+          });
+          continue;
+        }
+
+        const samples = settled.value;
+        if (samples.length === 0) continue;
+
+        // Persist every sample with its attempt index (1-based for legibility).
+        await db.insert(modelResponses).values(
+          samples.map((s) => ({
+            query_id: queryId,
+            provider: s.providerName,
+            model: s.model,
+            attempt: s.attempt,
+            raw_response: s.raw as never,
+            latency_ms: s.latencyMs,
+            cost_usd: s.costUsd,
+          })),
+        );
+
+        // Accumulate total cost onto the run (skips cached rows via costUsd=0).
+        const totalCost = samples.reduce((sum, s) => sum + (s.costUsd ?? 0), 0);
+        await recordRunCost(auditRunId, totalCost);
+
+        // Majority-vote consensus: score each sample, pick the majority on
+        // `mentioned`, and treat the canonical "winning" sample as the one
+        // whose `mentioned` matches the majority (first match wins).
+        const scored = await Promise.all(
+          samples.map(async (s) => ({
+            sample: s,
+            score: await scoreAlignment(brandTruth, queryText, s.text),
+          })),
+        );
+
+        const mentionedVotes = scored.filter((s) => s.score.mentioned).length;
+        const majorityMentioned = mentionedVotes * 2 > samples.length;
+        const variance = scored.length > 0
+          ? scored.filter((s) => s.score.mentioned !== majorityMentioned).length / scored.length
+          : 0;
+
+        // Pick the sample that matches the majority as the "canonical" for
+        // consensus answer + alignment_score. At k=1 this is the single sample.
+        const canonical = scored.find((s) => s.score.mentioned === majorityMentioned) ?? scored[0]!;
+
+        const [consensus] = await db
+          .insert(consensusResponses)
+          .values({
+            query_id: queryId,
+            self_consistency_k: samples.length,
+            majority_answer: canonical.sample.text.slice(0, 10000),
+            variance,
+            mentioned: majorityMentioned,
+          })
+          .returning({ id: consensusResponses.id });
+        const consensusId = consensus!.id;
+
+        const [alignmentRow] = await db.insert(alignmentScores).values({
+          consensus_response_id: consensusId,
+          mentioned: majorityMentioned,
+          tone_1_10: canonical.score.tone_score,
+          rag_label: canonical.score.remediation_priority,
+          gap_reasons: canonical.score.gap_reasons,
+          factual_errors: canonical.score.factual_accuracy?.errors ?? [],
+          remediation_priority:
+            canonical.score.remediation_priority === 'red' ? 1 :
+            canonical.score.remediation_priority === 'yellow' ? 2 : 3,
+        }).returning({ id: alignmentScores.id });
+
+        // Remediation ticket for Red consensus.
+        if (canonical.score.remediation_priority === 'red' && alignmentRow) {
+          await db.insert(remediationTickets).values({
+            firm_id: firmId,
+            source_type: 'audit',
+            source_id: alignmentRow.id,
+            status: 'open',
+            playbook_step: 'initial_triage',
+            due_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          });
+        }
+
+        // Citations from the canonical sample's score.
+        if (canonical.score.citations.length > 0) {
+          await db.insert(citationsTable).values(
+            canonical.score.citations.map((url, rank) => ({
+              consensus_response_id: consensusId,
+              url,
+              domain: extractDomain(url),
+              rank,
+            })),
+          );
+        }
+
+        // Competitor detection runs on the canonical text — one set of
+        // rows per (firm, competitor, query). At k=3 we could detect across
+        // all samples and merge, but the canonical sample is consistent
+        // with the consensus answer so it's the right signal.
+        if (competitorRoster.length > 0) {
+          const detected = detectCompetitorMentions({
+            brandTruth,
+            competitors: competitorRoster,
+            responseText: canonical.sample.text,
+          });
+          if (detected.length > 0) {
+            await db.insert(competitorMentions).values(
+              detected.map((d) => ({
+                firm_id: firmId,
+                competitor_id: d.competitorId,
+                query_id: queryId,
+                share: d.share,
+                praise_flag: d.praiseFlag,
+              })),
+            );
+          }
+        }
+      }
     }
 
-    // Mark completed
+    // Mark completed (or budget-truncated).
+    const finalStatus = budgetHit ? 'completed_budget_truncated' : 'completed';
     await db
       .update(auditRuns)
-      .set({ status: 'completed', finished_at: new Date() })
+      .set({ status: finalStatus, finished_at: new Date() })
       .where(eq(auditRuns.id, auditRunId));
   } catch (err) {
     // Mark failed
@@ -244,10 +311,54 @@ export async function runAudit(
   return auditRunId;
 }
 
+/** Run k samples of a provider in parallel and return them in attempt order. */
+async function runProviderWithSamples(args: {
+  provider: ProviderDescriptor;
+  userPrompt: string;
+  temperature: number;
+  k: number;
+}): Promise<SampleResult[]> {
+  const { provider, userPrompt, temperature, k } = args;
+  const results = await Promise.all(
+    Array.from({ length: k }, (_, idx) =>
+      runProviderQuery({
+        provider,
+        userPrompt,
+        temperature,
+        sampleIdx: idx,
+      }).then((r) => ({
+        providerName: provider.name,
+        model: r.model,
+        attempt: idx + 1,
+        text: r.text,
+        raw: r.raw,
+        latencyMs: r.latencyMs,
+        costUsd: r.costUsd,
+        cached: r.cached,
+      })),
+    ),
+  );
+  return results;
+}
+
 function extractDomain(url: string): string {
   try {
     return new URL(url).hostname;
   } catch {
     return url;
   }
+}
+
+/** Pre-flight wrapper for callers that want "skip if already over budget." */
+export async function runAuditIfUnderBudget(
+  firmId: string,
+  brandTruthVersionId: string,
+  options: RunAuditOptions = {},
+): Promise<{ ok: true; auditRunId: string } | { ok: false; reason: 'budget_exceeded'; status: Awaited<ReturnType<typeof getFirmBudgetStatus>> }> {
+  const status = await getFirmBudgetStatus(firmId);
+  if (status.overBudget) {
+    return { ok: false, reason: 'budget_exceeded', status };
+  }
+  const id = await runAudit(firmId, brandTruthVersionId, options);
+  return { ok: true, auditRunId: id };
 }

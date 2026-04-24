@@ -19,6 +19,7 @@ import {
   getFirmSummary,
   type FirmType,
 } from '../../actions/firm-actions';
+import type { FirmBudgetStatus } from '../../lib/audit/budget';
 
 export const dynamic = 'force-dynamic';
 
@@ -80,7 +81,7 @@ export default async function FirmOverviewPage({
       </div>
 
       {/* Headline stats */}
-      <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <StatTile
           label="Brand Truth"
           value={
@@ -109,6 +110,7 @@ export default async function FirmOverviewPage({
           value={String(summary?.redditMentionCount ?? 0)}
           detail="across all scans"
         />
+        <BudgetTile budget={summary?.budget ?? null} />
       </div>
 
       {/* Module cards */}
@@ -185,6 +187,73 @@ function StatTile({
         {value}
       </div>
       <div className="mt-1 text-xs text-white/40">{detail}</div>
+    </div>
+  );
+}
+
+/**
+ * Monthly LLM spend tile with over-cap / near-cap color state.
+ *
+ * over-cap  → red border + red value + "audits paused" detail (the crons
+ *             skip over-cap firms; they need to notice)
+ * near-cap  → amber border + amber value (within 10% of cap)
+ * normal    → default styling
+ */
+function BudgetTile({ budget }: { budget: FirmBudgetStatus | null }) {
+  if (!budget) {
+    return (
+      <div className="rounded-xl border border-white/10 bg-[--bg-secondary] p-5">
+        <div className="text-[10px] font-medium uppercase tracking-widest text-white/40">
+          LLM Budget
+        </div>
+        <div className="mt-2 font-[family-name:var(--font-jakarta)] text-xl font-bold text-white">
+          —
+        </div>
+        <div className="mt-1 text-xs text-white/40">unavailable</div>
+      </div>
+    );
+  }
+
+  const tone: 'danger' | 'warning' | 'normal' = budget.overBudget
+    ? 'danger'
+    : budget.nearCap
+      ? 'warning'
+      : 'normal';
+
+  const borderClass =
+    tone === 'danger'
+      ? 'border-red-500/40'
+      : tone === 'warning'
+        ? 'border-amber-500/40'
+        : 'border-white/10';
+
+  const valueClass =
+    tone === 'danger'
+      ? 'text-red-300'
+      : tone === 'warning'
+        ? 'text-amber-300'
+        : 'text-white';
+
+  const detailText =
+    tone === 'danger'
+      ? 'over cap — audits paused'
+      : tone === 'warning'
+        ? 'within 10% of cap'
+        : budget.source === 'firm'
+          ? 'this month (firm cap)'
+          : 'this month (default cap)';
+
+  return (
+    <div className={`rounded-xl border bg-[--bg-secondary] p-5 ${borderClass}`}>
+      <div className="text-[10px] font-medium uppercase tracking-widest text-white/40">
+        LLM Budget
+      </div>
+      <div
+        className={`mt-2 font-[family-name:var(--font-jakarta)] text-xl font-bold ${valueClass}`}
+      >
+        ${budget.spentThisMonthUsd.toFixed(2)} / ${budget.monthlyCapUsd.toFixed(2)}
+      </div>
+      <div className="mt-1 text-xs text-white/40">{detailText}</div>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { getDb, firms, brandTruthVersions } from '@ai-edge/db';
 import { eq, desc } from 'drizzle-orm';
 import { runAudit } from '../../../lib/audit/run-audit';
+import { getFirmBudgetStatus } from '../../../lib/audit/budget';
 import { isAuthorizedCronRequest, unauthorizedResponse } from '../../../lib/cron/auth';
 
 export const dynamic = 'force-dynamic';
@@ -41,6 +42,15 @@ export async function GET(request: Request) {
       if (!btv) {
         console.log(`[cron:audit-daily] skip ${firm.slug} — no_brand_truth`);
         results.push({ firmSlug: firm.slug, status: 'skipped', reason: 'no_brand_truth' });
+        continue;
+      }
+
+      // Pre-flight budget gate. Daily cron is the cheap cadence but it still
+      // fires every morning — if a firm is already over cap, we quietly skip.
+      const budget = await getFirmBudgetStatus(firm.id);
+      if (budget.overBudget) {
+        console.log(`[cron:audit-daily] skip ${firm.slug} — budget_exceeded ($${budget.spentThisMonthUsd.toFixed(2)}/$${budget.monthlyCapUsd.toFixed(2)})`);
+        results.push({ firmSlug: firm.slug, status: 'skipped', reason: 'budget_exceeded' });
         continue;
       }
 

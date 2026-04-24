@@ -22,6 +22,13 @@
       "when": 1777025784900,
       "tag": "0002_first_wind_dancer",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1777027750646,
+      "tag": "0003_natural_wiccan",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,8 @@
 import OpenAI from 'openai';
 
-const SYSTEM_PROMPT =
+export const PROVIDER_NAME = 'openai' as const;
+export const DEFAULT_MODEL = 'gpt-4.1';
+export const SYSTEM_PROMPT =
   'You are a helpful assistant answering questions about marketing agencies and law firms. Provide detailed, factual answers. Always cite your sources when possible.';
 
 let _client: OpenAI | null = null;
@@ -11,18 +13,28 @@ function getClient(): OpenAI {
   return _client;
 }
 
-export async function queryOpenAI(queryText: string): Promise<{
+export interface ProviderQueryResult {
   text: string;
   model: string;
   latencyMs: number;
   raw: unknown;
-}> {
+}
+
+export interface ProviderQueryOptions {
+  /** 0 for deterministic k=1 runs, ~0.7 for k=3 self-consistency fan-out. */
+  temperature?: number;
+}
+
+export async function queryOpenAI(
+  queryText: string,
+  options: ProviderQueryOptions = {},
+): Promise<ProviderQueryResult> {
   const client = getClient();
   const start = Date.now();
 
   const response = await client.chat.completions.create({
-    model: 'gpt-4.1',
-    temperature: 0,
+    model: DEFAULT_MODEL,
+    temperature: options.temperature ?? 0,
     messages: [
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: queryText },

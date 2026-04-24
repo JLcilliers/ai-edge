@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import type { ProviderQueryOptions, ProviderQueryResult } from './openai';
 
 // Perplexity Sonar is OpenAI-API-compatible — same SDK, different baseURL.
 // Sonar models run live web search and include citations in the response
@@ -6,13 +7,13 @@ import OpenAI from 'openai';
 // training-data responses from OpenAI / Anthropic / OpenRouter.
 //
 // See https://docs.perplexity.ai/api-reference/chat-completions-post
-const SYSTEM_PROMPT =
-  'You are a helpful assistant answering questions about marketing agencies and law firms. Provide detailed, factual answers. Always cite your sources when possible.';
-
+export const PROVIDER_NAME = 'perplexity' as const;
 // `sonar` is the budget tier with built-in web search — fine for audit
 // fan-out. Override to `sonar-pro` / `sonar-reasoning` via env when we want
 // deeper answers per query.
-const DEFAULT_MODEL = process.env.PERPLEXITY_MODEL ?? 'sonar';
+export const DEFAULT_MODEL = process.env.PERPLEXITY_MODEL ?? 'sonar';
+export const SYSTEM_PROMPT =
+  'You are a helpful assistant answering questions about marketing agencies and law firms. Provide detailed, factual answers. Always cite your sources when possible.';
 
 let _client: OpenAI | null = null;
 function getClient(): OpenAI {
@@ -25,18 +26,16 @@ function getClient(): OpenAI {
   return _client;
 }
 
-export async function queryPerplexity(queryText: string): Promise<{
-  text: string;
-  model: string;
-  latencyMs: number;
-  raw: unknown;
-}> {
+export async function queryPerplexity(
+  queryText: string,
+  options: ProviderQueryOptions = {},
+): Promise<ProviderQueryResult> {
   const client = getClient();
   const start = Date.now();
 
   const response = await client.chat.completions.create({
     model: DEFAULT_MODEL,
-    temperature: 0,
+    temperature: options.temperature ?? 0,
     messages: [
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: queryText },

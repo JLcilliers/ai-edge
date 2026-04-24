@@ -1,12 +1,13 @@
 import OpenAI from 'openai';
+import type { ProviderQueryOptions, ProviderQueryResult } from './openai';
 
 // OpenRouter is OpenAI-API-compatible — same SDK, different baseURL.
 // Model IDs use "{vendor}/{model}" format (e.g. google/gemini-2.5-pro).
 // See https://openrouter.ai/docs/quickstart
-const SYSTEM_PROMPT =
+export const PROVIDER_NAME = 'openrouter' as const;
+export const DEFAULT_MODEL = process.env.OPENROUTER_MODEL ?? 'google/gemini-2.5-pro';
+export const SYSTEM_PROMPT =
   'You are a helpful assistant answering questions about marketing agencies and law firms. Provide detailed, factual answers. Always cite your sources when possible.';
-
-const DEFAULT_MODEL = process.env.OPENROUTER_MODEL ?? 'google/gemini-2.5-pro';
 
 let _client: OpenAI | null = null;
 function getClient(): OpenAI {
@@ -23,18 +24,16 @@ function getClient(): OpenAI {
   return _client;
 }
 
-export async function queryOpenRouter(queryText: string): Promise<{
-  text: string;
-  model: string;
-  latencyMs: number;
-  raw: unknown;
-}> {
+export async function queryOpenRouter(
+  queryText: string,
+  options: ProviderQueryOptions = {},
+): Promise<ProviderQueryResult> {
   const client = getClient();
   const start = Date.now();
 
   const response = await client.chat.completions.create({
     model: DEFAULT_MODEL,
-    temperature: 0,
+    temperature: options.temperature ?? 0,
     messages: [
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: queryText },
