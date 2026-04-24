@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import Link from 'next/link';
 import {
   Download,
   RotateCw,
@@ -8,6 +9,7 @@ import {
   Calendar,
   CheckCircle2,
   AlertTriangle,
+  Eye,
 } from 'lucide-react';
 import {
   rebuildMonthlyReport,
@@ -155,22 +157,33 @@ export function ReportsClient({
                 : 'Cron fires on the 1st of each month. Click "Rebuild" to trigger manually.'}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => handleRebuild(summary.previousMonthKey)}
-            disabled={isPending}
-            className="flex shrink-0 items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm text-white transition-colors hover:border-[--accent] disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <RotateCw
-              size={14}
-              className={
-                isPending && busyMonth === summary.previousMonthKey
-                  ? 'animate-spin'
-                  : ''
-              }
-            />
-            Rebuild
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            {summary.previousMonthHasReport && (
+              <Link
+                href={`/dashboard/${firmSlug}/reports/${summary.previousMonthKey}`}
+                className="flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm text-white transition-colors hover:border-[--accent]"
+              >
+                <Eye size={14} />
+                View
+              </Link>
+            )}
+            <button
+              type="button"
+              onClick={() => handleRebuild(summary.previousMonthKey)}
+              disabled={isPending}
+              className="flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm text-white transition-colors hover:border-[--accent] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <RotateCw
+                size={14}
+                className={
+                  isPending && busyMonth === summary.previousMonthKey
+                    ? 'animate-spin'
+                    : ''
+                }
+              />
+              Rebuild
+            </button>
+          </div>
         </div>
       )}
 
@@ -252,6 +265,14 @@ export function ReportsClient({
                 </span>
                 <span className="text-white/70">{r.redditMentions}</span>
                 <div className="flex items-center gap-2">
+                  <Link
+                    href={`/dashboard/${firmSlug}/reports/${r.monthKey}`}
+                    className="flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-xs text-white transition-colors hover:border-[--accent]"
+                    title="Open full report breakdown"
+                  >
+                    <Eye size={12} />
+                    View
+                  </Link>
                   {r.blobUrl && (
                     <a
                       href={r.blobUrl}
