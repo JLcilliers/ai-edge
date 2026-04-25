@@ -59,7 +59,10 @@ export const providerBioSchema = z.object({
   role: z.string().optional(),
   credentials: z.array(z.string()).default([]),
   bio: z.string().optional(),
-  photo_url: z.string().url().optional(),
+  // Empty string allowed because the editor binds `photo_url ?? ''` and
+  // strict `.url()` rejected an unfilled input with an opaque Zod error.
+  // The save action coerces '' → undefined before persisting.
+  photo_url: z.string().url().optional().or(z.literal('')),
   bar_number: z.string().optional(),     // law_firm
   license_number: z.string().optional(), // dental / medical
 });
@@ -118,6 +121,12 @@ export type PressItem = z.infer<typeof pressItemSchema>;
 // ── Shared base fields (all firm types) ────────────────────
 const baseFields = {
   firm_name: z.string().min(1),
+  // Canonical homepage. Read by suppression + entity scanners
+  // (`resolveFirmSiteUrl` in apps/web/app/lib/suppression/scan.ts and
+  // apps/web/app/lib/entity/scan.ts) — without it, those scans throw
+  // "Brand Truth missing a primary URL". Optional only because legacy
+  // tenants pre-date this field; new firms should always set it.
+  primary_url: z.string().url().optional(),
   name_variants: z.array(z.string()).default([]),
   common_misspellings: z.array(z.string()).default([]),
   legal_entity: z.string().optional(),
