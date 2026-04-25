@@ -827,7 +827,17 @@ export function BrandTruthEditor({
             >
               <span className="font-medium">v{v.version}</span>
               {v.version === currentVersion && <span className="ml-1 text-white/40">(latest)</span>}
-              <span className="ml-2">
+              {/*
+                `toLocaleDateString` with hour/minute options is locale + TZ
+                sensitive — the server (UTC) and the client (the operator's
+                local TZ) produce different strings, which throws React #418
+                hydration mismatches. We *want* the local time on the client,
+                so suppress the warning at this exact span. React will swap
+                the server's UTC string for the client's local string on
+                first render. The visible flicker is acceptable for a
+                version-history sidebar.
+              */}
+              <span className="ml-2" suppressHydrationWarning>
                 {v.createdAt.toLocaleDateString('en-US', {
                   month: 'short',
                   day: 'numeric',

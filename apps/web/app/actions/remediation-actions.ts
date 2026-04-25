@@ -285,10 +285,30 @@ export type TicketStats = {
   openOverdue: number;
 };
 
-export async function getTicketStats(firmSlug: string): Promise<TicketStats> {
+/**
+ * Faceted counts for the filter pills + stat strip.
+ *
+ * Each metric respects every active filter EXCEPT the axis it represents:
+ *   • `byStatus[s]` and `total` and `openOverdue` respect `filter.sourceType`
+ *     only — the status pill swaps the status axis, so its count holds
+ *     source constant and shows "tickets if I switch status to s".
+ *   • `bySource[src]` respects `filter.status` only — the source pill
+ *     swaps the source axis, so its count holds status constant.
+ *
+ * Without this, the source pills displayed lifetime totals (e.g. "Audit 16")
+ * even when the operator was on `?status=closed`, where the actual closed
+ * audit count was 1.
+ */
+export async function getTicketStats(
+  firmSlug: string,
+  filter: TicketFilter = {},
+): Promise<TicketStats> {
   const db = getDb();
   const firmId = await resolveFirmId(firmSlug);
 
+  // Pull every ticket for the firm — we need two cross-cutting aggregations
+  // (status × source filter holding the other constant) and page load is
+  // dominated by the context joins in `listRemediationTickets`, not this.
   const rows = await db
     .select({
       status: remediationTickets.status,
@@ -299,7 +319,7 @@ export async function getTicketStats(firmSlug: string): Promise<TicketStats> {
     .where(eq(remediationTickets.firm_id, firmId));
 
   const stats: TicketStats = {
-    total: rows.length,
+    total: 0,
     byStatus: { open: 0, in_progress: 0, closed: 0 },
     bySource: { audit: 0, legacy: 0, reddit: 0, entity: 0 },
     openOverdue: 0,
@@ -309,10 +329,21 @@ export async function getTicketStats(firmSlug: string): Promise<TicketStats> {
   for (const r of rows) {
     const status = normalizeStatus(r.status);
     const source = normalizeSource(r.sourceType);
-    stats.byStatus[status] += 1;
-    stats.bySource[source] += 1;
-    if (status !== 'closed' && r.dueAt && r.dueAt.getTime() < now) {
-      stats.openOverdue += 1;
+    const overdue =
+      status !== 'closed' && r.dueAt != null && r.dueAt.getTime() < now;
+
+    const matchesSourceFilter =
+      !filter.sourceType || filter.sourceType === source;
+    const matchesStatusFilter =
+      !filter.status || filter.status === status;
+
+    if (matchesSourceFilter) {
+      stats.byStatus[status] += 1;
+      stats.total += 1;
+      if (overdue) stats.openOverdue += 1;
+    }
+    if (matchesStatusFilter) {
+      stats.bySource[source] += 1;
     }
   }
 

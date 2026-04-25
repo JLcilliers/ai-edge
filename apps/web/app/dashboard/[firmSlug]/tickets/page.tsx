@@ -47,7 +47,12 @@ export default async function TicketsPage({
       status: activeStatus ?? undefined,
       sourceType: activeSource ?? undefined,
     }).catch(() => []),
-    getTicketStats(firmSlug).catch(() => ({
+    // Faceted: pass both filters so byStatus respects the source axis and
+    // bySource respects the status axis. See `getTicketStats` for details.
+    getTicketStats(firmSlug, {
+      status: activeStatus ?? undefined,
+      sourceType: activeSource ?? undefined,
+    }).catch(() => ({
       total: 0,
       byStatus: { open: 0, in_progress: 0, closed: 0 } as Record<TicketStatus, number>,
       bySource: { audit: 0, legacy: 0, reddit: 0, entity: 0 } as Record<TicketSource, number>,

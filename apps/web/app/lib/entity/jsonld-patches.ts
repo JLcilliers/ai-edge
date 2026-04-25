@@ -52,12 +52,44 @@ function address(a: Address | undefined) {
 }
 
 /**
+ * Compare two URLs by canonical form (origin + path, trailing slash stripped,
+ * lowercased host). Used so we don't accidentally treat
+ * `https://example.com` and `https://www.example.com/` as different. Returns
+ * `false` when either side is unparseable — better to keep the field than
+ * drop it on a parser quirk.
+ */
+function sameUrl(a: string | undefined | null, b: string | undefined | null): boolean {
+  if (!a || !b) return false;
+  try {
+    const ua = new URL(a);
+    const ub = new URL(b);
+    const norm = (u: URL) => {
+      const path = u.pathname.replace(/\/$/, '');
+      return `${u.host.toLowerCase().replace(/^www\./, '')}${path}`;
+    };
+    return norm(ua) === norm(ub);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Map an attorney/dentist/team-member bio to a schema.org Person. Credentials
  * become `hasCredential` strings; bar / license numbers become `identifier`
  * under a `PropertyValue` so search engines can disambiguate two lawyers
  * with the same name.
+ *
+ * `image` is only emitted when `bio.photo_url` looks like a real photo URL —
+ * i.e. it is non-empty and is *not* the firm's homepage (a common operator
+ * mistake during onboarding, where the homepage URL gets pasted into every
+ * "Photo URL" field). A wrong `image` teaches Google + LLMs that the firm
+ * logo is the attorney's headshot, which is worse than no image at all.
  */
-function personBlock(bio: ProviderBio, orgName: string): Record<string, unknown> {
+function personBlock(
+  bio: ProviderBio,
+  orgName: string,
+  siteUrl: string | null,
+): Record<string, unknown> {
   const credentials = bio.credentials?.length
     ? bio.credentials.map((c) => ({
         '@type': 'EducationalOccupationalCredential',
@@ -81,13 +113,17 @@ function personBlock(bio: ProviderBio, orgName: string): Record<string, unknown>
     });
   }
 
+  const photoUrl = bio.photo_url?.trim();
+  const isUsablePhoto =
+    !!photoUrl && photoUrl.length > 0 && !sameUrl(photoUrl, siteUrl);
+
   return {
     '@context': 'https://schema.org',
     '@type': 'Person',
     name: bio.name,
     jobTitle: bio.role,
     description: bio.bio,
-    image: bio.photo_url,
+    image: isUsablePhoto ? photoUrl : undefined,
     worksFor: { '@type': 'Organization', name: orgName },
     hasCredential: credentials,
     identifier: identifiers.length ? identifiers : undefined,
@@ -183,7 +219,7 @@ export function generateJsonLdPatches(args: {
       patches.push({
         type: 'Person',
         reason: `Schema for ${bio.name} — ties their name to the firm so LLMs attribute quotes correctly.`,
-        jsonLd: jsonLdBlock(personBlock(bio, brandTruth.firm_name)),
+        jsonLd: jsonLdBlock(personBlock(bio, brandTruth.firm_name, siteUrl)),
       });
     }
   }

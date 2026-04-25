@@ -25,37 +25,155 @@ function getClient(): OpenAI {
  * "centroid" in PLAN §5.3 is: embed the Brand Truth once, treat that as
  * the target vector, and measure each page's cosine distance from it.
  *
- * We include the fields that describe the firm's voice + positioning
- * (identity, services, value props) but skip operational metadata like
- * compliance_jurisdictions — those don't describe content.
+ * Centroid breadth matters more than precision. text-embedding-3-large
+ * spreads similarity over a wide cosine range, so a thin centroid (just
+ * firm name + a 3-word practice area list) makes *every* page on the
+ * site look semantically distant — even pages that are clearly on-brand.
+ *
+ * We use every descriptive field in the discriminated union — the
+ * fields here must match `brandTruthSchema` in
+ * `packages/shared/src/brand-truth.ts`, NOT a guessed/legacy shape.
+ * Provider bios, notable cases, and service-offering scopes are the
+ * richest descriptive vocabulary the firm has, so we include their
+ * full body text — those bodies are what an aligned page reads like.
+ *
+ * Operational metadata (compliance_jurisdictions, banned_claims,
+ * common_misspellings) is intentionally excluded — it doesn't describe
+ * content, so including it would dilute the centroid.
  */
 export function brandTruthToText(brandTruth: BrandTruth): string {
-  const bt = brandTruth as any;
   const parts: string[] = [];
 
-  if (bt.firm_name) parts.push(`Firm: ${bt.firm_name}`);
-  if (Array.isArray(bt.name_variants) && bt.name_variants.length > 0) {
-    parts.push(`Also known as: ${bt.name_variants.join(', ')}`);
+  // Identity — every firm type has these.
+  parts.push(`Firm: ${brandTruth.firm_name}`);
+  if (brandTruth.name_variants?.length) {
+    parts.push(`Also known as: ${brandTruth.name_variants.join(', ')}`);
   }
-  if (bt.positioning) parts.push(`Positioning: ${bt.positioning}`);
-  if (bt.elevator_pitch) parts.push(`Elevator pitch: ${bt.elevator_pitch}`);
-  if (bt.mission) parts.push(`Mission: ${bt.mission}`);
+  if (brandTruth.legal_entity) {
+    parts.push(`Legal entity: ${brandTruth.legal_entity}`);
+  }
 
-  if (Array.isArray(bt.practice_areas) && bt.practice_areas.length > 0) {
-    parts.push(`Practice areas: ${bt.practice_areas.join(', ')}`);
+  // Positioning markers.
+  if (brandTruth.required_positioning_phrases?.length) {
+    parts.push(
+      `Positioning phrases: ${brandTruth.required_positioning_phrases.join('. ')}`,
+    );
   }
-  if (Array.isArray(bt.services) && bt.services.length > 0) {
-    parts.push(`Services: ${bt.services.join(', ')}`);
+  if (brandTruth.unique_differentiators?.length) {
+    parts.push(
+      `Differentiators: ${brandTruth.unique_differentiators.join('. ')}`,
+    );
   }
-  if (Array.isArray(bt.value_props) && bt.value_props.length > 0) {
-    parts.push(`Value propositions: ${bt.value_props.join('. ')}`);
+  if (brandTruth.brand_values?.length) {
+    parts.push(`Brand values: ${brandTruth.brand_values.join(', ')}`);
   }
-  if (Array.isArray(bt.differentiators) && bt.differentiators.length > 0) {
-    parts.push(`Differentiators: ${bt.differentiators.join('. ')}`);
+
+  // Tone — `tone_guidelines.voice` is the actual prose, not a single word.
+  if (brandTruth.tone_guidelines?.voice) {
+    parts.push(`Tone of voice: ${brandTruth.tone_guidelines.voice}`);
+    if (brandTruth.tone_guidelines.register) {
+      parts.push(`Register: ${brandTruth.tone_guidelines.register}`);
+    }
   }
-  if (bt.tone) parts.push(`Tone of voice: ${bt.tone}`);
-  if (Array.isArray(bt.target_audience) && bt.target_audience.length > 0) {
-    parts.push(`Target audience: ${bt.target_audience.join(', ')}`);
+
+  // Target audience — flatten the structured object so all sub-fields
+  // contribute to the centroid.
+  const aud = brandTruth.target_audience;
+  if (aud) {
+    if (aud.primary_verticals?.length) {
+      parts.push(`Target audience: ${aud.primary_verticals.join(', ')}`);
+    }
+    if (aud.secondary_verticals?.length) {
+      parts.push(`Also serves: ${aud.secondary_verticals.join(', ')}`);
+    }
+    if (aud.firmographic) parts.push(`Firmographic: ${aud.firmographic}`);
+    if (aud.persona) parts.push(`Persona: ${aud.persona}`);
+  }
+
+  // What kinds of queries this firm wants to win — these are intent
+  // strings written in the same register as user search queries, so
+  // they pull the centroid toward search-relevant vocabulary.
+  if (brandTruth.seed_query_intents?.length) {
+    parts.push(
+      `Search intents: ${brandTruth.seed_query_intents.join('. ')}`,
+    );
+  }
+
+  // Awards — names alone are a useful signal for "this is the firm" pages.
+  if (brandTruth.awards?.length) {
+    const awardNames = brandTruth.awards.map((a) =>
+      a.year ? `${a.name} (${a.year})` : a.name,
+    );
+    parts.push(`Awards: ${awardNames.join(', ')}`);
+  }
+
+  // Type-specific descriptive content — this is where the centroid gets
+  // its body. Practice areas + bio prose + case summaries collectively
+  // sample the firm's actual vocabulary.
+  if (brandTruth.firm_type === 'law_firm') {
+    if (brandTruth.practice_areas?.length) {
+      parts.push(`Practice areas: ${brandTruth.practice_areas.join(', ')}`);
+    }
+    if (brandTruth.geographies_served?.length) {
+      const geos = brandTruth.geographies_served.map(
+        (g) => `${g.city}, ${g.state}`,
+      );
+      parts.push(`Geographies served: ${geos.join('; ')}`);
+    }
+    for (const bio of brandTruth.attorney_bios ?? []) {
+      const line = [bio.name, bio.role, bio.bio].filter(Boolean).join(' — ');
+      if (line) parts.push(`Attorney: ${line}`);
+      if (bio.credentials?.length) {
+        parts.push(`Credentials: ${bio.credentials.join(', ')}`);
+      }
+    }
+    for (const c of brandTruth.notable_cases ?? []) {
+      const line = [c.summary, c.outcome, c.jurisdiction]
+        .filter(Boolean)
+        .join(' — ');
+      if (line) parts.push(`Notable case: ${line}`);
+    }
+  } else if (brandTruth.firm_type === 'dental_practice') {
+    if (brandTruth.practice_areas?.length) {
+      parts.push(`Services: ${brandTruth.practice_areas.join(', ')}`);
+    }
+    if (brandTruth.geographies_served?.length) {
+      const geos = brandTruth.geographies_served.map(
+        (g) => `${g.city}, ${g.state}`,
+      );
+      parts.push(`Geographies served: ${geos.join('; ')}`);
+    }
+    for (const bio of brandTruth.provider_bios ?? []) {
+      const line = [bio.name, bio.role, bio.bio].filter(Boolean).join(' — ');
+      if (line) parts.push(`Provider: ${line}`);
+      if (bio.credentials?.length) {
+        parts.push(`Credentials: ${bio.credentials.join(', ')}`);
+      }
+    }
+  } else if (brandTruth.firm_type === 'marketing_agency') {
+    for (const s of brandTruth.service_offerings ?? []) {
+      parts.push(`Service: ${s.name} — ${s.scope}`);
+    }
+    if (brandTruth.service_areas?.length) {
+      parts.push(`Service areas: ${brandTruth.service_areas.join(', ')}`);
+    }
+    for (const m of brandTruth.team_members ?? []) {
+      const line = [m.name, m.role, m.bio].filter(Boolean).join(' — ');
+      if (line) parts.push(`Team: ${line}`);
+    }
+    for (const c of brandTruth.key_clients_public ?? []) {
+      const line = [c.name, c.vertical, c.testimonial_quote]
+        .filter(Boolean)
+        .join(' — ');
+      if (line) parts.push(`Client: ${line}`);
+    }
+  } else if (brandTruth.firm_type === 'other') {
+    for (const s of brandTruth.service_offerings ?? []) {
+      parts.push(`Service: ${s.name} — ${s.scope}`);
+    }
+    if (brandTruth.service_areas?.length) {
+      parts.push(`Service areas: ${brandTruth.service_areas.join(', ')}`);
+    }
   }
 
   return parts.join('\n');

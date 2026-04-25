@@ -410,6 +410,14 @@ export async function getFirmHealthSnapshot(): Promise<FirmHealthRow[]> {
     // drizzle's neon-http adapter has edge cases with raw DISTINCT ON
     // and the firm count is bounded (dozens max for this internal
     // tool), so parallel fanout is simpler and more robust.
+    //
+    // Filter to *visibility* audit kinds only (`full`, `daily-priority`,
+    // `competitive`). Reddit scans share the `audit_run` table because
+    // they reuse cron + budget plumbing, but they are not what the
+    // operator means by "Last audit" — Reddit has its own column
+    // (Open complaints) and dashboard. Without this filter a recent
+    // Reddit run would overwrite the alignment audit timestamp and
+    // mislead the operator about pipeline health.
     Promise.all(
       firmIds.map(async (fid) => {
         const [row] = await db
@@ -424,6 +432,7 @@ export async function getFirmHealthSnapshot(): Promise<FirmHealthRow[]> {
           .where(and(
             eq(auditRuns.firm_id, fid),
             sql`${auditRuns.started_at} IS NOT NULL`,
+            inArray(auditRuns.kind, ['full', 'daily-priority', 'competitive']),
           ))
           .orderBy(desc(auditRuns.started_at))
           .limit(1);
