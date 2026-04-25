@@ -156,7 +156,10 @@ export function CompetitorsClient({
               Roster & Share of Mention
             </h2>
             {initialShare.latestRunFinishedAt && (
-              <p className="mt-1 font-[family-name:var(--font-geist-mono)] text-xs text-white/40">
+              <p
+                className="mt-1 font-[family-name:var(--font-geist-mono)] text-xs text-white/40"
+                suppressHydrationWarning
+              >
                 From audit completed{' '}
                 {new Date(initialShare.latestRunFinishedAt).toLocaleString()}
               </p>

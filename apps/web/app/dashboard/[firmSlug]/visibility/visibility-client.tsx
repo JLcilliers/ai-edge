@@ -170,7 +170,10 @@ function RegressionBanner({ regression }: { regression: AlignmentRegression }) {
       <div>
         <p className={`font-semibold ${C.textColor}`}>{C.label}</p>
         <p className="mt-1 text-sm text-white/55">{C.subLabel}</p>
-        <p className="mt-2 font-[family-name:var(--font-geist-mono)] text-xs text-white/40">
+        <p
+          className="mt-2 font-[family-name:var(--font-geist-mono)] text-xs text-white/40"
+          suppressHydrationWarning
+        >
           Latest red: {latestRedPct.toFixed(1)}% · Previous red: {previousRedPct.toFixed(1)}%
           {' · '}
           Last run {formatDate(regression.latestRunStartedAt)}
@@ -353,7 +356,10 @@ function CitationSourcesView({ data }: { data: CitationSourceGraph }) {
               <span className="w-20 text-right font-[family-name:var(--font-geist-mono)] text-xs text-white/60">
                 {row.uniqueQueries}
               </span>
-              <span className="w-24 text-right font-[family-name:var(--font-geist-mono)] text-xs text-white/40">
+              <span
+                className="w-24 text-right font-[family-name:var(--font-geist-mono)] text-xs text-white/40"
+                suppressHydrationWarning
+              >
                 {formatDate(row.lastSeenAt)}
               </span>
             </div>
@@ -383,7 +389,10 @@ function DriftView({ history, firmSlug }: { history: CitationDriftRow[]; firmSlu
           className="rounded-xl border border-white/10 bg-[--bg-secondary] p-5"
         >
           <div className="mb-3 flex items-center justify-between gap-4">
-            <div className="font-[family-name:var(--font-geist-mono)] text-xs text-white/40">
+            <div
+              className="font-[family-name:var(--font-geist-mono)] text-xs text-white/40"
+              suppressHydrationWarning
+            >
               detected {formatDateTime(row.detectedAt)}
             </div>
             <div className="flex items-center gap-3 text-xs">

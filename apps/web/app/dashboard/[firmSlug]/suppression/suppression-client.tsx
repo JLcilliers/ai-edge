@@ -89,7 +89,10 @@ export function SuppressionClient({
             : 'Run Suppression Scan'}
         </button>
         {initialLatestRun?.finishedAt && (
-          <span className="font-[family-name:var(--font-geist-mono)] text-xs text-white/40">
+          <span
+            className="font-[family-name:var(--font-geist-mono)] text-xs text-white/40"
+            suppressHydrationWarning
+          >
             Last scanned {new Date(initialLatestRun.finishedAt).toLocaleString()}
           </span>
         )}
@@ -181,7 +184,10 @@ function FindingRow({
             </span>
           )}
           {finding.ticketDueAt && (
-            <span className="font-[family-name:var(--font-geist-mono)] text-xs text-white/30">
+            <span
+              className="font-[family-name:var(--font-geist-mono)] text-xs text-white/30"
+              suppressHydrationWarning
+            >
               Due {new Date(finding.ticketDueAt).toLocaleDateString()}
             </span>
           )}

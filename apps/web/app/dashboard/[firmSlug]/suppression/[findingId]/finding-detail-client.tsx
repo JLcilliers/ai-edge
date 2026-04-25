@@ -223,7 +223,10 @@ function DraftView({ detail }: { detail: Detail }) {
             What changed
           </div>
           <p className="mt-2 text-sm text-white/80">{d.changeSummary}</p>
-          <div className="mt-3 font-[family-name:var(--font-geist-mono)] text-[10px] text-white/40">
+          <div
+            className="mt-3 font-[family-name:var(--font-geist-mono)] text-[10px] text-white/40"
+            suppressHydrationWarning
+          >
             {d.generatedByModel} · ${(d.costUsd ?? 0).toFixed(4)} · generated{' '}
             {new Date(d.generatedAt).toLocaleString()}
           </div>

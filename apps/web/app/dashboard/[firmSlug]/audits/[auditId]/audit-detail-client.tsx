@@ -75,7 +75,10 @@ export function AuditDetailClient({
 
       <div className="mb-8 flex items-start justify-between">
         <div>
-          <h1 className="font-[family-name:var(--font-jakarta)] text-3xl font-extrabold tracking-tight text-white">
+          <h1
+            className="font-[family-name:var(--font-jakarta)] text-3xl font-extrabold tracking-tight text-white"
+            suppressHydrationWarning
+          >
             Audit Results — {dateStr}
           </h1>
           <p className="mt-2 text-white/55">

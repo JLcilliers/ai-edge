@@ -124,7 +124,9 @@ function CronRow({
         <td className="px-4 py-3">
           {last ? (
             <div>
-              <div className="text-white/80">{formatRelative(last.startedAt)}</div>
+              <div className="text-white/80" suppressHydrationWarning>
+                {formatRelative(last.startedAt)}
+              </div>
               <div className="mt-0.5 text-[10px] text-white/40">
                 {last.durationMs != null ? formatDuration(last.durationMs) : '—'}
               </div>
@@ -212,7 +214,10 @@ function CronRunDetail({ run }: { run: CronRunRow }) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <StatusDot status={run.status} />
-          <div className="font-[family-name:var(--font-geist-mono)] text-xs text-white/90">
+          <div
+            className="font-[family-name:var(--font-geist-mono)] text-xs text-white/90"
+            suppressHydrationWarning
+          >
             {run.startedAt.toLocaleString('en-US', {
               month: 'short',
               day: 'numeric',
@@ -355,7 +360,7 @@ function FirmRow({ row }: { row: FirmHealthRow }) {
       <td className="px-4 py-3">
         {row.lastAudit ? (
           <div>
-            <div className={auditTone}>
+            <div className={auditTone} suppressHydrationWarning>
               {row.lastAudit.startedAt
                 ? formatRelative(row.lastAudit.startedAt)
                 : 'pending'}

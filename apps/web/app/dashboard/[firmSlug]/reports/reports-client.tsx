@@ -235,7 +235,10 @@ export function ReportsClient({
                   <div className="font-[family-name:var(--font-jakarta)] text-base font-semibold text-white">
                     {formatMonth(r.monthKey)}
                   </div>
-                  <div className="mt-0.5 font-[family-name:var(--font-geist-mono)] text-[10px] text-white/40">
+                  <div
+                    className="mt-0.5 font-[family-name:var(--font-geist-mono)] text-[10px] text-white/40"
+                    suppressHydrationWarning
+                  >
                     generated {formatDateTime(r.generatedAt)}
                   </div>
                 </div>
