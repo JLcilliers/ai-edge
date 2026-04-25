@@ -7,7 +7,7 @@ import {
   brandTruthVersions,
 } from '@ai-edge/db';
 import type { BrandTruth } from '@ai-edge/shared';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and, inArray } from 'drizzle-orm';
 import { createHash } from 'node:crypto';
 import { crawlViaSitemap } from './crawler';
 import { fetchAndExtract } from './extract';
@@ -125,6 +125,55 @@ export async function runSuppressionScan(
     }
     const brandTruth = btv.payload as BrandTruth;
     const siteUrl = resolveFirmSiteUrl(brandTruth);
+
+    // 0. Wipe prior open suppression findings + their unfinished tickets.
+    //
+    // A re-scan replaces the prior report — this is the operator's mental
+    // model ("I clicked Run Scan, the new numbers should be the truth")
+    // and the only way calibration changes are verifiable from the UI.
+    // We *keep* findings whose ticket the operator already closed; those
+    // are historical record (and the ticket close-out is auditable).
+    //
+    // Order matters: tickets first (they FK to findings via source_id),
+    // then findings (they FK to pages, which we leave intact since pages
+    // get upserted below).
+    const priorOpenFindings = await db
+      .select({
+        findingId: legacyFindings.id,
+      })
+      .from(legacyFindings)
+      .innerJoin(pages, eq(pages.id, legacyFindings.page_id))
+      .innerJoin(
+        remediationTickets,
+        and(
+          eq(remediationTickets.source_id, legacyFindings.id),
+          eq(remediationTickets.source_type, 'legacy'),
+        ),
+      )
+      .where(
+        and(
+          eq(pages.firm_id, firmId),
+          inArray(remediationTickets.status, ['open', 'in_progress']),
+        ),
+      );
+
+    if (priorOpenFindings.length > 0) {
+      const ids = priorOpenFindings.map((r) => r.findingId);
+      // Delete the open tickets first (FK constraint).
+      await db
+        .delete(remediationTickets)
+        .where(
+          and(
+            eq(remediationTickets.source_type, 'legacy'),
+            inArray(remediationTickets.source_id, ids),
+            inArray(remediationTickets.status, ['open', 'in_progress']),
+          ),
+        );
+      // Then delete the now-orphan findings.
+      await db
+        .delete(legacyFindings)
+        .where(inArray(legacyFindings.id, ids));
+    }
 
     // 1. Crawl.
     const crawl = await crawlViaSitemap({ firmSiteUrl: siteUrl, maxUrls });
