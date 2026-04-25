@@ -34,22 +34,35 @@ import {
  *      + remediation_ticket rows.
  *   7. Upsert `page` rows so re-runs don't duplicate.
  *
- * Thresholds from PLAN §5.3:
- *   - d > 0.45  → no-index candidate (action = 'noindex')
- *   - 0.30 < d ≤ 0.45 → rewrite candidate
- *   - d ≤ 0.30  → aligned, no action
+ * Thresholds (calibrated against text-embedding-3-large empirical
+ * distance distribution):
+ *   - d > 0.55  → no-index candidate (action = 'noindex')
+ *   - 0.40 < d ≤ 0.55 → rewrite candidate
+ *   - d ≤ 0.40  → aligned, no action
+ *
+ * Calibration history: PLAN §5.3 originally specified 0.30 / 0.45, but
+ * those bounds produced ~95% noindex rates on real firm sites (Andrew
+ * Pickett Law: 73/75 noindex) because text-embedding-3-large produces
+ * distances in [0.3, 0.5] for genuinely on-brand pages whose vocabulary
+ * doesn't *exactly* mirror the Brand Truth centroid. We bumped both
+ * thresholds by 0.10 — false-positive noindex (suppressing a real
+ * on-brand page) destroys operator trust, so erring conservative on the
+ * upper bound is worth missing some legacy pages we'd then catch with
+ * a tighter centroid in v2. We also enriched `brandTruthToText` to
+ * include attorney bio bodies + case summaries so the centroid carries
+ * the firm's actual vocabulary, not just its taxonomy.
  *
  * The PLAN also distinguishes "no-index" vs "301 to closest aligned page"
  * based on backlinks. We don't have a backlinks source yet, so the v1
- * default for d > 0.45 is `'noindex'`; the UI can surface a redirect
+ * default for d > 0.55 is `'noindex'`; the UI can surface a redirect
  * override when the operator knows better.
  */
 
 const PAGE_CONCURRENCY = 1; // Be polite — firm sites are small targets.
 const MAX_URLS_DEFAULT = 75;
 
-const DISTANCE_THRESHOLD_REWRITE = 0.30;
-const DISTANCE_THRESHOLD_SUPPRESS = 0.45;
+const DISTANCE_THRESHOLD_REWRITE = 0.40;
+const DISTANCE_THRESHOLD_SUPPRESS = 0.55;
 const MIN_WORDS_TO_SCORE = 150; // Skip thin pages (contact, thank-you, etc).
 
 export interface RunSuppressionOptions {

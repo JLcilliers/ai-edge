@@ -249,7 +249,17 @@ function TicketRow({
                 @{ticket.owner}
               </span>
             )}
-            <span className="font-[family-name:var(--font-geist-mono)] text-xs text-white/30">
+            {/*
+              `toLocaleDateString` is locale + TZ sensitive: a UTC timestamp
+              near midnight prints a different calendar day on the server
+              (UTC) vs the client (local), which throws hydration mismatches.
+              `suppressHydrationWarning` is the React-blessed escape hatch for
+              this exact case — the client value is the one we actually want.
+            */}
+            <span
+              className="font-[family-name:var(--font-geist-mono)] text-xs text-white/30"
+              suppressHydrationWarning
+            >
               {new Date(ticket.createdAt).toLocaleDateString('en-US', {
                 month: 'short',
                 day: 'numeric',
@@ -261,6 +271,7 @@ function TicketRow({
                 className={`font-[family-name:var(--font-geist-mono)] text-xs ${
                   ticket.overdue ? 'text-red-400' : 'text-white/40'
                 }`}
+                suppressHydrationWarning
               >
                 Due {new Date(ticket.dueAt).toLocaleDateString()}
               </span>
