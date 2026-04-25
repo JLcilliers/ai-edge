@@ -32,7 +32,17 @@ function Section({
 }
 
 // ── Simple Input ──────────────────────────────────────────
-function Field({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+function Field({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
   return (
     <label className="block">
       <span className="text-xs text-white/55">{label}</span>
@@ -40,6 +50,7 @@ function Field({ label, value, onChange }: { label: string; value: string; onCha
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
         className="mt-1 block w-full rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-2 text-sm text-white placeholder:text-white/40 focus:border-[--accent] focus:outline-none"
       />
     </label>
@@ -171,6 +182,22 @@ export function BrandTruthEditor({
           <Field label="Firm Name" value={data.firm_name ?? ''} onChange={(v) => set('firm_name', v)} />
           <Field label="Firm Type" value={data.firm_type ?? ''} onChange={(v) => set('firm_type', v)} />
           <Field label="Legal Entity" value={data.legal_entity ?? ''} onChange={(v) => set('legal_entity', v)} />
+          {/*
+            Primary URL is the canonical homepage. The Suppression and Entity
+            scanners read it via `resolveFirmSiteUrl` — without it, both throw
+            "Brand Truth missing a primary URL". Bind to '' to keep the input
+            controlled; coerce empty back to undefined so we don't persist a
+            blank string that would fail the schema's `.url()` validation.
+          */}
+          <Field
+            label="Primary URL"
+            value={data.primary_url ?? ''}
+            onChange={(v) => {
+              const trimmed = v.trim();
+              set('primary_url', trimmed === '' ? undefined : v);
+            }}
+            placeholder="https://www.example.com"
+          />
         </div>
         <div className="mt-4">
           <StringArray label="Name Variants" items={data.name_variants ?? []} onChange={(v) => set('name_variants', v)} />
@@ -326,7 +353,11 @@ export function BrandTruthEditor({
                   value={ab.photo_url ?? ''}
                   onChange={(e) => {
                     const copy = [...(data.attorney_bios ?? [])];
-                    copy[i] = { ...copy[i], photo_url: e.target.value };
+                    // Coerce empty input to undefined so the persisted JSON
+                    // doesn't carry empty strings (the schema permits '' as
+                    // a safety net but undefined is the cleaner shape).
+                    const trimmed = e.target.value.trim();
+                    copy[i] = { ...copy[i], photo_url: trimmed === '' ? undefined : e.target.value };
                     set('attorney_bios', copy);
                   }}
                   className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
@@ -490,7 +521,8 @@ export function BrandTruthEditor({
                   value={pb.photo_url ?? ''}
                   onChange={(e) => {
                     const copy = [...(data.provider_bios ?? [])];
-                    copy[i] = { ...copy[i], photo_url: e.target.value };
+                    const trimmed = e.target.value.trim();
+                    copy[i] = { ...copy[i], photo_url: trimmed === '' ? undefined : e.target.value };
                     set('provider_bios', copy);
                   }}
                   className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
