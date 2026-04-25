@@ -86,7 +86,10 @@ export function EntityClient({
             : 'Run Entity Scan'}
         </button>
         {initialLatestRun?.finishedAt && (
-          <span className="font-[family-name:var(--font-geist-mono)] text-xs text-white/40">
+          <span
+            className="font-[family-name:var(--font-geist-mono)] text-xs text-white/40"
+            suppressHydrationWarning
+          >
             Last scanned {new Date(initialLatestRun.finishedAt).toLocaleString()}
           </span>
         )}

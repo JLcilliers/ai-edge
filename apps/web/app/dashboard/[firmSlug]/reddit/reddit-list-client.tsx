@@ -158,7 +158,10 @@ export function RedditListClient({
             : 'Run Reddit Scan'}
         </button>
         {initialLatestRun?.finishedAt && (
-          <span className="font-[family-name:var(--font-geist-mono)] text-xs text-white/40">
+          <span
+            className="font-[family-name:var(--font-geist-mono)] text-xs text-white/40"
+            suppressHydrationWarning
+          >
             Last scanned {new Date(initialLatestRun.finishedAt).toLocaleString()}
           </span>
         )}
@@ -294,7 +297,10 @@ function MentionRow({
               {mention.karma ?? 0} karma
             </span>
             {mention.postedAt && (
-              <span className="font-[family-name:var(--font-geist-mono)] text-xs text-white/30">
+              <span
+                className="font-[family-name:var(--font-geist-mono)] text-xs text-white/30"
+                suppressHydrationWarning
+              >
                 {new Date(mention.postedAt).toLocaleDateString('en-US', {
                   month: 'short',
                   day: 'numeric',
@@ -373,7 +379,10 @@ function MentionRow({
           </>
         )}
         {mention.triagedAt && !isOpen && (
-          <span className="ml-auto font-[family-name:var(--font-geist-mono)] text-[10px] text-white/30">
+          <span
+            className="ml-auto font-[family-name:var(--font-geist-mono)] text-[10px] text-white/30"
+            suppressHydrationWarning
+          >
             Triaged {new Date(mention.triagedAt).toLocaleDateString()}
           </span>
         )}

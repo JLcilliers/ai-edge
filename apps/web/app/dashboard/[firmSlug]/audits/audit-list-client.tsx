@@ -189,7 +189,10 @@ export function AuditListClient({
               <StatusBadge status={run.status} />
               <div>
                 <span className="text-sm font-medium text-white">{run.kind} audit</span>
-                <span className="ml-3 font-[family-name:var(--font-geist-mono)] text-xs text-white/40">
+                <span
+                  className="ml-3 font-[family-name:var(--font-geist-mono)] text-xs text-white/40"
+                  suppressHydrationWarning
+                >
                   {run.startedAt
                     ? new Date(run.startedAt).toLocaleDateString('en-US', {
                         month: 'short',

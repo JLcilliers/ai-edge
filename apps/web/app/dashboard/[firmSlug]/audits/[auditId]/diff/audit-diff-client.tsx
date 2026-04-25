@@ -223,7 +223,10 @@ function RunContextCard({
           </span>
         ) : null}
       </div>
-      <div className="mt-2 font-[family-name:var(--font-jakarta)] text-base font-semibold text-white">
+      <div
+        className="mt-2 font-[family-name:var(--font-jakarta)] text-base font-semibold text-white"
+        suppressHydrationWarning
+      >
         {formatDateTime(ctx.startedAt)}
       </div>
       <div className="mt-3 flex items-center gap-2">
