@@ -64,6 +64,13 @@
       "when": 1777500000000,
       "tag": "0008_reddit_triage",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1777600000000,
+      "tag": "0009_scenario_lab",
+      "breakpoints": true
     }
   ]
 }
