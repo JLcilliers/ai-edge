@@ -386,3 +386,127 @@ export const legacyRewriteDrafts = pgTable('legacy_rewrite_draft', {
 }, (t) => ({
   findingIdx: uniqueIndex('legacy_rewrite_draft_finding').on(t.legacy_finding_id),
 }));
+
+// ── Scenario Lab (PreFlight Ranker) ─────────────────────────
+// Per ADR-0006: a calibrated proxy ranker that lets operators rank-order
+// proposed content changes BEFORE they ship. NOT a Google replica — a
+// linear scoring function calibrated against observed SERPs via PSO.
+// Honest claim: directional, not absolute rank prediction.
+//
+// Tables (all firm-scoped, cascade-on-delete):
+//   serp_snapshot   — one observed SERP for a (firm, query) pair, any source
+//   serp_result     — ranked rows inside a snapshot
+//   page_features   — extracted feature vectors keyed by (firm, url)
+//   ranker_weights  — calibrated weights per generation, with fitness
+//   scenario        — operator-defined what-if (baseline → proposed change)
+
+export const serpSnapshots = pgTable('serp_snapshot', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  firm_id: uuid('firm_id').notNull().references(() => firms.id, { onDelete: 'cascade' }),
+  query: text('query').notNull(),
+  // 'manual' (paste-in) | 'bing-web-search' | 'serpapi' | 'dataforseo'
+  // v1 ships only 'manual'; the others are the Phase B integrations.
+  provider: text('provider').notNull().default('manual'),
+  // Locale + geo so we can scope calibration corpus when a firm targets
+  // multiple regions. ISO 3166-1 alpha-2 + IETF lang tag.
+  country: text('country'),
+  language: text('language'),
+  fetched_at: timestamp('fetched_at', { withTimezone: true }).defaultNow().notNull(),
+  // Raw provider response for replay/debug. Manual paste-ins store the
+  // original text in `notes` and leave this null.
+  raw: jsonb('raw'),
+  notes: text('notes'),
+}, (t) => ({
+  firmQueryIdx: index('serp_snapshot_firm_query_idx').on(t.firm_id, t.query),
+}));
+
+export const serpResults = pgTable('serp_result', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  snapshot_id: uuid('snapshot_id').notNull()
+    .references(() => serpSnapshots.id, { onDelete: 'cascade' }),
+  position: integer('position').notNull(),
+  url: text('url').notNull(),
+  domain: text('domain').notNull(),
+  title: text('title'),
+  snippet: text('snippet'),
+  // True when the result domain matches the firm's primary_url host.
+  // Lets the calibration step weight the firm's own URLs higher and the
+  // simulation step locate the baseline rank without re-running comparisons.
+  is_target: boolean('is_target').notNull().default(false),
+}, (t) => ({
+  snapshotIdx: index('serp_result_snapshot_idx').on(t.snapshot_id),
+}));
+
+export const pageFeatures = pgTable('page_features', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  firm_id: uuid('firm_id').notNull().references(() => firms.id, { onDelete: 'cascade' }),
+  // Optional FK — features for hypothetical/external URLs (competitor pages
+  // we want to compare against) won't have a `page` row.
+  page_id: uuid('page_id').references(() => pages.id, { onDelete: 'set null' }),
+  url: text('url').notNull(),
+  // jsonb so the feature schema can grow without a migration each time.
+  // The canonical list lives in lib/scenarios/ranker-feature-list.ts.
+  features: jsonb('features').$type<Record<string, number>>().notNull(),
+  extracted_at: timestamp('extracted_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  firmUrlIdx: uniqueIndex('page_features_firm_url').on(t.firm_id, t.url),
+}));
+
+export const rankerWeights = pgTable('ranker_weights', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  firm_id: uuid('firm_id').notNull().references(() => firms.id, { onDelete: 'cascade' }),
+  // Monotonically increasing per firm. Calibration writes generation+1 each
+  // time, never overwrites. Old weights remain queryable for "did this
+  // scenario use the latest model?" UX.
+  generation: integer('generation').notNull(),
+  weights: jsonb('weights').$type<Record<string, number>>().notNull(),
+  // Mean Spearman ρ across calibration SERPs at the end of training.
+  // Range [-1, 1]; negative means "worse than random" — we surface a
+  // warning in the UI when fitness < 0.1.
+  fitness: real('fitness').notNull(),
+  observation_count: integer('observation_count').notNull(),
+  // PSO hyperparameters used, for repro + debugging.
+  pso_params: jsonb('pso_params'),
+  trained_at: timestamp('trained_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  firmGenIdx: uniqueIndex('ranker_weights_firm_gen').on(t.firm_id, t.generation),
+}));
+
+export const scenarios = pgTable('scenario', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  firm_id: uuid('firm_id').notNull().references(() => firms.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  // The page being optimized (free-form URL — usually a `pages.url`).
+  baseline_url: text('baseline_url').notNull(),
+  // The query the scenario is targeting. Should match a serp_snapshot.query
+  // for there to be a competitor set; otherwise simulation reports
+  // Δscore-only with no Δrank.
+  query: text('query').notNull(),
+  description: text('description'),
+  // Proposed delta on the feature vector. Values are JSON-encoded ops:
+  //   numeric: { "word_count": "+200" }    → add 200
+  //            { "word_count": "*1.5" }    → multiply by 1.5
+  //            { "word_count": "= 1500" }  → set absolute
+  //   boolean: { "has_jsonld_legalservice": true }
+  // The simulator parses these and applies to the baseline FeatureVec.
+  proposed_change: jsonb('proposed_change').$type<Record<string, string | number | boolean>>().notNull(),
+  // Computed at scenario creation time and frozen in this row — re-run
+  // updates the row in place. Surfaces in the list view without recompute.
+  baseline_score: real('baseline_score'),
+  proposed_score: real('proposed_score'),
+  delta_score: real('delta_score'),
+  baseline_rank: integer('baseline_rank'),
+  proposed_rank: integer('proposed_rank'),
+  delta_rank: integer('delta_rank'),
+  competitor_count: integer('competitor_count'),
+  weights_generation_used: integer('weights_generation_used'),
+  // 'directional' | 'low_confidence' | 'no_calibration'. The UI maps this
+  // to a coloured badge so operators don't over-interpret a Δrank=+1 result
+  // when the calibration corpus is too thin to support it.
+  confidence_label: text('confidence_label'),
+  created_by: text('created_by'),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  recomputed_at: timestamp('recomputed_at', { withTimezone: true }),
+}, (t) => ({
+  firmIdx: index('scenario_firm_idx').on(t.firm_id),
+}));

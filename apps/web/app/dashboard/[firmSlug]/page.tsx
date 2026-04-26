@@ -19,6 +19,7 @@ import {
   TrendingUp,
   TrendingDown,
   AlertTriangle,
+  FlaskConical,
 } from 'lucide-react';
 import {
   getFirmBySlug,
@@ -222,6 +223,13 @@ export default async function FirmOverviewPage({
           title="Monthly Reports"
           description="Per-firm month-in-review: audit RAG totals, reddit sentiment, competitor share, suppression queue, entity divergences. Downloadable JSON."
           cta="View & rebuild"
+        />
+        <ModuleCard
+          href={`/dashboard/${firmSlug}/scenarios`}
+          icon={FlaskConical}
+          title="Scenario Lab"
+          description="Predict directional rank impact of a proposed content change before you ship it. Calibrated against this firm's observed SERPs via PSO."
+          cta="Run a scenario"
         />
       </div>
     </div>
