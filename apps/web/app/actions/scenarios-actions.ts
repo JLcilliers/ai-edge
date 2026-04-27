@@ -17,6 +17,7 @@ import { revalidatePath } from 'next/cache';
 import { extractFeaturesFromMainContent } from '../lib/scenarios/features';
 import { runCalibration, getLatestWeights } from '../lib/scenarios/calibrate';
 import { simulate, type ConfidenceLabel } from '../lib/scenarios/simulate';
+import { recrawlFeaturesForFirm } from '../lib/scenarios/recrawl-features';
 import {
   emptyFeatureVec,
   type FeatureVec,
@@ -413,6 +414,40 @@ export async function extractFeaturesForFirm(
 
   revalidatePath(`/dashboard/${firmSlug}/scenarios`);
   return { extracted, skipped, total: rows.length };
+}
+
+/**
+ * Slow-but-thorough recrawl: re-fetch each page's HTML and run the full
+ * `extractFeaturesFromHtml` extractor (JSON-LD blocks, headings, link
+ * counts — everything the degraded `main_content`-only path can't see).
+ *
+ * Replaces every `page_features` row for the firm with values that have
+ * real signal across all 22 dimensions. Until this runs, schema-presence
+ * features are universally 0 and PSO can't learn anything about them.
+ */
+export interface RecrawlFeaturesOutcome {
+  pagesScanned: number;
+  pagesWithFullFeatures: number;
+  pagesSkippedNetworkError: number;
+  pagesSkippedNoUrl: number;
+  // Cap at ~10 errors in the response — a long error list bloats the
+  // server-action payload and the UI surface only shows the first few.
+  sampleErrors: Array<{ url: string; error: string }>;
+}
+
+export async function recrawlFeaturesViaHtml(
+  firmSlug: string,
+): Promise<RecrawlFeaturesOutcome> {
+  const firmId = await resolveFirmId(firmSlug);
+  const outcome = await recrawlFeaturesForFirm(firmId);
+  revalidatePath(`/dashboard/${firmSlug}/scenarios`);
+  return {
+    pagesScanned: outcome.pagesScanned,
+    pagesWithFullFeatures: outcome.pagesWithFullFeatures,
+    pagesSkippedNetworkError: outcome.pagesSkippedNetworkError,
+    pagesSkippedNoUrl: outcome.pagesSkippedNoUrl,
+    sampleErrors: outcome.errors.slice(0, 10),
+  };
 }
 
 // ── Calibration ────────────────────────────────────────────
