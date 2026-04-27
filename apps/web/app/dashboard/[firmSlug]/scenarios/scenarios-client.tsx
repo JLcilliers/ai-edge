@@ -19,11 +19,13 @@ import {
   Beaker,
   Lightbulb,
   Globe,
+  Search,
 } from 'lucide-react';
 import {
   type ScenarioOverview,
   type SerpRow,
   type ScenarioRow,
+  type BingCaptureUiOutcome,
   addManualSerp,
   deleteSerp,
   createScenario,
@@ -31,6 +33,7 @@ import {
   deleteScenario,
   extractFeaturesForFirm,
   recrawlFeaturesViaHtml,
+  captureSerpsViaBing,
   runFirmCalibration,
   previewScenario,
 } from '../../../actions/scenarios-actions';
@@ -1196,6 +1199,8 @@ function SerpsTab({
   const router = useRouter();
   const [showForm, setShowForm] = useState(false);
   const [isPending, start] = useTransition();
+  const [bingResult, setBingResult] = useState<BingCaptureUiOutcome | null>(null);
+  const [bingError, setBingError] = useState<string | null>(null);
 
   const onDelete = (id: string) => {
     if (!confirm('Delete this SERP snapshot? Calibration will lose this evidence.')) return;
@@ -1209,23 +1214,70 @@ function SerpsTab({
     });
   };
 
+  const onCaptureLive = () => {
+    setBingError(null);
+    setBingResult(null);
+    start(async () => {
+      try {
+        const r = await captureSerpsViaBing(firmSlug, { maxQueries: 5, count: 10 });
+        setBingResult(r);
+        router.refresh();
+      } catch (e) {
+        setBingError(e instanceof Error ? e.message : 'Capture failed');
+      }
+    });
+  };
+
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-white/55">
           {serps.length === 0
-            ? 'No observed SERPs yet. Paste at least one to start calibration.'
+            ? 'No observed SERPs yet. Paste manually OR capture live via Bing to start calibration.'
             : `${serps.length} SERP${serps.length === 1 ? '' : 's'} observed`}
         </p>
-        <button
-          type="button"
-          onClick={() => setShowForm((v) => !v)}
-          className="inline-flex items-center gap-2 rounded-full bg-[--accent] px-4 py-2 text-sm font-semibold text-black transition-colors hover:bg-[--accent-hover]"
-        >
-          <ListPlus size={14} strokeWidth={2} />
-          {showForm ? 'Cancel' : 'Add SERP'}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={onCaptureLive}
+            disabled={isPending}
+            className="inline-flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm text-white transition-colors hover:border-white/30 disabled:opacity-50"
+            title="Captures top 10 results from Bing Web Search v7 for the firm's seed_query_intents (top 5 queries). Free tier: 1,000 queries/month."
+          >
+            {isPending ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Search size={14} strokeWidth={2} />
+            )}
+            Capture live (Bing)
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowForm((v) => !v)}
+            className="inline-flex items-center gap-2 rounded-full bg-[--accent] px-4 py-2 text-sm font-semibold text-black transition-colors hover:bg-[--accent-hover]"
+          >
+            <ListPlus size={14} strokeWidth={2} />
+            {showForm ? 'Cancel' : 'Add SERP'}
+          </button>
+        </div>
       </div>
+
+      {bingResult && (
+        <div className="rounded-lg border border-[--rag-green]/30 bg-[--rag-green-bg] px-3 py-2 text-xs text-[--rag-green]">
+          Bing capture: {bingResult.succeeded} succeeded · {bingResult.skipped} skipped
+          {bingResult.failed > 0 ? ` · ${bingResult.failed} failed` : ''}
+          {bingResult.skipped > 0 && (
+            <span className="mt-1 block text-white/70">
+              Skipped reasons: {Array.from(new Set(bingResult.perQuery.filter((p) => !p.ok).map((p) => p.reason ?? 'unknown'))).slice(0, 3).join(', ')}
+            </span>
+          )}
+        </div>
+      )}
+      {bingError && (
+        <div className="rounded-lg border border-[--rag-red]/30 bg-[--rag-red-bg] px-3 py-2 text-xs text-[--rag-red]">
+          {bingError}
+        </div>
+      )}
 
       {showForm && (
         <NewSerpForm firmSlug={firmSlug} onClose={() => setShowForm(false)} />

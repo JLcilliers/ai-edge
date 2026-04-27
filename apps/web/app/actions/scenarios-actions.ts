@@ -18,6 +18,7 @@ import { extractFeaturesFromMainContent } from '../lib/scenarios/features';
 import { runCalibration, getLatestWeights } from '../lib/scenarios/calibrate';
 import { simulate, type ConfidenceLabel } from '../lib/scenarios/simulate';
 import { recrawlFeaturesForFirm } from '../lib/scenarios/recrawl-features';
+import { captureSerpsForFirm } from '../lib/scenarios/serp-capture';
 import {
   emptyFeatureVec,
   type FeatureVec,
@@ -447,6 +448,52 @@ export async function recrawlFeaturesViaHtml(
     pagesSkippedNetworkError: outcome.pagesSkippedNetworkError,
     pagesSkippedNoUrl: outcome.pagesSkippedNoUrl,
     sampleErrors: outcome.errors.slice(0, 10),
+  };
+}
+
+/**
+ * Manually trigger a Bing Web Search live SERP capture for the firm's
+ * top N seed_query_intents. Used by the Observed SERPs tab as a
+ * "capture live now" alternative to the manual paste-in flow.
+ *
+ * Graceful: if BING_SEARCH_API_KEY is not set, every per-query result
+ * comes back as skipped — UI surfaces "configure key" rather than
+ * masking the gap.
+ */
+export interface BingCaptureUiOutcome {
+  attempted: number;
+  succeeded: number;
+  skipped: number;
+  failed: number;
+  perQuery: Array<{
+    query: string;
+    ok: boolean;
+    resultCount?: number;
+    reason?: string;
+  }>;
+}
+
+export async function captureSerpsViaBing(
+  firmSlug: string,
+  options: { maxQueries?: number; count?: number } = {},
+): Promise<BingCaptureUiOutcome> {
+  const firmId = await resolveFirmId(firmSlug);
+  const outcome = await captureSerpsForFirm(firmId, {
+    maxQueries: options.maxQueries ?? 5,
+    count: options.count ?? 10,
+  });
+  revalidatePath(`/dashboard/${firmSlug}/scenarios`);
+  return {
+    attempted: outcome.attempted,
+    succeeded: outcome.succeeded,
+    skipped: outcome.skipped,
+    failed: outcome.failed,
+    perQuery: outcome.perQuery.map((p) => ({
+      query: p.query,
+      ok: p.outcome.ok,
+      resultCount: p.outcome.ok ? p.outcome.resultCount : undefined,
+      reason: p.outcome.ok ? undefined : p.outcome.reason,
+    })),
   };
 }
 
