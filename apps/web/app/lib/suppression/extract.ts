@@ -123,3 +123,46 @@ export async function fetchAndExtract(url: string): Promise<ExtractedPage> {
     wordCount: wordCount(capped),
   };
 }
+
+/**
+ * Fetch the raw HTML for a URL with no cleaning, for callers that need to
+ * see the document as the browser saw it — JSON-LD blocks, headings, links,
+ * etc. The Scenario Lab feature extractor and any future per-page schema
+ * scanner depend on this path.
+ *
+ * Same network layer (UA, redirect-follow, content-type guard) as
+ * `fetchAndExtract`; the only difference is we DON'T strip noise so the
+ * caller can run their own analysis. Throws on non-2xx and non-HTML
+ * responses so the caller can decide whether to skip-and-continue or abort.
+ *
+ * Returns title separately as a convenience — every caller wants it and
+ * there's no point re-parsing twice for it.
+ */
+export interface FetchedHtml {
+  url: string;
+  html: string;
+  title: string | null;
+}
+
+export async function fetchHtml(url: string): Promise<FetchedHtml> {
+  const res = await fetch(url, {
+    headers: {
+      'User-Agent': 'ai-edge-feature-recrawl/0.1 (brand audit)',
+      Accept: 'text/html,application/xhtml+xml',
+    },
+    redirect: 'follow',
+  });
+  if (!res.ok) {
+    throw new Error(`fetch ${url} returned ${res.status}`);
+  }
+  const contentType = res.headers.get('content-type') ?? '';
+  if (!contentType.includes('text/html') && !contentType.includes('application/xhtml')) {
+    throw new Error(`unexpected content-type for ${url}: ${contentType}`);
+  }
+  const html = await res.text();
+  // Light parse just for the <title> — we don't strip the doc, callers get
+  // the raw HTML for their own analysis.
+  const $ = cheerio.load(html);
+  const title = collapseWhitespace($('title').first().text()) || null;
+  return { url, html, title };
+}

@@ -18,6 +18,7 @@ import {
   ListPlus,
   Beaker,
   Lightbulb,
+  Globe,
 } from 'lucide-react';
 import {
   type ScenarioOverview,
@@ -29,6 +30,7 @@ import {
   recomputeScenario,
   deleteScenario,
   extractFeaturesForFirm,
+  recrawlFeaturesViaHtml,
   runFirmCalibration,
   previewScenario,
 } from '../../../actions/scenarios-actions';
@@ -919,11 +921,19 @@ function CalibrationTab({
     resultsConsidered: number;
     resultsSkippedNoFeatures: number;
   } | null>(null);
+  const [recrawlResult, setRecrawlResult] = useState<{
+    pagesScanned: number;
+    pagesWithFullFeatures: number;
+    pagesSkippedNetworkError: number;
+    pagesSkippedNoUrl: number;
+    sampleErrors: Array<{ url: string; error: string }>;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const onExtract = () => {
     setError(null);
     setExtractResult(null);
+    setRecrawlResult(null);
     start(async () => {
       try {
         const r = await extractFeaturesForFirm(firmSlug);
@@ -931,6 +941,20 @@ function CalibrationTab({
         router.refresh();
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Extraction failed');
+      }
+    });
+  };
+  const onRecrawl = () => {
+    setError(null);
+    setRecrawlResult(null);
+    setExtractResult(null);
+    start(async () => {
+      try {
+        const r = await recrawlFeaturesViaHtml(firmSlug);
+        setRecrawlResult(r);
+        router.refresh();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Recrawl failed');
       }
     });
   };
@@ -953,40 +977,95 @@ function CalibrationTab({
       {/* Step 1 — Extract features */}
       <div className="rounded-xl border border-white/10 bg-[--bg-secondary] p-5">
         <div className="flex items-start justify-between gap-3">
-          <div>
+          <div className="min-w-0 flex-1">
             <h3 className="font-[family-name:var(--font-jakarta)] text-base font-semibold text-white">
               Step 1 · Extract page features
             </h3>
             <p className="mt-1 text-sm text-white/55">
-              Reads `pages.main_content` for every crawled page and computes
-              the 22-feature vector. Schema/heading features are limited
-              without the original HTML — re-crawl for full extraction.
+              Two paths. <strong className="font-semibold text-white/80">Fast</strong>{' '}
+              reads <code className="font-[family-name:var(--font-geist-mono)] text-[11px]">pages.main_content</code>{' '}
+              and fills word-count, freshness, query/keyword, URL, and centroid features —
+              schema/heading/link features stay 0. <strong className="font-semibold text-white/80">Full HTML</strong>{' '}
+              re-fetches every page and runs the rich extractor — fills all 22
+              dimensions (JSON-LD type presence, H1/H2 counts, internal/external/authoritative
+              link densities, FAQ count). Slower (one HTTP request per page, ~250ms politeness
+              gap) but the calibration math actually has signal across every feature.
             </p>
             <p className="mt-2 font-[family-name:var(--font-geist-mono)] text-[11px] text-white/40">
               Currently {overview.pageFeatureCount} page
               {overview.pageFeatureCount === 1 ? '' : 's'} indexed.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onExtract}
-            disabled={isPending}
-            className="inline-flex shrink-0 items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm text-white transition-colors hover:border-white/30 disabled:opacity-50"
-          >
-            {isPending ? (
-              <Loader2 size={14} className="animate-spin" />
-            ) : (
-              <Database size={14} strokeWidth={2} />
-            )}
-            Extract features
-          </button>
+          <div className="flex shrink-0 flex-col gap-2">
+            <button
+              type="button"
+              onClick={onExtract}
+              disabled={isPending}
+              className="inline-flex items-center justify-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm text-white transition-colors hover:border-white/30 disabled:opacity-50"
+              title="Fast path — uses stored main_content; schema features default to 0"
+            >
+              {isPending ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <Database size={14} strokeWidth={2} />
+              )}
+              Fast extract
+            </button>
+            <button
+              type="button"
+              onClick={onRecrawl}
+              disabled={isPending}
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-[--accent] px-4 py-2 text-sm font-semibold text-black transition-colors hover:bg-[--accent-hover] disabled:opacity-50"
+              title="Re-fetches each page's HTML — slower but fills all 22 features"
+            >
+              {isPending ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <Globe size={14} strokeWidth={2} />
+              )}
+              Recrawl (full HTML)
+            </button>
+          </div>
         </div>
         {extractResult && (
           <div className="mt-3 rounded-lg border border-[--rag-green]/30 bg-[--rag-green-bg] px-3 py-2 text-xs text-[--rag-green]">
-            Extracted {extractResult.extracted} of {extractResult.total} pages
+            Fast extracted {extractResult.extracted} of {extractResult.total} pages
             {extractResult.skipped > 0
               ? ` (${extractResult.skipped} skipped — no main_content)`
               : ''}
+            . Schema/heading/link features default to 0 on this path —
+            run a full recrawl to fill them.
+          </div>
+        )}
+        {recrawlResult && (
+          <div className="mt-3 flex flex-col gap-2">
+            <div className="rounded-lg border border-[--rag-green]/30 bg-[--rag-green-bg] px-3 py-2 text-xs text-[--rag-green]">
+              Recrawled {recrawlResult.pagesWithFullFeatures} of{' '}
+              {recrawlResult.pagesScanned} pages with full feature vectors
+              {recrawlResult.pagesSkippedNetworkError > 0
+                ? ` · ${recrawlResult.pagesSkippedNetworkError} skipped (network)`
+                : ''}
+              {recrawlResult.pagesSkippedNoUrl > 0
+                ? ` · ${recrawlResult.pagesSkippedNoUrl} skipped (no URL)`
+                : ''}
+              .
+            </div>
+            {recrawlResult.sampleErrors.length > 0 && (
+              <details className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-[11px] text-white/55">
+                <summary className="cursor-pointer">
+                  {recrawlResult.sampleErrors.length} sample error
+                  {recrawlResult.sampleErrors.length === 1 ? '' : 's'}
+                </summary>
+                <ul className="mt-2 list-disc space-y-1 pl-5 font-[family-name:var(--font-geist-mono)]">
+                  {recrawlResult.sampleErrors.map((e, i) => (
+                    <li key={i}>
+                      <span className="text-white/70">{e.url}</span>:{' '}
+                      <span className="text-white/55">{e.error}</span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
           </div>
         )}
       </div>
