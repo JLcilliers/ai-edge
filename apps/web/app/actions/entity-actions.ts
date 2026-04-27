@@ -11,6 +11,7 @@ import type { BrandTruth, FirmType } from '@ai-edge/shared';
 import { eq, desc, and } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { runEntityScan } from '../lib/entity/scan';
+import { runCrossSourceScan, type CrossSourceOutcome } from '../lib/entity/cross-source-scan';
 import {
   EXPECTED_TYPES_BY_FIRM,
   RECOMMENDED_TYPES,
@@ -41,6 +42,127 @@ export async function startEntityScan(
   } catch (err) {
     return { error: String(err) };
   }
+}
+
+/**
+ * Trigger a cross-source vector alignment + badge verification scan.
+ * Synchronous (the scan itself batches embedding calls and returns
+ * directly) — UI shows the outcome immediately rather than polling.
+ */
+export interface CrossSourceUiOutcome {
+  sourcesScanned: number;
+  sourcesFetched: number;
+  sourcesAligned: number;
+  sourcesDrifted: number;
+  sourcesDivergent: number;
+  awardsVerified: number;
+  awardsUnverified: number;
+  ticketsOpened: number;
+  // Cap at 10 errors in the response — long lists bloat the action payload.
+  sampleErrors: Array<{ url: string; error: string }>;
+}
+
+export async function startCrossSourceScan(
+  firmSlug: string,
+): Promise<CrossSourceUiOutcome | { error: string }> {
+  try {
+    const firmId = await resolveFirmId(firmSlug);
+    const outcome = await runCrossSourceScan(firmId);
+    revalidatePath(`/dashboard/${firmSlug}/entity`);
+    revalidatePath(`/dashboard/${firmSlug}/tickets`);
+    return {
+      sourcesScanned: outcome.sourcesScanned,
+      sourcesFetched: outcome.sourcesFetched,
+      sourcesAligned: outcome.sourcesAligned,
+      sourcesDrifted: outcome.sourcesDrifted,
+      sourcesDivergent: outcome.sourcesDivergent,
+      awardsVerified: outcome.awardsVerified,
+      awardsUnverified: outcome.awardsUnverified,
+      ticketsOpened: outcome.ticketsOpened,
+      sampleErrors: outcome.errors.slice(0, 10),
+    };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/**
+ * Aggregated cross-source health for the UI: per-source row with the
+ * latest scan's distance, alignment label, and (for awards) badge
+ * verification status.
+ */
+export interface CrossSourceHealthRow {
+  source: string;
+  url: string | null;
+  alignment: 'aligned' | 'drift' | 'divergent' | 'never_scanned';
+  distance: number | null;
+  badgeStatus: 'verified' | 'unverified' | 'not_applicable';
+  awardName: string | null;
+  scannedAt: Date | null;
+}
+
+export async function getCrossSourceHealth(
+  firmSlug: string,
+): Promise<CrossSourceHealthRow[]> {
+  const db = getDb();
+  const firmId = await resolveFirmId(firmSlug);
+
+  const allRows = await db
+    .select()
+    .from(entitySignals)
+    .where(eq(entitySignals.firm_id, firmId))
+    .orderBy(desc(entitySignals.verified_at));
+
+  // Cross-source signals are anything that's NOT one of the
+  // single-source-per-firm types ('website', 'wikidata', 'google-kg').
+  // Multiple rows per source over time — keep the latest per (source, url).
+  const reservedSources = new Set(['website', 'wikidata', 'google-kg']);
+  const seen = new Map<string, (typeof allRows)[number]>();
+  for (const r of allRows) {
+    if (reservedSources.has(r.source)) continue;
+    const key = `${r.source}::${r.url ?? ''}`;
+    if (!seen.has(key)) seen.set(key, r);
+  }
+
+  const out: CrossSourceHealthRow[] = [];
+  for (const r of seen.values()) {
+    const flags = (r.divergence_flags ?? []) as string[];
+    let alignment: CrossSourceHealthRow['alignment'] = 'never_scanned';
+    if (flags.includes('cross-source:divergent')) alignment = 'divergent';
+    else if (flags.includes('cross-source:drift')) alignment = 'drift';
+    else if (flags.includes('cross-source:aligned')) alignment = 'aligned';
+
+    const distFlag = flags.find((f) => f.startsWith('distance:'));
+    const distance = distFlag
+      ? Number.parseFloat(distFlag.slice('distance:'.length))
+      : null;
+
+    let badgeStatus: CrossSourceHealthRow['badgeStatus'] = 'not_applicable';
+    if (flags.includes('badge:verified')) badgeStatus = 'verified';
+    else if (flags.includes('badge:unverified')) badgeStatus = 'unverified';
+
+    const awardFlag = flags.find((f) => f.startsWith('award:'));
+    const awardName = awardFlag ? awardFlag.slice('award:'.length) : null;
+
+    out.push({
+      source: r.source,
+      url: r.url,
+      alignment,
+      distance: Number.isFinite(distance ?? NaN) ? distance : null,
+      badgeStatus,
+      awardName,
+      scannedAt: r.verified_at,
+    });
+  }
+  // Stable ordering: divergent first, then drift, then aligned.
+  const order: Record<CrossSourceHealthRow['alignment'], number> = {
+    divergent: 0,
+    drift: 1,
+    never_scanned: 2,
+    aligned: 3,
+  };
+  out.sort((a, b) => order[a.alignment] - order[b.alignment]);
+  return out;
 }
 
 /** Poll status for an entity scan. */
