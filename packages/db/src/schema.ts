@@ -510,3 +510,50 @@ export const scenarios = pgTable('scenario', {
 }, (t) => ({
   firmIdx: index('scenario_firm_idx').on(t.firm_id),
 }));
+
+// ── Search Console connection (Phase B #6) ──────────────────
+// One row per firm linking it to a Google Search Console property.
+// access_token + refresh_token are AES-256-GCM-encrypted with the
+// OAUTH_TOKEN_ENCRYPTION_KEY env var; the columns store hex-encoded
+// `iv:auth_tag:ciphertext` triples so a leaked DB dump alone doesn't
+// give an attacker working tokens. The SearchAnalytics queries refresh
+// the access token automatically when expires_at passes.
+export const gscConnections = pgTable('gsc_connection', {
+  firm_id: uuid('firm_id').primaryKey()
+    .references(() => firms.id, { onDelete: 'cascade' }),
+  // GSC property URL ('https://www.example.com/' or 'sc-domain:example.com').
+  // The exact form must match what the operator selected in Search Console.
+  site_url: text('site_url').notNull(),
+  // Encrypted (AES-256-GCM, hex 'iv:tag:ciphertext'). Plain TEXT column —
+  // database-level encryption only adds defense-in-depth here.
+  access_token_enc: text('access_token_enc').notNull(),
+  refresh_token_enc: text('refresh_token_enc').notNull(),
+  // Granted scope (recorded so we can detect a re-auth requirement when
+  // we add new query types in the future).
+  scope: text('scope').notNull(),
+  expires_at: timestamp('expires_at', { withTimezone: true }).notNull(),
+  connected_by: text('connected_by'),
+  connected_at: timestamp('connected_at', { withTimezone: true }).defaultNow().notNull(),
+  // Last-sync metadata so the UI can show 'updated 3h ago / never synced'.
+  last_synced_at: timestamp('last_synced_at', { withTimezone: true }),
+  last_sync_error: text('last_sync_error'),
+});
+
+// Daily Search Console rollups per firm. One row per (firm, date),
+// populated by the nightly /api/cron/gsc-sync route. The visibility
+// dashboard reads these alongside audit citation rates so an operator
+// can see organic-clicks trend vs LLM-citation trend on the same chart.
+export const gscDailyMetrics = pgTable('gsc_daily_metric', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  firm_id: uuid('firm_id').notNull().references(() => firms.id, { onDelete: 'cascade' }),
+  // YYYY-MM-DD — stored as TEXT not DATE because Postgres DATE adds
+  // timezone surprises and we always treat GSC dates as UTC anyway.
+  date: text('date').notNull(),
+  clicks: integer('clicks').notNull(),
+  impressions: integer('impressions').notNull(),
+  ctr: real('ctr'),
+  position: real('position'),
+  fetched_at: timestamp('fetched_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  firmDateIdx: uniqueIndex('gsc_daily_firm_date').on(t.firm_id, t.date),
+}));

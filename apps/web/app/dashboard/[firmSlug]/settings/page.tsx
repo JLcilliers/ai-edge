@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { Settings } from 'lucide-react';
 import { getFirmSettings } from '../../../actions/settings-actions';
+import { getGscStatus } from '../../../actions/gsc-actions';
 import { SettingsClient } from './settings-client';
 
 export const dynamic = 'force-dynamic';
@@ -26,7 +27,20 @@ export default async function SettingsPage({
   params: Promise<{ firmSlug: string }>;
 }) {
   const { firmSlug } = await params;
-  const bundle = await getFirmSettings(firmSlug);
+  const [bundle, gscStatus] = await Promise.all([
+    getFirmSettings(firmSlug),
+    getGscStatus(firmSlug).catch(() => ({
+      oauthConfigured: false,
+      connected: false,
+      siteUrl: null,
+      connectedAt: null,
+      lastSyncedAt: null,
+      lastSyncError: null,
+      recentDays: 0,
+      totalClicks: 0,
+      totalImpressions: 0,
+    })),
+  ]);
   if (!bundle) notFound();
 
   return (
@@ -47,7 +61,11 @@ export default async function SettingsPage({
         </div>
       </div>
 
-      <SettingsClient firmSlug={firmSlug} initialBundle={bundle} />
+      <SettingsClient
+        firmSlug={firmSlug}
+        initialBundle={bundle}
+        initialGscStatus={gscStatus}
+      />
     </div>
   );
 }

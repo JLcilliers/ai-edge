@@ -24,6 +24,10 @@ export const config: VercelConfig = {
     // free tier (1,000 queries/month). No-ops when BING_SEARCH_API_KEY
     // isn't set so a deploy without procurement still runs cleanly.
     { path: '/api/cron/serp-capture', schedule: '0 9 * * 1' },
+    // Daily Search Console sync (Phase B #6) — pulls last 30 days of
+    // clicks/impressions/ctr/position per connected firm at 06:30 UTC.
+    // Firms without a gsc_connection row are silently skipped.
+    { path: '/api/cron/gsc-sync', schedule: '30 6 * * *' },
   ],
   headers: [
     routes.cacheControl('/_next/static/(.*)', {
