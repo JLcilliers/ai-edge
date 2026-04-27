@@ -18,6 +18,12 @@ import {
   semanticDistance,
   EMBEDDING_MODEL,
 } from './embeddings';
+import {
+  getBacklinksProvider,
+  decideSuppressionAction,
+  buildRationale,
+  type BacklinkCount,
+} from './backlinks';
 
 /**
  * Suppression scan — see PLAN §5.3.
@@ -211,6 +217,12 @@ export async function runSuppressionScan(
       throw new Error('No pages with enough content to score (min 150 words)');
     }
 
+    // 2.5 Resolve backlinks provider once. NullProvider when no API key
+    // is configured — every getBacklinks() call returns 0 ref-domains so
+    // the action policy keeps current 'noindex' behavior. With Ahrefs or
+    // DataForSEO credentials in env, providers light up automatically.
+    const backlinksProvider = getBacklinksProvider();
+
     // 3. Embed Brand Truth centroid + all page contents.
     const bTruthText = brandTruthToText(brandTruth);
     const [brandVec, pageVecs] = await Promise.all([
@@ -272,14 +284,40 @@ export async function runSuppressionScan(
         pageId = inserted!.id;
       }
 
-      // Classify + record.
+      // Classify + record. With Phase B #4 wiring: when distance > suppress
+      // threshold AND backlinks ≥ 5 ref-domains, action becomes 'redirect'
+      // instead of 'noindex' — preserves link equity for pages worth saving.
+      // backlinksProvider is resolved once outside the loop; the per-URL
+      // lookup is async + paid, so we only call it when distance is in
+      // the suppress range (the only place the result changes our action).
       if (distance > DISTANCE_THRESHOLD_REWRITE) {
-        const action =
-          distance > DISTANCE_THRESHOLD_SUPPRESS ? 'noindex' : 'rewrite';
-        const rationale =
-          action === 'noindex'
-            ? `Semantic distance ${distance.toFixed(3)} > ${DISTANCE_THRESHOLD_SUPPRESS} — page doesn't reflect the Brand Truth; candidate for noindex or redirect to the closest aligned page.`
-            : `Semantic distance ${distance.toFixed(3)} in (${DISTANCE_THRESHOLD_REWRITE}, ${DISTANCE_THRESHOLD_SUPPRESS}] — rewrite to align with Brand Truth positioning while keeping on-page entities.`;
+        let backlinks: BacklinkCount | null = null;
+        if (distance > DISTANCE_THRESHOLD_SUPPRESS) {
+          // Only ask the backlinks provider when the action might flip to
+          // redirect — for rewrite-bucket findings the answer is irrelevant
+          // and we'd waste API quota.
+          backlinks = await backlinksProvider.getBacklinks(page.url);
+        }
+        const action = decideSuppressionAction(
+          distance,
+          {
+            rewrite: DISTANCE_THRESHOLD_REWRITE,
+            suppress: DISTANCE_THRESHOLD_SUPPRESS,
+          },
+          backlinks,
+        );
+        // 'aligned' shouldn't reach here (we gated on > rewrite threshold)
+        // but the type makes us handle it explicitly.
+        if (action === 'aligned') continue;
+        const rationale = buildRationale(
+          distance,
+          action,
+          {
+            rewrite: DISTANCE_THRESHOLD_REWRITE,
+            suppress: DISTANCE_THRESHOLD_SUPPRESS,
+          },
+          backlinks,
+        );
 
         const [finding] = await db
           .insert(legacyFindings)
@@ -291,20 +329,27 @@ export async function runSuppressionScan(
           })
           .returning({ id: legacyFindings.id });
 
-        // Create a remediation ticket so the finding surfaces alongside
-        // audit-driven Red tickets. noindex gets a shorter due date than
-        // rewrite — an unaligned page leaking to LLMs is more urgent than
-        // a fixable one.
+        // Ticket policy:
+        //   noindex  → 3-day due (unaligned page leaking to LLMs is urgent)
+        //   redirect → 7-day due (less urgent than noindex; preserves link
+        //                          equity but operator needs to map to the
+        //                          closest aligned page)
+        //   rewrite  → 14-day due (content work, longest runway)
+        const dueDays =
+          action === 'noindex' ? 3 : action === 'redirect' ? 7 : 14;
+        const playbookStep =
+          action === 'noindex'
+            ? 'suppress'
+            : action === 'redirect'
+              ? 'redirect'
+              : 'rewrite';
         await db.insert(remediationTickets).values({
           firm_id: firmId,
           source_type: 'legacy',
           source_id: finding!.id,
           status: 'open',
-          playbook_step: action === 'noindex' ? 'suppress' : 'rewrite',
-          due_at: new Date(
-            Date.now() +
-              (action === 'noindex' ? 3 : 14) * 24 * 60 * 60 * 1000,
-          ),
+          playbook_step: playbookStep,
+          due_at: new Date(Date.now() + dueDays * 24 * 60 * 60 * 1000),
         });
       }
     }
