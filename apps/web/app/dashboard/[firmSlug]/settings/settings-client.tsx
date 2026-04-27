@@ -12,6 +12,9 @@ import {
   Trash2,
   TrendingUp,
   Wand2,
+  LineChart,
+  Plug,
+  RefreshCw,
 } from 'lucide-react';
 import {
   deleteFirm,
@@ -19,6 +22,12 @@ import {
   updateFirmMetadata,
   type FirmSettingsBundle,
 } from '../../../actions/settings-actions';
+import {
+  connectGsc,
+  disconnectGscConnection,
+  triggerGscSync,
+  type GscStatusUi,
+} from '../../../actions/gsc-actions';
 import type { FirmType } from '../../../actions/firm-actions';
 import type { CostBreakdown } from '../../../lib/cost/telemetry';
 
@@ -46,9 +55,11 @@ const FIRM_TYPE_OPTIONS: Array<{ value: FirmType; label: string }> = [
 export function SettingsClient({
   firmSlug,
   initialBundle,
+  initialGscStatus,
 }: {
   firmSlug: string;
   initialBundle: FirmSettingsBundle;
+  initialGscStatus: GscStatusUi;
 }) {
   const [bundle, setBundle] = useState(initialBundle);
 
@@ -62,12 +73,207 @@ export function SettingsClient({
         }
       />
       <CostTelemetrySection bundle={bundle} />
+      <SearchConsoleSection firmSlug={firmSlug} status={initialGscStatus} />
       <MetadataSection
         firmSlug={firmSlug}
         bundle={bundle}
         onSaved={(firm) => setBundle((b) => ({ ...b, firm }))}
       />
       <DangerZoneSection firmSlug={firmSlug} bundle={bundle} />
+    </div>
+  );
+}
+
+// ─── Search Console (Phase B #6) ──────────────────────────────────────────
+
+function SearchConsoleSection({
+  firmSlug,
+  status,
+}: {
+  firmSlug: string;
+  status: GscStatusUi;
+}) {
+  const router = useRouter();
+  const [isPending, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
+
+  const onConnect = () => {
+    setError(null);
+    setInfo(null);
+    start(async () => {
+      const r = await connectGsc(firmSlug);
+      if (!r.ok) {
+        setError(r.error);
+      } else {
+        // Send the operator to Google's consent screen.
+        window.location.href = r.redirectUrl;
+      }
+    });
+  };
+  const onDisconnect = () => {
+    if (!confirm('Disconnect Search Console? Stored tokens will be deleted; reconnecting requires going through the OAuth flow again.')) {
+      return;
+    }
+    setError(null);
+    setInfo(null);
+    start(async () => {
+      const r = await disconnectGscConnection(firmSlug);
+      if (!r.ok) setError(r.error);
+      else router.refresh();
+    });
+  };
+  const onSync = () => {
+    setError(null);
+    setInfo(null);
+    start(async () => {
+      const r = await triggerGscSync(firmSlug);
+      if (!r.ok) setError(r.error);
+      else {
+        setInfo(`Synced ${r.rowsFetched} day-rows.`);
+        router.refresh();
+      }
+    });
+  };
+
+  return (
+    <SectionCard
+      icon={LineChart}
+      title="Search Console (Phase B #6)"
+      description="Connect Google Search Console to correlate organic clicks/impressions with LLM citation rates. Helps answer the 'did AIO eat our organic traffic?' question."
+    >
+      {!status.oauthConfigured && (
+        <div className="rounded-lg border border-[--rag-yellow]/30 bg-[--rag-yellow-bg] px-4 py-3 text-sm text-[--rag-yellow]">
+          OAuth client credentials not configured. Set{' '}
+          <code className="font-[family-name:var(--font-geist-mono)] text-xs">GOOGLE_OAUTH_CLIENT_ID</code>,{' '}
+          <code className="font-[family-name:var(--font-geist-mono)] text-xs">GOOGLE_OAUTH_CLIENT_SECRET</code>,{' '}
+          <code className="font-[family-name:var(--font-geist-mono)] text-xs">GOOGLE_OAUTH_REDIRECT_URI</code>, and{' '}
+          <code className="font-[family-name:var(--font-geist-mono)] text-xs">OAUTH_TOKEN_ENCRYPTION_KEY</code>{' '}
+          on Vercel. Until then this section is informational only — the rest
+          of the dashboard works fine without GSC.
+        </div>
+      )}
+
+      {status.oauthConfigured && !status.connected && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-[--bg-tertiary]/40 p-4">
+          <div className="text-sm text-white/60">
+            Not connected. Click <em>Connect</em> to authorize Search Console
+            access — you'll pick the property URL on Google's consent screen.
+          </div>
+          <button
+            type="button"
+            onClick={onConnect}
+            disabled={isPending}
+            className="inline-flex items-center gap-2 rounded-full bg-[--accent] px-4 py-2 text-sm font-semibold text-black transition-colors hover:bg-[--accent-hover] disabled:opacity-50"
+          >
+            {isPending ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Plug size={14} strokeWidth={2} />
+            )}
+            Connect Search Console
+          </button>
+        </div>
+      )}
+
+      {status.connected && (
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-[--rag-green]/30 bg-[--rag-green-bg] p-4 text-sm">
+            <CheckCircle2 size={16} strokeWidth={2} className="shrink-0 text-[--rag-green]" />
+            <div className="flex-1">
+              <div className="font-medium text-[--rag-green]">Connected</div>
+              <div className="mt-0.5 font-[family-name:var(--font-geist-mono)] text-[11px] text-white/55">
+                {status.siteUrl ?? '—'}
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={onSync}
+                disabled={isPending}
+                className="inline-flex items-center gap-1.5 rounded-full border border-white/15 px-3 py-1.5 text-xs text-white transition-colors hover:border-white/30 disabled:opacity-50"
+              >
+                {isPending ? (
+                  <Loader2 size={12} className="animate-spin" />
+                ) : (
+                  <RefreshCw size={12} strokeWidth={2} />
+                )}
+                Sync now
+              </button>
+              <button
+                type="button"
+                onClick={onDisconnect}
+                disabled={isPending}
+                className="inline-flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-xs text-white/55 transition-colors hover:border-[--rag-red]/50 hover:text-[--rag-red] disabled:opacity-50"
+              >
+                <Trash2 size={12} strokeWidth={2} />
+                Disconnect
+              </button>
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <KvTile
+              label="Days indexed"
+              value={String(status.recentDays)}
+              hint="Last 30 days available"
+            />
+            <KvTile
+              label="Total clicks (30d)"
+              value={status.totalClicks.toLocaleString('en-US')}
+              hint="Sum across all pages"
+            />
+            <KvTile
+              label="Total impressions (30d)"
+              value={status.totalImpressions.toLocaleString('en-US')}
+              hint="Sum across all pages"
+            />
+          </div>
+
+          {status.lastSyncedAt && (
+            <p
+              className="font-[family-name:var(--font-geist-mono)] text-[11px] text-white/40"
+              suppressHydrationWarning
+            >
+              Last synced {new Date(status.lastSyncedAt).toLocaleString()}
+              {status.lastSyncError ? ` · last error: ${status.lastSyncError}` : ''}
+            </p>
+          )}
+        </div>
+      )}
+
+      {error && (
+        <div className="mt-3 rounded-lg border border-[--rag-red]/30 bg-[--rag-red-bg] px-3 py-2 text-xs text-[--rag-red]">
+          {error}
+        </div>
+      )}
+      {info && (
+        <div className="mt-3 rounded-lg border border-[--rag-green]/30 bg-[--rag-green-bg] px-3 py-2 text-xs text-[--rag-green]">
+          {info}
+        </div>
+      )}
+    </SectionCard>
+  );
+}
+
+function KvTile({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+}) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-[--bg-tertiary]/40 p-3">
+      <div className="text-[10px] font-medium uppercase tracking-widest text-white/40">
+        {label}
+      </div>
+      <div className="mt-1 font-[family-name:var(--font-jakarta)] text-lg font-bold text-white">
+        {value}
+      </div>
+      {hint && <div className="mt-0.5 text-[11px] text-white/40">{hint}</div>}
     </div>
   );
 }
