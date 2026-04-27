@@ -557,3 +557,55 @@ export const gscDailyMetrics = pgTable('gsc_daily_metric', {
 }, (t) => ({
   firmDateIdx: uniqueIndex('gsc_daily_firm_date').on(t.firm_id, t.date),
 }));
+
+// ── AI Overview capture (Phase B #7) ────────────────────────
+// One row per observed Google AI Overview panel for a (firm, query)
+// pair at a point in time. The capture records both the AIO prose
+// (what Google's AI summary actually said) and the sources Google
+// listed below it. Visibility-tab consumers diff captures over time
+// to surface "the AI Overview started/stopped citing us" alerts.
+//
+// Sources are stored as a JSON array of { url, title, domain } so
+// the visibility-tab citation drift can compare them against the
+// audit-driven citation set already tracked in `citation`.
+//
+// Provider discriminator:
+//   'dataforseo' — DataForSEO Google AI Mode endpoint (primary;
+//                  paid; ADR-0009 picked them as the licensed SERP
+//                  capture vendor)
+//   'serpapi'    — SerpAPI Google AI Overview (alt provider)
+//   'playwright' — fallback for AIO pages no provider covers
+//                  (requires Bright Data residential proxies per
+//                  ADR-0010)
+export const aioCaptures = pgTable('aio_capture', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  firm_id: uuid('firm_id').notNull().references(() => firms.id, { onDelete: 'cascade' }),
+  query: text('query').notNull(),
+  provider: text('provider').notNull(),
+  // Locale + geo for the capture — AIO content varies materially
+  // across markets even for the same English query.
+  country: text('country'),
+  language: text('language'),
+  fetched_at: timestamp('fetched_at', { withTimezone: true }).defaultNow().notNull(),
+  // True if Google rendered an AI Overview at all for this query.
+  // False = "we asked, Google chose not to show one" (a useful
+  // signal in itself: AIO triggers shrank for navigational vs.
+  // research queries).
+  has_aio: boolean('has_aio').notNull().default(false),
+  // The visible AI Overview prose. NULL when has_aio = false.
+  overview_text: text('overview_text'),
+  // Sources Google cited as references for the overview. Each entry
+  // is at minimum {url, title, domain}; provider may include extra
+  // metadata that we preserve as-is.
+  sources: jsonb('sources').$type<Array<{ url: string; title?: string; domain?: string }>>()
+    .default([]),
+  // Did the firm appear in the cited sources? We compute this once
+  // at capture time so the visibility tab doesn't have to re-derive
+  // from `sources` each render.
+  firm_cited: boolean('firm_cited').notNull().default(false),
+  // Full provider response for debugging + future re-analysis.
+  raw: jsonb('raw'),
+}, (t) => ({
+  firmQueryIdx: index('aio_capture_firm_query').on(t.firm_id, t.query),
+  firmFetchedIdx: index('aio_capture_firm_fetched').on(t.firm_id, t.fetched_at),
+}));
