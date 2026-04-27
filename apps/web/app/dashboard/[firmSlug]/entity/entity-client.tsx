@@ -11,11 +11,17 @@ import {
   Globe,
   Database,
   Network,
+  Layers,
+  Award,
+  Loader2,
 } from 'lucide-react';
 import {
   startEntityScan,
   getEntityScanStatus,
+  startCrossSourceScan,
   type EntityHealth,
+  type CrossSourceHealthRow,
+  type CrossSourceUiOutcome,
 } from '../../../actions/entity-actions';
 
 type LatestRun = {
@@ -30,16 +36,22 @@ export function EntityClient({
   firmSlug,
   initialHealth,
   initialLatestRun,
+  initialCrossSource,
 }: {
   firmSlug: string;
   initialHealth: EntityHealth | null;
   initialLatestRun: LatestRun;
+  initialCrossSource: CrossSourceHealthRow[];
 }) {
   const [isPending, startTransition] = useTransition();
   const [runningId, setRunningId] = useState<string | null>(
     initialLatestRun?.status === 'running' ? initialLatestRun.id : null,
   );
   const [error, setError] = useState<string | null>(initialLatestRun?.error ?? null);
+  const [crossSourcePending, startCrossSourceTransition] = useTransition();
+  const [crossSourceResult, setCrossSourceResult] =
+    useState<CrossSourceUiOutcome | null>(null);
+  const [crossSourceError, setCrossSourceError] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -64,6 +76,20 @@ export function EntityClient({
         setError(result.error);
       } else {
         setRunningId(result.runId);
+        router.refresh();
+      }
+    });
+  };
+
+  const handleCrossSourceScan = () => {
+    setCrossSourceError(null);
+    setCrossSourceResult(null);
+    startCrossSourceTransition(async () => {
+      const result = await startCrossSourceScan(firmSlug);
+      if ('error' in result) {
+        setCrossSourceError(result.error);
+      } else {
+        setCrossSourceResult(result);
         router.refresh();
       }
     });
@@ -245,7 +271,190 @@ export function EntityClient({
           )}
         </>
       )}
+
+      {/* ── Cross-source vector alignment + badge verification ── */}
+      <div className="mt-12 border-t border-white/10 pt-10">
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="font-[family-name:var(--font-jakarta)] text-lg font-semibold text-white">
+              Cross-source alignment + badge verification
+            </h2>
+            <p className="mt-1 max-w-3xl text-sm text-white/55">
+              Fetches every URL the operator has curated in Brand Truth (
+              <code className="font-[family-name:var(--font-geist-mono)] text-[11px]">
+                third_party_listings[]
+              </code>{' '}
+              + every <code className="font-[family-name:var(--font-geist-mono)] text-[11px]">awards[].source_url</code>),
+              embeds the prose, and compares to the Brand Truth centroid.
+              Divergent third-party listings poison LLM alignment the same
+              way divergent on-site copy does — except we can&apos;t fix
+              them in the CMS, the operator has to update each platform
+              via its own form. Award URLs also get a name-presence check
+              ({' '}<strong className="font-semibold text-white/80">badge verification</strong>) — if the firm name doesn&apos;t
+              appear on the listed page, the award is flagged unverified.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleCrossSourceScan}
+            disabled={crossSourcePending}
+            className="inline-flex shrink-0 items-center gap-2 rounded-full bg-[--accent] px-4 py-2 text-sm font-semibold text-black transition-colors hover:bg-[--accent-hover] disabled:opacity-50"
+          >
+            {crossSourcePending ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Layers size={14} strokeWidth={2} />
+            )}
+            Run cross-source scan
+          </button>
+        </div>
+
+        {crossSourceResult && (
+          <div className="mb-4 rounded-lg border border-[--rag-green]/30 bg-[--rag-green-bg] px-3 py-2 text-xs text-[--rag-green]">
+            Scanned {crossSourceResult.sourcesFetched} of{' '}
+            {crossSourceResult.sourcesScanned} sources ·{' '}
+            <span className="text-[--rag-green]">
+              {crossSourceResult.sourcesAligned} aligned
+            </span>{' '}
+            ·{' '}
+            <span className="text-[--rag-yellow]">
+              {crossSourceResult.sourcesDrifted} drift
+            </span>{' '}
+            ·{' '}
+            <span className="text-[--rag-red]">
+              {crossSourceResult.sourcesDivergent} divergent
+            </span>
+            {crossSourceResult.awardsVerified + crossSourceResult.awardsUnverified > 0 && (
+              <>
+                {' · awards: '}
+                <span className="text-[--rag-green]">
+                  {crossSourceResult.awardsVerified} verified
+                </span>
+                {crossSourceResult.awardsUnverified > 0 && (
+                  <>
+                    {' / '}
+                    <span className="text-[--rag-red]">
+                      {crossSourceResult.awardsUnverified} unverified
+                    </span>
+                  </>
+                )}
+              </>
+            )}
+            {crossSourceResult.ticketsOpened > 0
+              ? ` · ${crossSourceResult.ticketsOpened} ticket${crossSourceResult.ticketsOpened === 1 ? '' : 's'} opened`
+              : ''}
+            {crossSourceResult.sampleErrors.length > 0 && (
+              <> · {crossSourceResult.sampleErrors.length} fetch error
+                {crossSourceResult.sampleErrors.length === 1 ? '' : 's'}</>
+            )}
+          </div>
+        )}
+
+        {crossSourceError && (
+          <div className="mb-4 rounded-lg border border-[--rag-red]/30 bg-[--rag-red-bg] px-3 py-2 text-xs text-[--rag-red]">
+            {crossSourceError}
+          </div>
+        )}
+
+        {initialCrossSource.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-white/10 bg-[--bg-secondary]/50 p-6 text-sm text-white/55">
+            No cross-source signals yet. Add directory profile URLs to your
+            Brand Truth (Brand Truth editor →{' '}
+            <code className="font-[family-name:var(--font-geist-mono)] text-[11px]">
+              third_party_listings[]
+            </code>
+            , one entry per BBB / Super Lawyers / Avvo / Justia profile)
+            and/or set <code className="font-[family-name:var(--font-geist-mono)] text-[11px]">source_url</code>{' '}
+            on each award, then click <em>Run cross-source scan</em>.
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-xl border border-white/10">
+            <table className="w-full text-sm">
+              <thead className="border-b border-white/10 bg-white/[0.02]">
+                <tr className="text-left text-[10px] uppercase tracking-widest text-white/40">
+                  <th className="px-4 py-2 font-medium">Source</th>
+                  <th className="px-4 py-2 font-medium">URL</th>
+                  <th className="px-4 py-2 font-medium">Alignment</th>
+                  <th className="px-4 py-2 font-medium">Distance</th>
+                  <th className="px-4 py-2 font-medium">Badge</th>
+                  <th className="px-4 py-2 font-medium">Last scan</th>
+                </tr>
+              </thead>
+              <tbody>
+                {initialCrossSource.map((row, i) => (
+                  <CrossSourceRow key={`${row.source}-${i}`} row={row} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
+  );
+}
+
+function CrossSourceRow({ row }: { row: CrossSourceHealthRow }) {
+  const alignmentClass =
+    row.alignment === 'divergent'
+      ? 'text-[--rag-red]'
+      : row.alignment === 'drift'
+        ? 'text-[--rag-yellow]'
+        : row.alignment === 'aligned'
+          ? 'text-[--rag-green]'
+          : 'text-white/40';
+  const badgeClass =
+    row.badgeStatus === 'verified'
+      ? 'text-[--rag-green]'
+      : row.badgeStatus === 'unverified'
+        ? 'text-[--rag-red]'
+        : 'text-white/30';
+  return (
+    <tr className="border-b border-white/5 last:border-b-0">
+      <td className="px-4 py-3 font-[family-name:var(--font-geist-mono)] text-xs text-white/85">
+        {row.source}
+        {row.awardName && (
+          <div className="mt-0.5 flex items-center gap-1 text-[10px] text-white/40">
+            <Award size={10} strokeWidth={1.5} />
+            {row.awardName}
+          </div>
+        )}
+      </td>
+      <td className="max-w-[28rem] truncate px-4 py-3 font-[family-name:var(--font-geist-mono)] text-[11px] text-white/55">
+        {row.url ? (
+          <a
+            href={row.url}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 hover:text-white"
+          >
+            {row.url} <ExternalLink size={10} strokeWidth={2} />
+          </a>
+        ) : (
+          '—'
+        )}
+      </td>
+      <td className={`px-4 py-3 text-xs font-semibold uppercase tracking-wider ${alignmentClass}`}>
+        {row.alignment === 'never_scanned' ? '—' : row.alignment}
+      </td>
+      <td className="px-4 py-3 font-[family-name:var(--font-geist-mono)] text-xs text-white/70">
+        {row.distance != null ? row.distance.toFixed(3) : '—'}
+      </td>
+      <td className={`px-4 py-3 text-xs ${badgeClass}`}>
+        {row.badgeStatus === 'not_applicable' ? '—' : row.badgeStatus}
+      </td>
+      <td
+        className="px-4 py-3 font-[family-name:var(--font-geist-mono)] text-[11px] text-white/40"
+        suppressHydrationWarning
+      >
+        {row.scannedAt
+          ? new Date(row.scannedAt).toLocaleDateString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+            })
+          : '—'}
+      </td>
+    </tr>
   );
 }
 

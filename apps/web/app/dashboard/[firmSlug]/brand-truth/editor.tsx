@@ -752,6 +752,80 @@ export function BrandTruthEditor({
         <button type="button" onClick={() => set('awards', [...(data.awards ?? []), { name: '', source_url: '', source_required: true, verification_status: 'unverified_at_ingestion', notes: '' }])} className="rounded-lg border border-dashed border-white/10 px-3 py-1 text-xs text-white/55 hover:border-white/20 hover:text-white">+ Add Award</button>
       </Section>
 
+      {/* Third-Party Listings — drives the cross-source vector alignment scan
+          (BBB / Super Lawyers / Avvo / Justia / Findlaw / Healthgrades / etc.).
+          Each entry is fetched, embedded, and compared to the Brand Truth
+          centroid; divergent listings open a remediation ticket. The
+          `source` value should match what entity_signal expects so admin
+          aggregations stay consistent. */}
+      <Section title="Third-Party Directory Listings">
+        <p className="mb-2 text-xs text-white/55">
+          One entry per BBB / Super Lawyers / Avvo / Justia / Findlaw / Healthgrades /
+          Zocdoc / Yelp / Clutch / G2 profile page. The cross-source scan checks each
+          for vector alignment with this Brand Truth.
+        </p>
+        {(data.third_party_listings ?? []).map((tl: any, i: number) => (
+          <div key={i} className="mb-3 rounded border border-white/10 p-3">
+            <div className="grid gap-2 sm:grid-cols-2">
+              <input
+                placeholder="Source (e.g. bbb, superlawyers, avvo)"
+                value={tl.source ?? ''}
+                onChange={(e) => {
+                  const copy = [...(data.third_party_listings ?? [])];
+                  copy[i] = { ...copy[i], source: e.target.value };
+                  set('third_party_listings', copy);
+                }}
+                className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+              />
+              <input
+                placeholder="Profile URL"
+                value={tl.url ?? ''}
+                onChange={(e) => {
+                  const copy = [...(data.third_party_listings ?? [])];
+                  copy[i] = { ...copy[i], url: e.target.value };
+                  set('third_party_listings', copy);
+                }}
+                className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+              />
+            </div>
+            <input
+              placeholder="Notes (optional)"
+              value={tl.notes ?? ''}
+              onChange={(e) => {
+                const copy = [...(data.third_party_listings ?? [])];
+                copy[i] = { ...copy[i], notes: e.target.value };
+                set('third_party_listings', copy);
+              }}
+              className="mt-2 w-full rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={() =>
+                set(
+                  'third_party_listings',
+                  (data.third_party_listings ?? []).filter((_: any, j: number) => j !== i),
+                )
+              }
+              className="mt-1 text-xs text-red-400 hover:text-red-300"
+            >
+              Remove
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={() =>
+            set('third_party_listings', [
+              ...(data.third_party_listings ?? []),
+              { source: '', url: '', notes: '' },
+            ])
+          }
+          className="rounded-lg border border-dashed border-white/10 px-3 py-1 text-xs text-white/55 hover:border-white/20 hover:text-white"
+        >
+          + Add Listing
+        </button>
+      </Section>
+
       {/* Service Areas + Compliance
           - Service Areas (strings) only live on marketing_agency / other schemas.
           - Compliance Jurisdictions is a base field and always available. */}

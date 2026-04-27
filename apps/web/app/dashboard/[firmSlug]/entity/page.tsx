@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import {
   getEntityHealth,
   getLatestEntityRun,
+  getCrossSourceHealth,
 } from '../../../actions/entity-actions';
 import { getFirmBySlug } from '../../../actions/firm-actions';
 import { EntityClient } from './entity-client';
@@ -17,9 +18,10 @@ export default async function EntityPage({
   const firm = await getFirmBySlug(firmSlug);
   if (!firm) notFound();
 
-  const [health, latestRun] = await Promise.all([
+  const [health, latestRun, crossSource] = await Promise.all([
     getEntityHealth(firmSlug).catch(() => null),
     getLatestEntityRun(firmSlug).catch(() => null),
+    getCrossSourceHealth(firmSlug).catch(() => []),
   ]);
 
   return (
@@ -38,6 +40,7 @@ export default async function EntityPage({
         firmSlug={firmSlug}
         initialHealth={health}
         initialLatestRun={latestRun}
+        initialCrossSource={crossSource}
       />
     </div>
   );

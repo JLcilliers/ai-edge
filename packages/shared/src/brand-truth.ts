@@ -118,6 +118,24 @@ export const pressItemSchema = z.object({
 });
 export type PressItem = z.infer<typeof pressItemSchema>;
 
+// Third-party directory listings (BBB, Super Lawyers, Avvo, Justia, Findlaw,
+// Healthgrades, Zocdoc, Yelp, Clutch, G2, etc). The cross-source scanner
+// fetches each URL, extracts main content, embeds, and compares against the
+// Brand Truth centroid — divergent third-party copy poisons LLM alignment
+// just like divergent on-site copy does. We can't rewrite the listing
+// directly (each platform has its own submit-correction workflow), but we
+// can flag drift and open a remediation ticket so an operator can update
+// the listing through the platform's own form.
+export const directoryListingSchema = z.object({
+  // Free-form short label — matches `entity_signal.source` values like
+  // 'bbb' / 'superlawyers' / 'avvo' / 'justia' / 'findlaw' / 'martindale' /
+  // 'healthgrades' / 'zocdoc' / 'yelp' / 'clutch' / 'g2' / 'gbp'.
+  source: z.string().min(1),
+  url: z.string().url(),
+  notes: z.string().optional(),
+});
+export type DirectoryListing = z.infer<typeof directoryListingSchema>;
+
 // ── Shared base fields (all firm types) ────────────────────
 const baseFields = {
   firm_name: z.string().min(1),
@@ -142,6 +160,9 @@ const baseFields = {
   seed_query_intents: z.array(z.string()).default([]),
   competitors_for_llm_monitoring: z.array(z.string()).default([]),
   known_press_and_media: z.array(pressItemSchema).default([]),
+  // Cross-source vector alignment + badge verification corpus. Operator-
+  // curated for v1; auto-discovery via search lookups is a Phase C item.
+  third_party_listings: z.array(directoryListingSchema).default([]),
 } as const;
 
 // ── Law firm ───────────────────────────────────────────────
