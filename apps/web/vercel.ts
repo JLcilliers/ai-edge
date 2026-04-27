@@ -28,6 +28,11 @@ export const config: VercelConfig = {
     // clicks/impressions/ctr/position per connected firm at 06:30 UTC.
     // Firms without a gsc_connection row are silently skipped.
     { path: '/api/cron/gsc-sync', schedule: '30 6 * * *' },
+    // AI Overview panel capture (Phase B #7) — Tuesday 10:00 UTC.
+    // DataForSEO primary, Playwright fallback. No-ops when neither is
+    // configured (records provider:'none' + has_aio:false rows so the
+    // visibility tab shows "tried, no provider").
+    { path: '/api/cron/aio-capture', schedule: '0 10 * * 2' },
   ],
   headers: [
     routes.cacheControl('/_next/static/(.*)', {

@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   ArrowDownRight,
   ArrowUpRight,
@@ -12,6 +13,9 @@ import {
   TrendingUp,
   Globe,
   GitCompare,
+  Sparkles,
+  Loader2,
+  Search,
 } from 'lucide-react';
 import type {
   ShareOfVoiceResult,
@@ -19,8 +23,13 @@ import type {
   CitationDriftRow,
   AlignmentRegression,
 } from '../../../actions/visibility-actions';
+import {
+  triggerAioCapture,
+  type AioCaptureRow,
+  type AioCaptureUiOutcome,
+} from '../../../actions/aio-actions';
 
-type Tab = 'share' | 'sources' | 'drift';
+type Tab = 'share' | 'sources' | 'drift' | 'aio';
 
 function formatDate(d: Date | null | undefined): string {
   if (!d) return '—';
@@ -47,6 +56,8 @@ export function VisibilityClient({
   sourceGraph,
   driftHistory,
   regression,
+  aioCaptures,
+  aioProvider,
 }: {
   firmSlug: string;
   firmName: string;
@@ -54,6 +65,8 @@ export function VisibilityClient({
   sourceGraph: CitationSourceGraph;
   driftHistory: CitationDriftRow[];
   regression: AlignmentRegression;
+  aioCaptures: AioCaptureRow[];
+  aioProvider: string;
 }) {
   const [tab, setTab] = useState<Tab>('share');
 
@@ -98,6 +111,9 @@ export function VisibilityClient({
         <TabButton active={tab === 'drift'} onClick={() => setTab('drift')} icon={GitCompare}>
           Drift
         </TabButton>
+        <TabButton active={tab === 'aio'} onClick={() => setTab('aio')} icon={Sparkles}>
+          AI Overviews
+        </TabButton>
       </div>
 
       {tab === 'share' && (
@@ -105,7 +121,181 @@ export function VisibilityClient({
       )}
       {tab === 'sources' && <CitationSourcesView data={sourceGraph} />}
       {tab === 'drift' && <DriftView history={driftHistory} firmSlug={firmSlug} />}
+      {tab === 'aio' && (
+        <AioView
+          firmSlug={firmSlug}
+          captures={aioCaptures}
+          provider={aioProvider}
+        />
+      )}
     </>
+  );
+}
+
+// ─── AIO view (Phase B #7) ──────────────────────────────────
+function AioView({
+  firmSlug,
+  captures,
+  provider,
+}: {
+  firmSlug: string;
+  captures: AioCaptureRow[];
+  provider: string;
+}) {
+  const router = useRouter();
+  const [isPending, start] = useTransition();
+  const [result, setResult] = useState<AioCaptureUiOutcome | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const onCapture = () => {
+    setError(null);
+    setResult(null);
+    start(async () => {
+      try {
+        const r = await triggerAioCapture(firmSlug, { maxQueries: 5 });
+        setResult(r);
+        router.refresh();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Capture failed');
+      }
+    });
+  };
+
+  const providerLabel =
+    provider === 'dataforseo'
+      ? 'DataForSEO'
+      : provider === 'playwright'
+        ? 'Playwright'
+        : 'none configured';
+  const providerTone = provider === 'none' ? 'warn' : 'ok';
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-white/10 bg-[--bg-secondary] p-4">
+        <div className="min-w-0 flex-1">
+          <h3 className="font-[family-name:var(--font-jakarta)] text-base font-semibold text-white">
+            Google AI Overview capture
+          </h3>
+          <p className="mt-1 max-w-2xl text-sm text-white/55">
+            Captures the AIO panel Google renders for the firm&apos;s
+            seed query intents and tracks whether the firm appears in the
+            cited sources. Different from the audit pipeline (which queries
+            the Gemini model directly) — this catches the AIO product
+            surface itself, including which sources Google chose to cite.
+          </p>
+          <p className="mt-2 font-[family-name:var(--font-geist-mono)] text-[11px] text-white/40">
+            Provider:{' '}
+            <span
+              className={
+                providerTone === 'warn'
+                  ? 'text-[--rag-yellow]'
+                  : 'text-[--rag-green]'
+              }
+            >
+              {providerLabel}
+            </span>
+            {provider === 'none' &&
+              ' — set DATAFORSEO_LOGIN + DATAFORSEO_PASSWORD on Vercel to enable real capture.'}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onCapture}
+          disabled={isPending}
+          className="inline-flex shrink-0 items-center gap-2 rounded-full bg-[--accent] px-4 py-2 text-sm font-semibold text-black transition-colors hover:bg-[--accent-hover] disabled:opacity-50"
+        >
+          {isPending ? (
+            <Loader2 size={14} className="animate-spin" />
+          ) : (
+            <Search size={14} strokeWidth={2} />
+          )}
+          Capture now
+        </button>
+      </div>
+
+      {result && (
+        <div className="rounded-lg border border-[--rag-green]/30 bg-[--rag-green-bg] px-3 py-2 text-xs text-[--rag-green]">
+          Attempted {result.attempted} ·{' '}
+          <span>{result.hasAio} had AIO</span>
+          {result.firmCited > 0 && (
+            <>
+              {' · '}
+              <span className="font-semibold">{result.firmCited} cited the firm</span>
+            </>
+          )}
+          {result.errors > 0 && (
+            <>
+              {' · '}
+              <span className="text-[--rag-red]">{result.errors} errors</span>
+            </>
+          )}
+        </div>
+      )}
+      {error && (
+        <div className="rounded-lg border border-[--rag-red]/30 bg-[--rag-red-bg] px-3 py-2 text-xs text-[--rag-red]">
+          {error}
+        </div>
+      )}
+
+      {captures.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-white/10 bg-[--bg-secondary]/50 p-6 text-sm text-white/55">
+          No AIO captures yet. Click <em>Capture now</em> to run an
+          ad-hoc capture, or wait for the weekly cron (Tuesday 10:00 UTC).
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-xl border border-white/10">
+          <table className="w-full text-sm">
+            <thead className="border-b border-white/10 bg-white/[0.02]">
+              <tr className="text-left text-[10px] uppercase tracking-widest text-white/40">
+                <th className="px-4 py-2 font-medium">Query</th>
+                <th className="px-4 py-2 font-medium">AIO</th>
+                <th className="px-4 py-2 font-medium">Firm cited</th>
+                <th className="px-4 py-2 font-medium">Sources</th>
+                <th className="px-4 py-2 font-medium">Provider</th>
+                <th className="px-4 py-2 font-medium">Captured</th>
+              </tr>
+            </thead>
+            <tbody>
+              {captures.map((c) => (
+                <tr key={c.id} className="border-b border-white/5 last:border-b-0">
+                  <td className="px-4 py-3 text-white">{c.query}</td>
+                  <td className="px-4 py-3 text-xs">
+                    {c.hasAio ? (
+                      <span className="text-[--rag-green]">yes</span>
+                    ) : (
+                      <span className="text-white/40">no</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-xs">
+                    {c.firmCited ? (
+                      <span className="font-semibold text-[--rag-green]">cited</span>
+                    ) : (
+                      <span className="text-white/40">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 font-[family-name:var(--font-geist-mono)] text-xs text-white/70">
+                    {c.sourceCount}
+                  </td>
+                  <td className="px-4 py-3 font-[family-name:var(--font-geist-mono)] text-xs text-white/55">
+                    {c.provider}
+                  </td>
+                  <td
+                    className="px-4 py-3 font-[family-name:var(--font-geist-mono)] text-[11px] text-white/40"
+                    suppressHydrationWarning
+                  >
+                    {new Date(c.fetchedAt).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   );
 }
 

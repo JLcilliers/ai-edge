@@ -7,6 +7,10 @@ import {
   getCitationDriftHistory,
   getAlignmentRegression,
 } from '../../../actions/visibility-actions';
+import {
+  listAioCaptures,
+  getAioProviderName,
+} from '../../../actions/aio-actions';
 import { VisibilityClient } from './visibility-client';
 
 export const dynamic = 'force-dynamic';
@@ -30,12 +34,15 @@ export default async function VisibilityPage({
   const firm = await getFirmBySlug(firmSlug);
   if (!firm) notFound();
 
-  const [shareOfVoice, sourceGraph, driftHistory, regression] = await Promise.all([
-    getShareOfVoice(firmSlug),
-    getCitationSourceGraph(firmSlug),
-    getCitationDriftHistory(firmSlug),
-    getAlignmentRegression(firmSlug),
-  ]);
+  const [shareOfVoice, sourceGraph, driftHistory, regression, aioCaptures, aioProvider] =
+    await Promise.all([
+      getShareOfVoice(firmSlug),
+      getCitationSourceGraph(firmSlug),
+      getCitationDriftHistory(firmSlug),
+      getAlignmentRegression(firmSlug),
+      listAioCaptures(firmSlug).catch(() => []),
+      getAioProviderName().catch(() => 'none'),
+    ]);
 
   return (
     <div>
@@ -63,6 +70,8 @@ export default async function VisibilityPage({
         sourceGraph={sourceGraph}
         driftHistory={driftHistory}
         regression={regression}
+        aioCaptures={aioCaptures}
+        aioProvider={aioProvider}
       />
     </div>
   );
