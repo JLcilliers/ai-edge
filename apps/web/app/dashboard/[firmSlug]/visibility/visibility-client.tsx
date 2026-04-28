@@ -33,6 +33,59 @@ import type { VisibilityCorrelation } from '../../../actions/visibility-correlat
 
 type Tab = 'share' | 'sources' | 'drift' | 'aio' | 'correlation';
 
+// Operator-facing one-paragraph explainer that surfaces under the tab nav.
+// Intent: every sub-tab answers a different question about the firm's surface
+// area in LLM answers — the description should make that question explicit
+// before any chart/table loads.
+const TAB_EXPLAINERS: Record<Tab, { what: string; why: string }> = {
+  share: {
+    what:
+      'How often this firm gets cited in LLM answers compared to its competitors, across the seed query set, in the most recent audit runs.',
+    why:
+      'Higher share = the LLMs reach for this firm first when asked about its space. A drop is the earliest signal that the LLMs have shifted who they trust on a topic.',
+  },
+  sources: {
+    what:
+      "Which domains the LLMs cite when they mention the firm. Wikipedia, the firm's own site, news outlets, directories — ranked by how often each shows up.",
+    why:
+      "Tells you whether the LLM's story about the firm depends on sources you control (own site, owned profiles) or sources you don't (third-party directories, old press). Shifting that mix is the lever for stable citations.",
+  },
+  drift: {
+    what:
+      'Did the citation set change between audit runs? Same query, different sources cited = drift. Each row shows a query whose source list moved.',
+    why:
+      "High drift means the LLM is unstable on this topic — it'll cite different sources on different days, so your visibility is unreliable. Low drift = locked-in source story.",
+  },
+  aio: {
+    what:
+      "Did Google render an AI Overview for this firm's seed queries? If so, what did the AIO say and which sources did it cite? Captured via DataForSEO (primary) with a Playwright residential-proxy fallback.",
+    why:
+      "AI Overviews are increasingly the only thing a searcher reads — if Google triggered one for your query and didn't cite you, that's a click you lost before the user even saw the regular SERP.",
+  },
+  correlation: {
+    what:
+      'GSC clicks/impressions per day overlaid with markers for days Google triggered an AI Overview on the firm\'s queries.',
+    why:
+      'Answers the "did the AI Overview eat our organic traffic?" question. A coincident click drop on a day Google triggered an AIO is the smoke signal worth chasing — open the Drift / AIO tabs from there.',
+  },
+};
+
+function TabExplainer({ tab }: { tab: Tab }) {
+  const info = TAB_EXPLAINERS[tab];
+  return (
+    <div className="mb-6 rounded-xl border border-white/10 bg-[var(--bg-secondary)]/60 p-4">
+      <p className="text-sm leading-relaxed text-white/75">
+        <span className="font-medium text-white">What this is. </span>
+        {info.what}
+      </p>
+      <p className="mt-2 text-sm leading-relaxed text-white/55">
+        <span className="font-medium text-white/70">Why it matters. </span>
+        {info.why}
+      </p>
+    </div>
+  );
+}
+
 function formatDate(d: Date | null | undefined): string {
   if (!d) return '—';
   return new Date(d).toLocaleDateString('en-US', {
@@ -126,6 +179,11 @@ export function VisibilityClient({
           Correlation
         </TabButton>
       </div>
+
+      {/* Per-sub-tab explainer — what this view answers + why an operator
+          should care. Replaces the previous "you'll have to read the chart
+          to know what it means" UX. */}
+      <TabExplainer tab={tab} />
 
       {tab === 'share' && (
         <ShareOfVoiceView firmSlug={firmSlug} firmName={firmName} data={shareOfVoice} />
