@@ -143,7 +143,7 @@ function SearchConsoleSection({
       description="Connect Google Search Console to correlate organic clicks/impressions with LLM citation rates. Helps answer the 'did AIO eat our organic traffic?' question."
     >
       {!status.oauthConfigured && (
-        <div className="rounded-lg border border-[--rag-yellow]/30 bg-[--rag-yellow-bg] px-4 py-3 text-sm text-[--rag-yellow]">
+        <div className="rounded-lg border border-[var(--rag-yellow)]/30 bg-[var(--rag-yellow-bg)] px-4 py-3 text-sm text-[var(--rag-yellow)]">
           OAuth client credentials not configured. Set{' '}
           <code className="font-[family-name:var(--font-geist-mono)] text-xs">GOOGLE_OAUTH_CLIENT_ID</code>,{' '}
           <code className="font-[family-name:var(--font-geist-mono)] text-xs">GOOGLE_OAUTH_CLIENT_SECRET</code>,{' '}
@@ -155,7 +155,7 @@ function SearchConsoleSection({
       )}
 
       {status.oauthConfigured && !status.connected && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-[--bg-tertiary]/40 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-[var(--bg-tertiary)]/40 p-4">
           <div className="text-sm text-white/60">
             Not connected. Click <em>Connect</em> to authorize Search Console
             access — you'll pick the property URL on Google's consent screen.
@@ -164,7 +164,7 @@ function SearchConsoleSection({
             type="button"
             onClick={onConnect}
             disabled={isPending}
-            className="inline-flex items-center gap-2 rounded-full bg-[--accent] px-4 py-2 text-sm font-semibold text-black transition-colors hover:bg-[--accent-hover] disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-full bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-black transition-colors hover:bg-[var(--accent-hover)] disabled:opacity-50"
           >
             {isPending ? (
               <Loader2 size={14} className="animate-spin" />
@@ -178,10 +178,10 @@ function SearchConsoleSection({
 
       {status.connected && (
         <div className="flex flex-col gap-3">
-          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-[--rag-green]/30 bg-[--rag-green-bg] p-4 text-sm">
-            <CheckCircle2 size={16} strokeWidth={2} className="shrink-0 text-[--rag-green]" />
+          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-[var(--rag-green)]/30 bg-[var(--rag-green-bg)] p-4 text-sm">
+            <CheckCircle2 size={16} strokeWidth={2} className="shrink-0 text-[var(--rag-green)]" />
             <div className="flex-1">
-              <div className="font-medium text-[--rag-green]">Connected</div>
+              <div className="font-medium text-[var(--rag-green)]">Connected</div>
               <div className="mt-0.5 font-[family-name:var(--font-geist-mono)] text-[11px] text-white/55">
                 {status.siteUrl ?? '—'}
               </div>
@@ -204,7 +204,7 @@ function SearchConsoleSection({
                 type="button"
                 onClick={onDisconnect}
                 disabled={isPending}
-                className="inline-flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-xs text-white/55 transition-colors hover:border-[--rag-red]/50 hover:text-[--rag-red] disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-xs text-white/55 transition-colors hover:border-[var(--rag-red)]/50 hover:text-[var(--rag-red)] disabled:opacity-50"
               >
                 <Trash2 size={12} strokeWidth={2} />
                 Disconnect
@@ -243,12 +243,12 @@ function SearchConsoleSection({
       )}
 
       {error && (
-        <div className="mt-3 rounded-lg border border-[--rag-red]/30 bg-[--rag-red-bg] px-3 py-2 text-xs text-[--rag-red]">
+        <div className="mt-3 rounded-lg border border-[var(--rag-red)]/30 bg-[var(--rag-red-bg)] px-3 py-2 text-xs text-[var(--rag-red)]">
           {error}
         </div>
       )}
       {info && (
-        <div className="mt-3 rounded-lg border border-[--rag-green]/30 bg-[--rag-green-bg] px-3 py-2 text-xs text-[--rag-green]">
+        <div className="mt-3 rounded-lg border border-[var(--rag-green)]/30 bg-[var(--rag-green-bg)] px-3 py-2 text-xs text-[var(--rag-green)]">
           {info}
         </div>
       )}
@@ -266,7 +266,7 @@ function KvTile({
   hint?: string;
 }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-[--bg-tertiary]/40 p-3">
+    <div className="rounded-xl border border-white/10 bg-[var(--bg-tertiary)]/40 p-3">
       <div className="text-[10px] font-medium uppercase tracking-widest text-white/40">
         {label}
       </div>
@@ -345,7 +345,7 @@ function BudgetSection({
       title="Monthly LLM Budget"
       description="Caps total spend on audits and rewrite drafts per UTC month. Cron schedulers skip any firm already over cap. Leave blank to fall back to the workspace default."
     >
-      <div className={`mb-5 rounded-xl border bg-[--bg-secondary] p-5 ${toneBorder}`}>
+      <div className={`mb-5 rounded-xl border bg-[var(--bg-secondary)] p-5 ${toneBorder}`}>
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
             <div className="text-[10px] font-medium uppercase tracking-widest text-white/40">
@@ -377,7 +377,7 @@ function BudgetSection({
                 ? 'bg-red-500'
                 : tone === 'warning'
                   ? 'bg-amber-500'
-                  : 'bg-[--accent]'
+                  : 'bg-[var(--accent)]'
             }`}
             style={{ width: `${percent}%` }}
           />
@@ -411,7 +411,7 @@ function BudgetSection({
           Save budget
         </PrimaryButton>
         {saved && !isPending && (
-          <span className="inline-flex items-center gap-1.5 text-xs text-[--rag-green]">
+          <span className="inline-flex items-center gap-1.5 text-xs text-[var(--rag-green)]">
             <CheckCircle2 size={14} strokeWidth={1.5} />
             Saved
           </span>
@@ -464,13 +464,13 @@ function CostTelemetrySection({ bundle }: { bundle: FirmSettingsBundle }) {
       </div>
 
       {/* 12-month stacked bar chart */}
-      <div className="mt-6 rounded-xl border border-white/10 bg-[--bg-secondary] p-5">
+      <div className="mt-6 rounded-xl border border-white/10 bg-[var(--bg-secondary)] p-5">
         <div className="mb-4 flex items-center justify-between">
           <div className="text-[10px] font-medium uppercase tracking-widest text-white/40">
             12-month spend
           </div>
           <div className="flex items-center gap-3 text-[10px] text-white/55">
-            <LegendSwatch color="bg-[--accent]" label="Audits" />
+            <LegendSwatch color="bg-[var(--accent)]" label="Audits" />
             <LegendSwatch color="bg-purple-400" label="Rewrites" />
           </div>
         </div>
@@ -499,9 +499,9 @@ function CostTile({
   value: number;
   tone: 'accent' | 'neutral';
 }) {
-  const valueClass = tone === 'accent' ? 'text-[--accent]' : 'text-white';
+  const valueClass = tone === 'accent' ? 'text-[var(--accent)]' : 'text-white';
   return (
-    <div className="rounded-xl border border-white/10 bg-[--bg-secondary] p-5">
+    <div className="rounded-xl border border-white/10 bg-[var(--bg-secondary)] p-5">
       <div className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-widest text-white/40">
         <Icon size={12} strokeWidth={1.5} />
         {label}
@@ -534,7 +534,7 @@ function BarColumn({ month, maxTotal }: { month: CostBreakdown; maxTotal: number
               title={`Rewrites: $${month.rewrites.toFixed(2)}`}
             />
             <div
-              className={`w-full bg-[--accent] ${rewritesPct === 0 ? 'rounded-t-sm' : ''}`}
+              className={`w-full bg-[var(--accent)] ${rewritesPct === 0 ? 'rounded-t-sm' : ''}`}
               style={{ height: `${auditsPct}%` }}
               title={`Audits: $${month.audits.toFixed(2)}`}
             />
@@ -613,7 +613,7 @@ function MetadataSection({
           <select
             value={firmType}
             onChange={(e) => setFirmType(e.target.value as FirmType)}
-            className="w-full rounded-lg border border-white/10 bg-[--bg-secondary] px-3 py-2 text-sm text-white focus:border-[--accent] focus:outline-none"
+            className="w-full rounded-lg border border-white/10 bg-[var(--bg-secondary)] px-3 py-2 text-sm text-white focus:border-[var(--accent)] focus:outline-none"
           >
             {FIRM_TYPE_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
@@ -636,7 +636,7 @@ function MetadataSection({
           Save metadata
         </PrimaryButton>
         {saved && !isPending && (
-          <span className="inline-flex items-center gap-1.5 text-xs text-[--rag-green]">
+          <span className="inline-flex items-center gap-1.5 text-xs text-[var(--rag-green)]">
             <CheckCircle2 size={14} strokeWidth={1.5} />
             Saved
           </span>
@@ -737,10 +737,10 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-white/10 bg-[--bg-secondary]/40 p-6">
+    <section className="rounded-2xl border border-white/10 bg-[var(--bg-secondary)]/40 p-6">
       <div className="mb-5 flex items-start gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/5">
-          <Icon size={18} strokeWidth={1.5} className="text-[--accent]" />
+          <Icon size={18} strokeWidth={1.5} className="text-[var(--accent)]" />
         </div>
         <div>
           <h2 className="font-[family-name:var(--font-jakarta)] text-lg font-semibold text-white">
@@ -787,7 +787,7 @@ function LabeledInput({
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg border border-white/10 bg-[--bg-secondary] px-3 py-2 text-sm text-white placeholder-white/30 focus:border-[--accent] focus:outline-none"
+        className="w-full rounded-lg border border-white/10 bg-[var(--bg-secondary)] px-3 py-2 text-sm text-white placeholder-white/30 focus:border-[var(--accent)] focus:outline-none"
       />
       {helper && <p className="mt-1 text-[10px] text-white/30">{helper}</p>}
     </div>
@@ -810,7 +810,7 @@ function PrimaryButton({
       type="button"
       onClick={onClick}
       disabled={pending}
-      className="inline-flex items-center gap-2 rounded-full bg-[--accent] px-5 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-[--accent-hover] disabled:opacity-60"
+      className="inline-flex items-center gap-2 rounded-full bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-[var(--accent-hover)] disabled:opacity-60"
     >
       {pending ? (
         <Loader2 size={14} strokeWidth={2} className="animate-spin" />

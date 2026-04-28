@@ -56,7 +56,7 @@ function AuditsSection({ payload }: { payload: MonthlyReportPayload }) {
 
       {/* RAG distribution */}
       {ragTotal > 0 && (
-        <div className="mt-4 rounded-xl border border-white/10 bg-[--bg-secondary] p-4">
+        <div className="mt-4 rounded-xl border border-white/10 bg-[var(--bg-secondary)] p-4">
           <div className="mb-2 flex items-center justify-between text-[10px] uppercase tracking-widest text-white/40">
             <span>RAG distribution</span>
             <span>{ragTotal} responses scored</span>
@@ -64,30 +64,30 @@ function AuditsSection({ payload }: { payload: MonthlyReportPayload }) {
           <div className="flex h-3 overflow-hidden rounded-full bg-white/5">
             {audits.rag_totals.red > 0 && (
               <div
-                className="h-full bg-[--rag-red]"
+                className="h-full bg-[var(--rag-red)]"
                 style={{ width: `${(audits.rag_totals.red / ragTotal) * 100}%` }}
                 title={`${audits.rag_totals.red} red`}
               />
             )}
             {audits.rag_totals.yellow > 0 && (
               <div
-                className="h-full bg-[--rag-yellow]"
+                className="h-full bg-[var(--rag-yellow)]"
                 style={{ width: `${(audits.rag_totals.yellow / ragTotal) * 100}%` }}
                 title={`${audits.rag_totals.yellow} yellow`}
               />
             )}
             {audits.rag_totals.green > 0 && (
               <div
-                className="h-full bg-[--rag-green]"
+                className="h-full bg-[var(--rag-green)]"
                 style={{ width: `${(audits.rag_totals.green / ragTotal) * 100}%` }}
                 title={`${audits.rag_totals.green} green`}
               />
             )}
           </div>
           <div className="mt-2 flex justify-between font-[family-name:var(--font-geist-mono)] text-[11px]">
-            <span className="text-[--rag-red]">{audits.rag_totals.red} red</span>
-            <span className="text-[--rag-yellow]">{audits.rag_totals.yellow} yellow</span>
-            <span className="text-[--rag-green]">{audits.rag_totals.green} green</span>
+            <span className="text-[var(--rag-red)]">{audits.rag_totals.red} red</span>
+            <span className="text-[var(--rag-yellow)]">{audits.rag_totals.yellow} yellow</span>
+            <span className="text-[var(--rag-green)]">{audits.rag_totals.green} green</span>
           </div>
         </div>
       )}
@@ -150,13 +150,13 @@ function AuditsSection({ payload }: { payload: MonthlyReportPayload }) {
                     {r.rag.red + r.rag.yellow + r.rag.green > 0 ? (
                       <span className="flex gap-2">
                         {r.rag.red > 0 && (
-                          <span className="text-[--rag-red]">{r.rag.red}R</span>
+                          <span className="text-[var(--rag-red)]">{r.rag.red}R</span>
                         )}
                         {r.rag.yellow > 0 && (
-                          <span className="text-[--rag-yellow]">{r.rag.yellow}Y</span>
+                          <span className="text-[var(--rag-yellow)]">{r.rag.yellow}Y</span>
                         )}
                         {r.rag.green > 0 && (
-                          <span className="text-[--rag-green]">{r.rag.green}G</span>
+                          <span className="text-[var(--rag-green)]">{r.rag.green}G</span>
                         )}
                       </span>
                     ) : (
@@ -210,7 +210,7 @@ function RedditSection({ payload }: { payload: MonthlyReportPayload }) {
           {reddit.top_mentions.map((m, i) => (
             <div
               key={i}
-              className="rounded-xl border border-white/10 bg-[--bg-secondary] px-4 py-3"
+              className="rounded-xl border border-white/10 bg-[var(--bg-secondary)] px-4 py-3"
             >
               <div className="flex flex-wrap items-center gap-2 text-[11px]">
                 <span
@@ -236,7 +236,7 @@ function RedditSection({ payload }: { payload: MonthlyReportPayload }) {
                   href={m.url}
                   target="_blank"
                   rel="noreferrer"
-                  className="ml-auto inline-flex items-center gap-1 text-[--accent] hover:underline"
+                  className="ml-auto inline-flex items-center gap-1 text-[var(--accent)] hover:underline"
                 >
                   Open
                   <ExternalLink size={10} strokeWidth={2} />
@@ -297,7 +297,7 @@ function CompetitiveSection({ payload }: { payload: MonthlyReportPayload }) {
                   </td>
                   <td className="px-4 py-2.5 font-[family-name:var(--font-geist-mono)] text-xs">
                     {c.praise_count > 0 ? (
-                      <span className="text-[--rag-green]">{c.praise_count}</span>
+                      <span className="text-[var(--rag-green)]">{c.praise_count}</span>
                     ) : (
                       <span className="text-white/40">0</span>
                     )}
@@ -487,10 +487,10 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-white/10 bg-[--bg-secondary]/40 p-6">
+    <section className="rounded-2xl border border-white/10 bg-[var(--bg-secondary)]/40 p-6">
       <div className="mb-5 flex items-center gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/5">
-          <Icon size={18} strokeWidth={1.5} className="text-[--accent]" />
+          <Icon size={18} strokeWidth={1.5} className="text-[var(--accent)]" />
         </div>
         <h2 className="font-[family-name:var(--font-jakarta)] text-lg font-semibold text-white">
           {title}
@@ -519,12 +519,12 @@ function Tile({
 }) {
   const valueClass =
     tone === 'accent'
-      ? 'text-[--accent]'
+      ? 'text-[var(--accent)]'
       : tone === 'red'
-      ? 'text-[--rag-red]'
+      ? 'text-[var(--rag-red)]'
       : 'text-white';
   return (
-    <div className="rounded-xl border border-white/10 bg-[--bg-secondary] p-4">
+    <div className="rounded-xl border border-white/10 bg-[var(--bg-secondary)] p-4">
       <div className="text-[10px] font-medium uppercase tracking-widest text-white/40">
         {label}
       </div>
@@ -539,9 +539,9 @@ function Tile({
 function StatusPill({ status }: { status: string }) {
   const cls =
     status === 'completed'
-      ? 'bg-[--rag-green-bg] text-[--rag-green]'
+      ? 'bg-[var(--rag-green-bg)] text-[var(--rag-green)]'
       : status === 'failed' || status === 'error'
-      ? 'bg-[--rag-red-bg] text-[--rag-red]'
+      ? 'bg-[var(--rag-red-bg)] text-[var(--rag-red)]'
       : status === 'running'
       ? 'bg-blue-500/15 text-blue-300'
       : 'bg-white/10 text-white/60';
@@ -565,11 +565,11 @@ function EmptyLine({ message }: { message: string }) {
 function sentimentBadgeClass(sentiment: string): string {
   switch (sentiment) {
     case 'praise':
-      return 'bg-[--rag-green-bg] text-[--rag-green]';
+      return 'bg-[var(--rag-green-bg)] text-[var(--rag-green)]';
     case 'complaint':
-      return 'bg-[--rag-red-bg] text-[--rag-red]';
+      return 'bg-[var(--rag-red-bg)] text-[var(--rag-red)]';
     case 'recommendation_request':
-      return 'bg-[--accent]/15 text-[--accent]';
+      return 'bg-[var(--accent)]/15 text-[var(--accent)]';
     case 'neutral':
     default:
       return 'bg-white/10 text-white/55';

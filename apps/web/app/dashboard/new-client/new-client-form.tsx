@@ -72,7 +72,7 @@ export function NewClientForm() {
           placeholder="e.g. Smith &amp; Partners Law"
           autoFocus
           required
-          className="w-full rounded-lg border border-white/10 bg-black/30 px-4 py-2.5 text-sm text-white placeholder:text-white/30 focus:border-[--accent] focus:outline-none"
+          className="w-full rounded-lg border border-white/10 bg-black/30 px-4 py-2.5 text-sm text-white placeholder:text-white/30 focus:border-[var(--accent)] focus:outline-none"
         />
       </div>
 
@@ -84,7 +84,7 @@ export function NewClientForm() {
         >
           URL slug
         </label>
-        <div className="flex items-center gap-0 rounded-lg border border-white/10 bg-black/30 focus-within:border-[--accent]">
+        <div className="flex items-center gap-0 rounded-lg border border-white/10 bg-black/30 focus-within:border-[var(--accent)]">
           <span className="pl-4 font-[family-name:var(--font-geist-mono)] text-sm text-white/40">
             /dashboard/
           </span>
@@ -121,7 +121,7 @@ export function NewClientForm() {
                 onClick={() => setFirmType(opt.value)}
                 className={`flex flex-col gap-0.5 rounded-lg border px-4 py-3 text-left transition-colors ${
                   selected
-                    ? 'border-[--accent] bg-[--accent]/10'
+                    ? 'border-[var(--accent)] bg-[var(--accent)]/10'
                     : 'border-white/10 bg-black/20 hover:border-white/20'
                 }`}
               >
@@ -146,7 +146,7 @@ export function NewClientForm() {
         <button
           type="submit"
           disabled={!canSubmit}
-          className="rounded-full bg-[--accent] px-6 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-[--accent-hover] disabled:opacity-50"
+          className="rounded-full bg-[var(--accent)] px-6 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-[var(--accent-hover)] disabled:opacity-50"
         >
           {isPending ? 'Creating...' : 'Create Client'}
         </button>

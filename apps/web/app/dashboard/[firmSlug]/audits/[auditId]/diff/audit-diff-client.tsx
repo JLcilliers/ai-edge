@@ -32,9 +32,9 @@ function formatDateTime(d: Date | null): string {
 }
 
 const RAG_CLASS: Record<RagLabel, string> = {
-  red: 'bg-[--rag-red-bg] text-[--rag-red] border-[--rag-red]/30',
-  yellow: 'bg-[--rag-yellow-bg] text-[--rag-yellow] border-[--rag-yellow]/30',
-  green: 'bg-[--rag-green-bg] text-[--rag-green] border-[--rag-green]/30',
+  red: 'bg-[var(--rag-red-bg)] text-[var(--rag-red)] border-[var(--rag-red)]/30',
+  yellow: 'bg-[var(--rag-yellow-bg)] text-[var(--rag-yellow)] border-[var(--rag-yellow)]/30',
+  green: 'bg-[var(--rag-green-bg)] text-[var(--rag-green)] border-[var(--rag-green)]/30',
 };
 
 const MOVEMENT_META: Record<
@@ -77,7 +77,7 @@ export function AuditDiffClient({
 
   if (!diff.previous) {
     return (
-      <div className="rounded-xl border border-dashed border-white/10 bg-[--bg-secondary] p-10 text-center">
+      <div className="rounded-xl border border-dashed border-white/10 bg-[var(--bg-secondary)] p-10 text-center">
         <Clock size={28} strokeWidth={1.5} className="mx-auto mb-3 text-white/30" />
         <p className="text-sm text-white/55">
           No earlier scoring run to compare against. Once at least one more
@@ -161,11 +161,11 @@ export function AuditDiffClient({
 
       {/* Rows */}
       {displayedRows.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-white/10 bg-[--bg-secondary] p-10 text-center">
+        <div className="rounded-xl border border-dashed border-white/10 bg-[var(--bg-secondary)] p-10 text-center">
           <p className="text-sm text-white/55">No rows in this diff.</p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-white/10 bg-[--bg-secondary]">
+        <div className="overflow-hidden rounded-xl border border-white/10 bg-[var(--bg-secondary)]">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-white/10 bg-white/5 text-left text-[10px] font-medium uppercase tracking-widest text-white/40">
@@ -200,7 +200,7 @@ function RunContextCard({
 }) {
   if (!ctx) {
     return (
-      <div className="rounded-xl border border-dashed border-white/10 bg-[--bg-secondary] p-5">
+      <div className="rounded-xl border border-dashed border-white/10 bg-[var(--bg-secondary)] p-5">
         <div className="text-[10px] font-medium uppercase tracking-widest text-white/40">
           {label}
         </div>
@@ -211,7 +211,7 @@ function RunContextCard({
   return (
     <Link
       href={`/dashboard/${firmSlug}/audits/${ctx.runId}`}
-      className="group block rounded-xl border border-white/10 bg-[--bg-secondary] p-5 transition-colors hover:border-[--accent]/30"
+      className="group block rounded-xl border border-white/10 bg-[var(--bg-secondary)] p-5 transition-colors hover:border-[var(--accent)]/30"
     >
       <div className="flex items-center justify-between">
         <div className="text-[10px] font-medium uppercase tracking-widest text-white/40">
@@ -234,7 +234,7 @@ function RunContextCard({
         <RagPill label="yellow" pct={ctx.yellowPct} />
         <RagPill label="green" pct={ctx.greenPct} />
       </div>
-      <div className="mt-2 inline-flex items-center gap-1.5 text-xs text-[--accent] opacity-0 transition-opacity group-hover:opacity-100">
+      <div className="mt-2 inline-flex items-center gap-1.5 text-xs text-[var(--accent)] opacity-0 transition-opacity group-hover:opacity-100">
         Open run <ArrowRight size={12} strokeWidth={2} />
       </div>
     </Link>
@@ -276,7 +276,7 @@ function SummaryTile({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-xl border bg-[--bg-secondary] p-4 text-left transition-colors hover:border-white/30 ${border}`}
+      className={`rounded-xl border bg-[var(--bg-secondary)] p-4 text-left transition-colors hover:border-white/30 ${border}`}
     >
       <div className="text-[10px] font-medium uppercase tracking-widest text-white/40">
         {label}

@@ -17,11 +17,11 @@ function Section({
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="rounded-xl border border-white/10 bg-[--bg-secondary]">
+    <div className="rounded-xl border border-white/10 bg-[var(--bg-secondary)]">
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-semibold text-white hover:bg-[--bg-tertiary]/50"
+        className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-semibold text-white hover:bg-[var(--bg-tertiary)]/50"
       >
         {title}
         <span className="text-white/55">{open ? '−' : '+'}</span>
@@ -51,7 +51,7 @@ function Field({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="mt-1 block w-full rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-2 text-sm text-white placeholder:text-white/40 focus:border-[--accent] focus:outline-none"
+        className="mt-1 block w-full rounded-lg border border-white/10 bg-[var(--bg-tertiary)] px-3 py-2 text-sm text-white placeholder:text-white/40 focus:border-[var(--accent)] focus:outline-none"
       />
     </label>
   );
@@ -81,7 +81,7 @@ function StringArray({
                 copy[i] = e.target.value;
                 onChange(copy);
               }}
-              className="flex-1 rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+              className="flex-1 rounded-lg border border-white/10 bg-[var(--bg-tertiary)] px-3 py-1.5 text-sm text-white focus:border-[var(--accent)] focus:outline-none"
             />
             <button
               type="button"
@@ -248,7 +248,7 @@ export function BrandTruthEditor({
                     copy[i] = { ...copy[i], city: e.target.value };
                     set('geographies_served', copy);
                   }}
-                  className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+                  className="rounded-lg border border-white/10 bg-[var(--bg-tertiary)] px-3 py-1.5 text-sm text-white focus:border-[var(--accent)] focus:outline-none"
                 />
                 <input
                   placeholder="State (e.g. FL)"
@@ -258,7 +258,7 @@ export function BrandTruthEditor({
                     copy[i] = { ...copy[i], state: e.target.value };
                     set('geographies_served', copy);
                   }}
-                  className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+                  className="rounded-lg border border-white/10 bg-[var(--bg-tertiary)] px-3 py-1.5 text-sm text-white focus:border-[var(--accent)] focus:outline-none"
                 />
                 <input
                   placeholder="Country (2-letter)"
@@ -268,7 +268,7 @@ export function BrandTruthEditor({
                     copy[i] = { ...copy[i], country: e.target.value };
                     set('geographies_served', copy);
                   }}
-                  className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+                  className="rounded-lg border border-white/10 bg-[var(--bg-tertiary)] px-3 py-1.5 text-sm text-white focus:border-[var(--accent)] focus:outline-none"
                 />
                 <input
                   type="number"
@@ -280,7 +280,7 @@ export function BrandTruthEditor({
                     copy[i] = { ...copy[i], radius_mi: Number.isFinite(n) && n > 0 ? n : undefined };
                     set('geographies_served', copy);
                   }}
-                  className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+                  className="rounded-lg border border-white/10 bg-[var(--bg-tertiary)] px-3 py-1.5 text-sm text-white focus:border-[var(--accent)] focus:outline-none"
                 />
               </div>
               <button
@@ -326,7 +326,7 @@ export function BrandTruthEditor({
                     copy[i] = { ...copy[i], name: e.target.value };
                     set('attorney_bios', copy);
                   }}
-                  className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+                  className="rounded-lg border border-white/10 bg-[var(--bg-tertiary)] px-3 py-1.5 text-sm text-white focus:border-[var(--accent)] focus:outline-none"
                 />
                 <input
                   placeholder="Role"
@@ -336,7 +336,7 @@ export function BrandTruthEditor({
                     copy[i] = { ...copy[i], role: e.target.value };
                     set('attorney_bios', copy);
                   }}
-                  className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+                  className="rounded-lg border border-white/10 bg-[var(--bg-tertiary)] px-3 py-1.5 text-sm text-white focus:border-[var(--accent)] focus:outline-none"
                 />
                 <input
                   placeholder="Bar Number"
@@ -346,7 +346,7 @@ export function BrandTruthEditor({
                     copy[i] = { ...copy[i], bar_number: e.target.value };
                     set('attorney_bios', copy);
                   }}
-                  className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+                  className="rounded-lg border border-white/10 bg-[var(--bg-tertiary)] px-3 py-1.5 text-sm text-white focus:border-[var(--accent)] focus:outline-none"
                 />
                 <input
                   placeholder="Photo URL"
@@ -360,7 +360,7 @@ export function BrandTruthEditor({
                     copy[i] = { ...copy[i], photo_url: trimmed === '' ? undefined : e.target.value };
                     set('attorney_bios', copy);
                   }}
-                  className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+                  className="rounded-lg border border-white/10 bg-[var(--bg-tertiary)] px-3 py-1.5 text-sm text-white focus:border-[var(--accent)] focus:outline-none"
                 />
               </div>
               <textarea
@@ -372,7 +372,7 @@ export function BrandTruthEditor({
                   set('attorney_bios', copy);
                 }}
                 rows={2}
-                className="mt-2 w-full rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+                className="mt-2 w-full rounded-lg border border-white/10 bg-[var(--bg-tertiary)] px-3 py-1.5 text-sm text-white focus:border-[var(--accent)] focus:outline-none"
               />
               <button
                 type="button"
@@ -417,7 +417,7 @@ export function BrandTruthEditor({
                   set('notable_cases', copy);
                 }}
                 rows={2}
-                className="w-full rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+                className="w-full rounded-lg border border-white/10 bg-[var(--bg-tertiary)] px-3 py-1.5 text-sm text-white focus:border-[var(--accent)] focus:outline-none"
               />
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
                 <input
@@ -428,7 +428,7 @@ export function BrandTruthEditor({
                     copy[i] = { ...copy[i], outcome: e.target.value };
                     set('notable_cases', copy);
                   }}
-                  className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+                  className="rounded-lg border border-white/10 bg-[var(--bg-tertiary)] px-3 py-1.5 text-sm text-white focus:border-[var(--accent)] focus:outline-none"
                 />
                 <input
                   placeholder="Jurisdiction"
@@ -438,7 +438,7 @@ export function BrandTruthEditor({
                     copy[i] = { ...copy[i], jurisdiction: e.target.value };
                     set('notable_cases', copy);
                   }}
-                  className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+                  className="rounded-lg border border-white/10 bg-[var(--bg-tertiary)] px-3 py-1.5 text-sm text-white focus:border-[var(--accent)] focus:outline-none"
                 />
                 <input
                   placeholder="Source URL"
@@ -448,7 +448,7 @@ export function BrandTruthEditor({
                     copy[i] = { ...copy[i], source_url: e.target.value };
                     set('notable_cases', copy);
                   }}
-                  className="col-span-2 rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+                  className="col-span-2 rounded-lg border border-white/10 bg-[var(--bg-tertiary)] px-3 py-1.5 text-sm text-white focus:border-[var(--accent)] focus:outline-none"
                 />
               </div>
               <button
@@ -494,7 +494,7 @@ export function BrandTruthEditor({
                     copy[i] = { ...copy[i], name: e.target.value };
                     set('provider_bios', copy);
                   }}
-                  className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+                  className="rounded-lg border border-white/10 bg-[var(--bg-tertiary)] px-3 py-1.5 text-sm text-white focus:border-[var(--accent)] focus:outline-none"
                 />
                 <input
                   placeholder="Role"
@@ -504,7 +504,7 @@ export function BrandTruthEditor({
                     copy[i] = { ...copy[i], role: e.target.value };
                     set('provider_bios', copy);
                   }}
-                  className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+                  className="rounded-lg border border-white/10 bg-[var(--bg-tertiary)] px-3 py-1.5 text-sm text-white focus:border-[var(--accent)] focus:outline-none"
                 />
                 <input
                   placeholder="License Number"
@@ -514,7 +514,7 @@ export function BrandTruthEditor({
                     copy[i] = { ...copy[i], license_number: e.target.value };
                     set('provider_bios', copy);
                   }}
-                  className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+                  className="rounded-lg border border-white/10 bg-[var(--bg-tertiary)] px-3 py-1.5 text-sm text-white focus:border-[var(--accent)] focus:outline-none"
                 />
                 <input
                   placeholder="Photo URL"
@@ -525,7 +525,7 @@ export function BrandTruthEditor({
                     copy[i] = { ...copy[i], photo_url: trimmed === '' ? undefined : e.target.value };
                     set('provider_bios', copy);
                   }}
-                  className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+                  className="rounded-lg border border-white/10 bg-[var(--bg-tertiary)] px-3 py-1.5 text-sm text-white focus:border-[var(--accent)] focus:outline-none"
                 />
               </div>
               <textarea
@@ -537,7 +537,7 @@ export function BrandTruthEditor({
                   set('provider_bios', copy);
                 }}
                 rows={2}
-                className="mt-2 w-full rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+                className="mt-2 w-full rounded-lg border border-white/10 bg-[var(--bg-tertiary)] px-3 py-1.5 text-sm text-white focus:border-[var(--accent)] focus:outline-none"
               />
               <button
                 type="button"
@@ -581,7 +581,7 @@ export function BrandTruthEditor({
                 copy[i] = { ...copy[i], name: e.target.value };
                 set('service_offerings', copy);
               }}
-              className="w-40 rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+              className="w-40 rounded-lg border border-white/10 bg-[var(--bg-tertiary)] px-3 py-1.5 text-sm text-white focus:border-[var(--accent)] focus:outline-none"
             />
             <input
               placeholder="Scope"
@@ -591,7 +591,7 @@ export function BrandTruthEditor({
                 copy[i] = { ...copy[i], scope: e.target.value };
                 set('service_offerings', copy);
               }}
-              className="flex-1 rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+              className="flex-1 rounded-lg border border-white/10 bg-[var(--bg-tertiary)] px-3 py-1.5 text-sm text-white focus:border-[var(--accent)] focus:outline-none"
             />
             <button
               type="button"
@@ -636,7 +636,7 @@ export function BrandTruthEditor({
                   copy[i] = { ...copy[i], claim: e.target.value };
                   set('banned_claims', copy);
                 }}
-                className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+                className="rounded-lg border border-white/10 bg-[var(--bg-tertiary)] px-3 py-1.5 text-sm text-white focus:border-[var(--accent)] focus:outline-none"
               />
               <input
                 placeholder="Source Rule"
@@ -646,7 +646,7 @@ export function BrandTruthEditor({
                   copy[i] = { ...copy[i], source_rule: e.target.value };
                   set('banned_claims', copy);
                 }}
-                className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+                className="rounded-lg border border-white/10 bg-[var(--bg-tertiary)] px-3 py-1.5 text-sm text-white focus:border-[var(--accent)] focus:outline-none"
               />
             </div>
             <textarea
@@ -658,7 +658,7 @@ export function BrandTruthEditor({
                 set('banned_claims', copy);
               }}
               rows={2}
-              className="mt-2 w-full rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+              className="mt-2 w-full rounded-lg border border-white/10 bg-[var(--bg-tertiary)] px-3 py-1.5 text-sm text-white focus:border-[var(--accent)] focus:outline-none"
             />
             <button
               type="button"
@@ -714,13 +714,13 @@ export function BrandTruthEditor({
         {(data.key_clients_public ?? []).map((kc: any, i: number) => (
           <div key={i} className="mb-3 rounded border border-white/10 p-3">
             <div className="grid gap-2 sm:grid-cols-2">
-              <input placeholder="Client Name" value={kc.name ?? ''} onChange={(e) => { const copy = [...(data.key_clients_public ?? [])]; copy[i] = { ...copy[i], name: e.target.value }; set('key_clients_public', copy); }} className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none" />
-              <input placeholder="Vertical" value={kc.vertical ?? ''} onChange={(e) => { const copy = [...(data.key_clients_public ?? [])]; copy[i] = { ...copy[i], vertical: e.target.value }; set('key_clients_public', copy); }} className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none" />
-              <input placeholder="Location" value={kc.location ?? ''} onChange={(e) => { const copy = [...(data.key_clients_public ?? [])]; copy[i] = { ...copy[i], location: e.target.value }; set('key_clients_public', copy); }} className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none" />
-              <input placeholder="Attribution" value={kc.attribution ?? ''} onChange={(e) => { const copy = [...(data.key_clients_public ?? [])]; copy[i] = { ...copy[i], attribution: e.target.value }; set('key_clients_public', copy); }} className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none" />
-              <input placeholder="Source URL" value={kc.source_url ?? ''} onChange={(e) => { const copy = [...(data.key_clients_public ?? [])]; copy[i] = { ...copy[i], source_url: e.target.value }; set('key_clients_public', copy); }} className="col-span-2 rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none" />
+              <input placeholder="Client Name" value={kc.name ?? ''} onChange={(e) => { const copy = [...(data.key_clients_public ?? [])]; copy[i] = { ...copy[i], name: e.target.value }; set('key_clients_public', copy); }} className="rounded-lg border border-white/10 bg-[var(--bg-tertiary)] px-3 py-1.5 text-sm text-white focus:border-[var(--accent)] focus:outline-none" />
+              <input placeholder="Vertical" value={kc.vertical ?? ''} onChange={(e) => { const copy = [...(data.key_clients_public ?? [])]; copy[i] = { ...copy[i], vertical: e.target.value }; set('key_clients_public', copy); }} className="rounded-lg border border-white/10 bg-[var(--bg-tertiary)] px-3 py-1.5 text-sm text-white focus:border-[var(--accent)] focus:outline-none" />
+              <input placeholder="Location" value={kc.location ?? ''} onChange={(e) => { const copy = [...(data.key_clients_public ?? [])]; copy[i] = { ...copy[i], location: e.target.value }; set('key_clients_public', copy); }} className="rounded-lg border border-white/10 bg-[var(--bg-tertiary)] px-3 py-1.5 text-sm text-white focus:border-[var(--accent)] focus:outline-none" />
+              <input placeholder="Attribution" value={kc.attribution ?? ''} onChange={(e) => { const copy = [...(data.key_clients_public ?? [])]; copy[i] = { ...copy[i], attribution: e.target.value }; set('key_clients_public', copy); }} className="rounded-lg border border-white/10 bg-[var(--bg-tertiary)] px-3 py-1.5 text-sm text-white focus:border-[var(--accent)] focus:outline-none" />
+              <input placeholder="Source URL" value={kc.source_url ?? ''} onChange={(e) => { const copy = [...(data.key_clients_public ?? [])]; copy[i] = { ...copy[i], source_url: e.target.value }; set('key_clients_public', copy); }} className="col-span-2 rounded-lg border border-white/10 bg-[var(--bg-tertiary)] px-3 py-1.5 text-sm text-white focus:border-[var(--accent)] focus:outline-none" />
             </div>
-            <textarea placeholder="Testimonial Quote" value={kc.testimonial_quote ?? ''} onChange={(e) => { const copy = [...(data.key_clients_public ?? [])]; copy[i] = { ...copy[i], testimonial_quote: e.target.value }; set('key_clients_public', copy); }} rows={2} className="mt-2 w-full rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none" />
+            <textarea placeholder="Testimonial Quote" value={kc.testimonial_quote ?? ''} onChange={(e) => { const copy = [...(data.key_clients_public ?? [])]; copy[i] = { ...copy[i], testimonial_quote: e.target.value }; set('key_clients_public', copy); }} rows={2} className="mt-2 w-full rounded-lg border border-white/10 bg-[var(--bg-tertiary)] px-3 py-1.5 text-sm text-white focus:border-[var(--accent)] focus:outline-none" />
             <button type="button" onClick={() => set('key_clients_public', (data.key_clients_public ?? []).filter((_: any, j: number) => j !== i))} className="mt-1 text-xs text-red-400 hover:text-red-300">Remove</button>
           </div>
         ))}
@@ -733,19 +733,19 @@ export function BrandTruthEditor({
         {(data.awards ?? []).map((aw: any, i: number) => (
           <div key={i} className="mb-3 rounded border border-white/10 p-3">
             <div className="grid gap-2 sm:grid-cols-2">
-              <input placeholder="Award Name" value={aw.name ?? ''} onChange={(e) => { const copy = [...(data.awards ?? [])]; copy[i] = { ...copy[i], name: e.target.value }; set('awards', copy); }} className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none" />
-              <select value={aw.verification_status ?? 'unverified_at_ingestion'} onChange={(e) => { const copy = [...(data.awards ?? [])]; copy[i] = { ...copy[i], verification_status: e.target.value }; set('awards', copy); }} className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none">
+              <input placeholder="Award Name" value={aw.name ?? ''} onChange={(e) => { const copy = [...(data.awards ?? [])]; copy[i] = { ...copy[i], name: e.target.value }; set('awards', copy); }} className="rounded-lg border border-white/10 bg-[var(--bg-tertiary)] px-3 py-1.5 text-sm text-white focus:border-[var(--accent)] focus:outline-none" />
+              <select value={aw.verification_status ?? 'unverified_at_ingestion'} onChange={(e) => { const copy = [...(data.awards ?? [])]; copy[i] = { ...copy[i], verification_status: e.target.value }; set('awards', copy); }} className="rounded-lg border border-white/10 bg-[var(--bg-tertiary)] px-3 py-1.5 text-sm text-white focus:border-[var(--accent)] focus:outline-none">
                 <option value="unverified_at_ingestion">Unverified</option>
                 <option value="verified">Verified</option>
                 <option value="pending">Pending</option>
               </select>
-              <input placeholder="Source URL" value={aw.source_url ?? ''} onChange={(e) => { const copy = [...(data.awards ?? [])]; copy[i] = { ...copy[i], source_url: e.target.value }; set('awards', copy); }} className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none" />
+              <input placeholder="Source URL" value={aw.source_url ?? ''} onChange={(e) => { const copy = [...(data.awards ?? [])]; copy[i] = { ...copy[i], source_url: e.target.value }; set('awards', copy); }} className="rounded-lg border border-white/10 bg-[var(--bg-tertiary)] px-3 py-1.5 text-sm text-white focus:border-[var(--accent)] focus:outline-none" />
               <label className="flex items-center gap-2 text-xs text-white/55">
                 <input type="checkbox" checked={aw.source_required ?? true} onChange={(e) => { const copy = [...(data.awards ?? [])]; copy[i] = { ...copy[i], source_required: e.target.checked }; set('awards', copy); }} className="rounded border-neutral-600" />
                 Source Required
               </label>
             </div>
-            <textarea placeholder="Notes" value={aw.notes ?? ''} onChange={(e) => { const copy = [...(data.awards ?? [])]; copy[i] = { ...copy[i], notes: e.target.value }; set('awards', copy); }} rows={2} className="mt-2 w-full rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none" />
+            <textarea placeholder="Notes" value={aw.notes ?? ''} onChange={(e) => { const copy = [...(data.awards ?? [])]; copy[i] = { ...copy[i], notes: e.target.value }; set('awards', copy); }} rows={2} className="mt-2 w-full rounded-lg border border-white/10 bg-[var(--bg-tertiary)] px-3 py-1.5 text-sm text-white focus:border-[var(--accent)] focus:outline-none" />
             <button type="button" onClick={() => set('awards', (data.awards ?? []).filter((_: any, j: number) => j !== i))} className="mt-1 text-xs text-red-400 hover:text-red-300">Remove</button>
           </div>
         ))}
@@ -775,7 +775,7 @@ export function BrandTruthEditor({
                   copy[i] = { ...copy[i], source: e.target.value };
                   set('third_party_listings', copy);
                 }}
-                className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+                className="rounded-lg border border-white/10 bg-[var(--bg-tertiary)] px-3 py-1.5 text-sm text-white focus:border-[var(--accent)] focus:outline-none"
               />
               <input
                 placeholder="Profile URL"
@@ -785,7 +785,7 @@ export function BrandTruthEditor({
                   copy[i] = { ...copy[i], url: e.target.value };
                   set('third_party_listings', copy);
                 }}
-                className="rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+                className="rounded-lg border border-white/10 bg-[var(--bg-tertiary)] px-3 py-1.5 text-sm text-white focus:border-[var(--accent)] focus:outline-none"
               />
             </div>
             <input
@@ -796,7 +796,7 @@ export function BrandTruthEditor({
                 copy[i] = { ...copy[i], notes: e.target.value };
                 set('third_party_listings', copy);
               }}
-              className="mt-2 w-full rounded-lg border border-white/10 bg-[--bg-tertiary] px-3 py-1.5 text-sm text-white focus:border-[--accent] focus:outline-none"
+              className="mt-2 w-full rounded-lg border border-white/10 bg-[var(--bg-tertiary)] px-3 py-1.5 text-sm text-white focus:border-[var(--accent)] focus:outline-none"
             />
             <button
               type="button"
@@ -840,11 +840,11 @@ export function BrandTruthEditor({
 
       {/* Save (hidden in read-only mode) */}
       {!isReadOnly && (
-        <div className="sticky bottom-0 flex items-center gap-4 border-t border-white/10 bg-[--bg-primary] py-4">
+        <div className="sticky bottom-0 flex items-center gap-4 border-t border-white/10 bg-[var(--bg-primary)] py-4">
           <button
             type="submit"
             disabled={isPending}
-            className="rounded-full bg-[--accent] px-6 py-2.5 text-sm font-semibold text-black transition hover:bg-[--accent-hover] disabled:opacity-50"
+            className="rounded-full bg-[var(--accent)] px-6 py-2.5 text-sm font-semibold text-black transition hover:bg-[var(--accent-hover)] disabled:opacity-50"
           >
             {isPending ? 'Saving...' : 'Save New Version'}
           </button>
@@ -893,9 +893,9 @@ export function BrandTruthEditor({
                   handleViewVersion(v.id, v.version);
                 }
               }}
-              className={`w-full rounded-lg border px-3 py-2 text-left text-xs transition hover:border-[--accent]/30 ${
+              className={`w-full rounded-lg border px-3 py-2 text-left text-xs transition hover:border-[var(--accent)]/30 ${
                 (viewingVersion === null && v.version === currentVersion) || viewingVersion === v.version
-                  ? 'border-[--accent] bg-[--accent]/10 text-[--accent]'
+                  ? 'border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]'
                   : 'border-white/10 text-white/55'
               }`}
             >

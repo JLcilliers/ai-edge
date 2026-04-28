@@ -31,9 +31,9 @@ export default async function FindingDetailPage({
   const distance = detail.finding.semanticDistance;
   const distanceBadge =
     detail.finding.action === 'noindex'
-      ? 'bg-[--rag-red-bg] text-[--rag-red]'
+      ? 'bg-[var(--rag-red-bg)] text-[var(--rag-red)]'
       : detail.finding.action === 'rewrite'
-        ? 'bg-[--rag-yellow-bg] text-[--rag-yellow]'
+        ? 'bg-[var(--rag-yellow-bg)] text-[var(--rag-yellow)]'
         : 'bg-white/10 text-white/55';
 
   return (
@@ -50,7 +50,7 @@ export default async function FindingDetailPage({
 
       <div className="mb-8 flex items-start gap-4">
         <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/5">
-          <Wand2 size={24} strokeWidth={1.5} className="text-[--accent]" />
+          <Wand2 size={24} strokeWidth={1.5} className="text-[var(--accent)]" />
         </div>
         <div className="min-w-0 flex-1">
           <h1 className="font-[family-name:var(--font-jakarta)] text-3xl font-extrabold tracking-tight text-white">
@@ -77,7 +77,7 @@ export default async function FindingDetailPage({
               href={detail.page.url}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1 text-[--accent] hover:underline"
+              className="inline-flex items-center gap-1 text-[var(--accent)] hover:underline"
             >
               {detail.page.url}
               <ExternalLink size={12} strokeWidth={1.5} />

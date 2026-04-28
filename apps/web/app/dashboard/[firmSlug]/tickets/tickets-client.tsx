@@ -167,7 +167,7 @@ export function TicketsClient({
           <button
             onClick={() => handleBulkClose(activeSource)}
             disabled={isPending}
-            className="ml-auto rounded-full border border-white/10 bg-[--bg-secondary] px-3 py-1.5 text-xs font-medium text-white/60 transition-colors hover:border-white/20 hover:text-white disabled:opacity-50"
+            className="ml-auto rounded-full border border-white/10 bg-[var(--bg-secondary)] px-3 py-1.5 text-xs font-medium text-white/60 transition-colors hover:border-white/20 hover:text-white disabled:opacity-50"
             title={`Close every open or in-progress ${SOURCE_LABEL[activeSource]} ticket`}
           >
             {bulkSource === activeSource
@@ -230,7 +230,7 @@ function TicketRow({
 
   return (
     <div
-      className={`group flex flex-col gap-3 rounded-xl border bg-[--bg-secondary] px-5 py-4 transition-colors ${borderClass}`}
+      className={`group flex flex-col gap-3 rounded-xl border bg-[var(--bg-secondary)] px-5 py-4 transition-colors ${borderClass}`}
     >
       {/* Header row: source badge + status + meta */}
       <div className="flex items-start justify-between gap-4">
@@ -354,10 +354,10 @@ function TicketContext({ context }: { context: RemediationTicketRow['context'] }
             <span
               className={`rounded-full px-2.5 py-0.5 font-medium uppercase tracking-wider ${
                 context.ragLabel.toLowerCase() === 'red'
-                  ? 'bg-[--rag-red-bg] text-[--rag-red]'
+                  ? 'bg-[var(--rag-red-bg)] text-[var(--rag-red)]'
                   : context.ragLabel.toLowerCase() === 'amber'
                   ? 'bg-amber-500/15 text-amber-300'
-                  : 'bg-[--rag-green-bg] text-[--rag-green]'
+                  : 'bg-[var(--rag-green-bg)] text-[var(--rag-green)]'
               }`}
             >
               {context.ragLabel}
@@ -383,7 +383,7 @@ function TicketContext({ context }: { context: RemediationTicketRow['context'] }
             href={context.pageUrl}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1 text-sm text-[--accent] hover:underline"
+            className="inline-flex items-center gap-1 text-sm text-[var(--accent)] hover:underline"
           >
             {shortenUrl(context.pageUrl)}
             <ExternalLink size={11} strokeWidth={2} />
@@ -416,9 +416,9 @@ function TicketContext({ context }: { context: RemediationTicketRow['context'] }
             <span
               className={`rounded-full px-2 py-0.5 font-medium ${
                 context.sentiment === 'complaint'
-                  ? 'bg-[--rag-red-bg] text-[--rag-red]'
+                  ? 'bg-[var(--rag-red-bg)] text-[var(--rag-red)]'
                   : context.sentiment === 'praise'
-                  ? 'bg-[--rag-green-bg] text-[--rag-green]'
+                  ? 'bg-[var(--rag-green-bg)] text-[var(--rag-green)]'
                   : 'bg-white/10 text-white/55'
               }`}
             >
@@ -430,7 +430,7 @@ function TicketContext({ context }: { context: RemediationTicketRow['context'] }
               href={context.url}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1 text-[--accent] hover:underline"
+              className="inline-flex items-center gap-1 text-[var(--accent)] hover:underline"
             >
               View thread
               <ExternalLink size={10} strokeWidth={2} />
@@ -458,14 +458,14 @@ function StatCard({
   tone: 'green' | 'red' | 'amber' | 'accent' | 'gray';
 }) {
   const color = {
-    green: 'text-[--rag-green]',
-    red: 'text-[--rag-red]',
+    green: 'text-[var(--rag-green)]',
+    red: 'text-[var(--rag-red)]',
     amber: 'text-amber-300',
-    accent: 'text-[--accent]',
+    accent: 'text-[var(--accent)]',
     gray: 'text-white/80',
   }[tone];
   return (
-    <div className="rounded-xl border border-white/10 bg-[--bg-secondary] px-4 py-3">
+    <div className="rounded-xl border border-white/10 bg-[var(--bg-secondary)] px-4 py-3">
       <div className="font-[family-name:var(--font-geist-mono)] text-[10px] uppercase tracking-widest text-white/40">
         {label}
       </div>
@@ -489,13 +489,13 @@ function FilterPill({
 }) {
   const activeRing = active
     ? tone === 'open'
-      ? 'border-[--accent]/60 bg-[--accent]/15 text-[--accent]'
+      ? 'border-[var(--accent)]/60 bg-[var(--accent)]/15 text-[var(--accent)]'
       : tone === 'in_progress'
       ? 'border-amber-500/60 bg-amber-500/15 text-amber-300'
       : tone === 'closed'
       ? 'border-white/40 bg-white/10 text-white/80'
       : 'border-white/40 bg-white/10 text-white'
-    : 'border-white/10 bg-[--bg-secondary] text-white/60 hover:border-white/20 hover:text-white';
+    : 'border-white/10 bg-[var(--bg-secondary)] text-white/60 hover:border-white/20 hover:text-white';
   return (
     <Link
       href={href}
@@ -544,7 +544,7 @@ function SourcePill({
 function SourceBadge({ source }: { source: TicketSource }) {
   const Icon = SOURCE_ICON[source];
   const color = {
-    audit: 'bg-[--accent]/15 text-[--accent]',
+    audit: 'bg-[var(--accent)]/15 text-[var(--accent)]',
     legacy: 'bg-purple-500/15 text-purple-300',
     reddit: 'bg-orange-500/15 text-orange-300',
     entity: 'bg-cyan-500/15 text-cyan-300',
@@ -561,7 +561,7 @@ function SourceBadge({ source }: { source: TicketSource }) {
 
 function StatusBadge({ status }: { status: TicketStatus }) {
   const styles: Record<TicketStatus, string> = {
-    open: 'bg-[--accent]/15 text-[--accent]',
+    open: 'bg-[var(--accent)]/15 text-[var(--accent)]',
     in_progress: 'bg-amber-500/15 text-amber-300',
     closed: 'bg-white/10 text-white/50',
   };

@@ -37,8 +37,8 @@ type Detail = SuppressionFindingDetail;
 
 const STATUS_STYLES: Record<RewriteDraftStatus, string> = {
   draft: 'bg-white/10 text-white/70',
-  accepted: 'bg-[--rag-green-bg] text-[--rag-green]',
-  rejected: 'bg-[--rag-red-bg] text-[--rag-red]',
+  accepted: 'bg-[var(--rag-green-bg)] text-[var(--rag-green)]',
+  rejected: 'bg-[var(--rag-red-bg)] text-[var(--rag-red)]',
 };
 
 export function FindingDetailClient({ detail }: { detail: Detail }) {
@@ -106,12 +106,12 @@ export function FindingDetailClient({ detail }: { detail: Detail }) {
     <>
       {/* Rationale banner */}
       {detail.finding.rationale && (
-        <div className="mb-6 rounded-xl border border-white/10 bg-[--bg-secondary] p-4">
+        <div className="mb-6 rounded-xl border border-white/10 bg-[var(--bg-secondary)] p-4">
           <div className="flex items-start gap-3">
             <AlertTriangle
               size={16}
               strokeWidth={1.5}
-              className="mt-0.5 shrink-0 text-[--rag-yellow]"
+              className="mt-0.5 shrink-0 text-[var(--rag-yellow)]"
             />
             <p className="text-sm text-white/70">{detail.finding.rationale}</p>
           </div>
@@ -124,7 +124,7 @@ export function FindingDetailClient({ detail }: { detail: Detail }) {
           type="button"
           onClick={handleGenerate}
           disabled={isPending}
-          className="inline-flex items-center gap-2 rounded-full bg-[--accent] px-6 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-[--accent-hover] disabled:opacity-60"
+          className="inline-flex items-center gap-2 rounded-full bg-[var(--accent)] px-6 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-[var(--accent-hover)] disabled:opacity-60"
         >
           {isPending ? (
             <>
@@ -145,7 +145,7 @@ export function FindingDetailClient({ detail }: { detail: Detail }) {
               type="button"
               onClick={handleAccept}
               disabled={isPending || effectiveStatus === 'accepted'}
-              className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-transparent px-5 py-2.5 text-sm text-white transition-colors hover:border-[--rag-green] disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-transparent px-5 py-2.5 text-sm text-white transition-colors hover:border-[var(--rag-green)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               <CheckCircle2 size={14} strokeWidth={1.5} />
               Accept
@@ -154,7 +154,7 @@ export function FindingDetailClient({ detail }: { detail: Detail }) {
               type="button"
               onClick={handleReject}
               disabled={isPending || effectiveStatus === 'rejected'}
-              className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-transparent px-5 py-2.5 text-sm text-white transition-colors hover:border-[--rag-red] disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-transparent px-5 py-2.5 text-sm text-white transition-colors hover:border-[var(--rag-red)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               <XCircle size={14} strokeWidth={1.5} />
               Reject
@@ -172,13 +172,13 @@ export function FindingDetailClient({ detail }: { detail: Detail }) {
       </div>
 
       {error && (
-        <div className="mb-6 rounded-xl border border-[--rag-red]/30 bg-[--rag-red-bg] p-4 text-sm text-[--rag-red]">
+        <div className="mb-6 rounded-xl border border-[var(--rag-red)]/30 bg-[var(--rag-red-bg)] p-4 text-sm text-[var(--rag-red)]">
           {error}
         </div>
       )}
 
       {btvDrift && (
-        <div className="mb-6 rounded-xl border border-[--rag-yellow]/30 bg-[--rag-yellow-bg] p-4 text-sm text-[--rag-yellow]">
+        <div className="mb-6 rounded-xl border border-[var(--rag-yellow)]/30 bg-[var(--rag-yellow-bg)] p-4 text-sm text-[var(--rag-yellow)]">
           This draft was generated against an earlier Brand Truth version. The
           Brand Truth has been updated since — regenerate to align with the
           current version.
@@ -196,7 +196,7 @@ export function FindingDetailClient({ detail }: { detail: Detail }) {
 
 function EmptyDraftState({ isPending }: { isPending: boolean }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-white/10 bg-[--bg-secondary] py-16 text-center">
+    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-white/10 bg-[var(--bg-secondary)] py-16 text-center">
       <FileText size={32} strokeWidth={1.5} className="mb-3 text-white/30" />
       <h3 className="mb-2 text-lg font-semibold text-white/70">
         {isPending ? 'Generating a rewrite draft…' : 'No rewrite draft yet'}
@@ -218,7 +218,7 @@ function DraftView({ detail }: { detail: Detail }) {
     <div className="flex flex-col gap-6">
       {/* Change summary */}
       {d.changeSummary && (
-        <div className="rounded-xl border border-white/10 bg-[--bg-secondary] p-5">
+        <div className="rounded-xl border border-white/10 bg-[var(--bg-secondary)] p-5">
           <div className="text-[10px] font-medium uppercase tracking-widest text-white/40">
             What changed
           </div>
@@ -293,11 +293,11 @@ function DiffColumn({
   truncated?: boolean;
 }) {
   const borderClass =
-    tone === 'ok' ? 'border-[--rag-green]/20' : 'border-[--rag-yellow]/20';
+    tone === 'ok' ? 'border-[var(--rag-green)]/20' : 'border-[var(--rag-yellow)]/20';
   const labelClass =
-    tone === 'ok' ? 'text-[--rag-green]' : 'text-[--rag-yellow]';
+    tone === 'ok' ? 'text-[var(--rag-green)]' : 'text-[var(--rag-yellow)]';
   return (
-    <div className={`rounded-xl border bg-[--bg-secondary] p-5 ${borderClass}`}>
+    <div className={`rounded-xl border bg-[var(--bg-secondary)] p-5 ${borderClass}`}>
       <div
         className={`text-[10px] font-medium uppercase tracking-widest ${labelClass}`}
       >
@@ -337,12 +337,12 @@ function ReviewList({
 }) {
   const labelClass =
     tone === 'ok'
-      ? 'text-[--rag-green]'
+      ? 'text-[var(--rag-green)]'
       : tone === 'warn'
-        ? 'text-[--rag-yellow]'
+        ? 'text-[var(--rag-yellow)]'
         : 'text-white/55';
   return (
-    <div className="rounded-xl border border-white/10 bg-[--bg-secondary] p-5">
+    <div className="rounded-xl border border-white/10 bg-[var(--bg-secondary)] p-5">
       <div
         className={`text-[10px] font-medium uppercase tracking-widest ${labelClass}`}
       >

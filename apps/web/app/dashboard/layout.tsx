@@ -8,7 +8,7 @@ export default function DashboardLayout({
 }) {
   return (
     <div
-      className="min-h-screen bg-[--bg-primary]"
+      className="min-h-screen bg-[var(--bg-primary)]"
       style={{
         backgroundImage: "url('/topo-pattern.svg')",
         backgroundRepeat: 'repeat',

@@ -83,7 +83,7 @@ export default async function ClientListPage() {
         <div className="flex items-center gap-2">
           <Link
             href="/dashboard/admin"
-            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-[--bg-secondary] px-4 py-2.5 text-sm font-medium text-white/75 transition-colors hover:border-white/20 hover:text-white"
+            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-[var(--bg-secondary)] px-4 py-2.5 text-sm font-medium text-white/75 transition-colors hover:border-white/20 hover:text-white"
             title="Workspace observability — cron health, firm triage, workspace spend"
           >
             <Shield size={16} strokeWidth={2} />
@@ -91,7 +91,7 @@ export default async function ClientListPage() {
           </Link>
           <Link
             href="/dashboard/new-client"
-            className="inline-flex items-center gap-2 rounded-full bg-[--accent] px-5 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-[--accent-hover]"
+            className="inline-flex items-center gap-2 rounded-full bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-[var(--accent-hover)]"
           >
             <Plus size={16} strokeWidth={2} />
             Add Client
@@ -114,7 +114,7 @@ export default async function ClientListPage() {
           it's a summary ribbon, not a dispatcher. Drill-through happens by
           picking a specific card. */}
       {firms.length > 0 && aggregate && (
-        <div className="mb-6 flex flex-wrap items-center gap-3 rounded-xl border border-white/10 bg-[--bg-secondary] px-5 py-3 text-xs text-white/70">
+        <div className="mb-6 flex flex-wrap items-center gap-3 rounded-xl border border-white/10 bg-[var(--bg-secondary)] px-5 py-3 text-xs text-white/70">
           <span className="text-[10px] font-medium uppercase tracking-widest text-white/40">
             Workspace
           </span>
@@ -153,7 +153,7 @@ export default async function ClientListPage() {
 
       {/* Empty state */}
       {firms.length === 0 && (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-[--bg-secondary] py-20 text-center">
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-[var(--bg-secondary)] py-20 text-center">
           <Building2 className="mb-4 h-12 w-12 text-white/20" strokeWidth={1.5} />
           <h2 className="mb-2 text-lg font-semibold text-white/60">No clients yet</h2>
           <p className="mb-6 max-w-md text-sm text-white/40">
@@ -162,7 +162,7 @@ export default async function ClientListPage() {
           </p>
           <Link
             href="/dashboard/new-client"
-            className="inline-flex items-center gap-2 rounded-full bg-[--accent] px-5 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-[--accent-hover]"
+            className="inline-flex items-center gap-2 rounded-full bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-[var(--accent-hover)]"
           >
             <Plus size={16} strokeWidth={2} />
             Add Your First Client
@@ -232,7 +232,7 @@ function AggregateChip({
       : tone === 'warning'
         ? 'text-amber-300'
         : tone === 'accent'
-          ? 'text-[--accent]'
+          ? 'text-[var(--accent)]'
           : 'text-white/40';
   return (
     <span className="inline-flex items-center gap-1.5">
@@ -326,7 +326,7 @@ function ClientCard({
       : dot?.tone === 'warning'
         ? 'bg-amber-400'
         : dot?.tone === 'accent'
-          ? 'bg-[--accent]'
+          ? 'bg-[var(--accent)]'
           : '';
 
   const budgetPct =
@@ -350,7 +350,7 @@ function ClientCard({
   return (
     <Link
       href={`/dashboard/${firm.slug}`}
-      className="group relative flex flex-col gap-4 rounded-xl border border-white/10 bg-[--bg-secondary] p-6 transition-colors hover:border-[--accent]/30"
+      className="group relative flex flex-col gap-4 rounded-xl border border-white/10 bg-[var(--bg-secondary)] p-6 transition-colors hover:border-[var(--accent)]/30"
     >
       {/* Top-right health dot — single-tone, title-tooltip for context */}
       {dot && (
@@ -362,7 +362,7 @@ function ClientCard({
 
       <div className="flex items-start justify-between">
         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/5">
-          <Icon size={20} strokeWidth={1.5} className="text-[--accent]" />
+          <Icon size={20} strokeWidth={1.5} className="text-[var(--accent)]" />
         </div>
         <span className="rounded-full border border-white/10 px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-white/55">
           {FIRM_TYPE_LABEL[firm.firm_type]}
@@ -370,7 +370,7 @@ function ClientCard({
       </div>
 
       <div>
-        <h2 className="font-[family-name:var(--font-jakarta)] text-lg font-bold text-white group-hover:text-[--accent]">
+        <h2 className="font-[family-name:var(--font-jakarta)] text-lg font-bold text-white group-hover:text-[var(--accent)]">
           {firm.name}
         </h2>
         <p className="mt-1 font-[family-name:var(--font-geist-mono)] text-xs text-white/40">
@@ -387,7 +387,7 @@ function ClientCard({
           <span
             className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-[family-name:var(--font-geist-mono)] ${
               health.openTicketCount > 0
-                ? 'border-[--accent]/30 text-[--accent]'
+                ? 'border-[var(--accent)]/30 text-[var(--accent)]'
                 : 'border-white/10 text-white/40'
             }`}
             title="Open remediation tickets (audit / legacy / entity / reddit)"
@@ -397,7 +397,7 @@ function ClientCard({
           </span>
           {health.openMentionCount > 0 && (
             <span
-              className="inline-flex items-center gap-1 rounded-full border border-[--accent]/30 px-2 py-0.5 font-[family-name:var(--font-geist-mono)] text-[--accent]"
+              className="inline-flex items-center gap-1 rounded-full border border-[var(--accent)]/30 px-2 py-0.5 font-[family-name:var(--font-geist-mono)] text-[var(--accent)]"
               title="Reddit mentions awaiting triage"
             >
               <MessageSquare size={10} strokeWidth={2} />

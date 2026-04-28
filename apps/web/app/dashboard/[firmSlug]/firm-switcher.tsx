@@ -47,10 +47,10 @@ export function FirmSwitcher({
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="listbox"
         aria-expanded={open}
-        className="flex w-full items-center gap-3 rounded-xl border border-white/10 bg-[--bg-secondary] px-3 py-2.5 text-left transition-colors hover:border-white/20"
+        className="flex w-full items-center gap-3 rounded-xl border border-white/10 bg-[var(--bg-secondary)] px-3 py-2.5 text-left transition-colors hover:border-white/20"
       >
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/5">
-          <CurrentIcon size={16} strokeWidth={1.5} className="text-[--accent]" />
+          <CurrentIcon size={16} strokeWidth={1.5} className="text-[var(--accent)]" />
         </div>
         <div className="min-w-0 flex-1">
           <div className="truncate font-[family-name:var(--font-jakarta)] text-sm font-semibold text-white">
@@ -66,7 +66,7 @@ export function FirmSwitcher({
       {open && (
         <div
           role="listbox"
-          className="absolute left-0 right-0 top-full z-20 mt-2 overflow-hidden rounded-xl border border-white/10 bg-[--bg-secondary] shadow-xl"
+          className="absolute left-0 right-0 top-full z-20 mt-2 overflow-hidden rounded-xl border border-white/10 bg-[var(--bg-secondary)] shadow-xl"
         >
           <div className="max-h-64 overflow-y-auto py-1">
             {firms.map((f) => {
@@ -82,7 +82,7 @@ export function FirmSwitcher({
                   }`}
                 >
                   <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/5">
-                    <Icon size={14} strokeWidth={1.5} className="text-[--accent]" />
+                    <Icon size={14} strokeWidth={1.5} className="text-[var(--accent)]" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-white/90">{f.name}</div>
@@ -91,7 +91,7 @@ export function FirmSwitcher({
                     </div>
                   </div>
                   {isActive && (
-                    <Check size={14} strokeWidth={2} className="shrink-0 text-[--accent]" />
+                    <Check size={14} strokeWidth={2} className="shrink-0 text-[var(--accent)]" />
                   )}
                 </Link>
               );
@@ -100,7 +100,7 @@ export function FirmSwitcher({
           <Link
             href="/dashboard/new-client"
             onClick={() => setOpen(false)}
-            className="flex items-center gap-3 border-t border-white/10 px-3 py-2.5 text-sm text-[--accent] transition-colors hover:bg-[--accent]/10"
+            className="flex items-center gap-3 border-t border-white/10 px-3 py-2.5 text-sm text-[var(--accent)] transition-colors hover:bg-[var(--accent)]/10"
           >
             <Plus size={14} strokeWidth={2} />
             Add Client

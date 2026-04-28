@@ -103,7 +103,7 @@ export function EntityClient({
         <button
           onClick={handleStartScan}
           disabled={isPending || !!runningId}
-          className="rounded-full bg-[--accent] px-6 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-[--accent-hover] disabled:opacity-50"
+          className="rounded-full bg-[var(--accent)] px-6 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-[var(--accent-hover)] disabled:opacity-50"
         >
           {isPending
             ? 'Starting...'
@@ -128,16 +128,16 @@ export function EntityClient({
       )}
 
       {runningId && (
-        <div className="mt-4 flex items-center gap-3 rounded-xl border border-[--accent]/30 bg-[--accent]/10 px-4 py-3">
-          <div className="h-3 w-3 animate-pulse rounded-full bg-[--accent]" />
-          <span className="text-sm text-[--accent]">
+        <div className="mt-4 flex items-center gap-3 rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-4 py-3">
+          <div className="h-3 w-3 animate-pulse rounded-full bg-[var(--accent)]" />
+          <span className="text-sm text-[var(--accent)]">
             Probing schema + knowledge graphs... polling every 5s
           </span>
         </div>
       )}
 
       {!h && (
-        <div className="mt-10 rounded-xl border border-white/10 bg-[--bg-secondary] p-6 text-sm text-white/55">
+        <div className="mt-10 rounded-xl border border-white/10 bg-[var(--bg-secondary)] p-6 text-sm text-white/55">
           Set up a Brand Truth before running an entity scan — we need the firm
           name + site URL to probe schema and knowledge graphs.
         </div>
@@ -298,7 +298,7 @@ export function EntityClient({
             type="button"
             onClick={handleCrossSourceScan}
             disabled={crossSourcePending}
-            className="inline-flex shrink-0 items-center gap-2 rounded-full bg-[--accent] px-4 py-2 text-sm font-semibold text-black transition-colors hover:bg-[--accent-hover] disabled:opacity-50"
+            className="inline-flex shrink-0 items-center gap-2 rounded-full bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-black transition-colors hover:bg-[var(--accent-hover)] disabled:opacity-50"
           >
             {crossSourcePending ? (
               <Loader2 size={14} className="animate-spin" />
@@ -310,30 +310,30 @@ export function EntityClient({
         </div>
 
         {crossSourceResult && (
-          <div className="mb-4 rounded-lg border border-[--rag-green]/30 bg-[--rag-green-bg] px-3 py-2 text-xs text-[--rag-green]">
+          <div className="mb-4 rounded-lg border border-[var(--rag-green)]/30 bg-[var(--rag-green-bg)] px-3 py-2 text-xs text-[var(--rag-green)]">
             Scanned {crossSourceResult.sourcesFetched} of{' '}
             {crossSourceResult.sourcesScanned} sources ·{' '}
-            <span className="text-[--rag-green]">
+            <span className="text-[var(--rag-green)]">
               {crossSourceResult.sourcesAligned} aligned
             </span>{' '}
             ·{' '}
-            <span className="text-[--rag-yellow]">
+            <span className="text-[var(--rag-yellow)]">
               {crossSourceResult.sourcesDrifted} drift
             </span>{' '}
             ·{' '}
-            <span className="text-[--rag-red]">
+            <span className="text-[var(--rag-red)]">
               {crossSourceResult.sourcesDivergent} divergent
             </span>
             {crossSourceResult.awardsVerified + crossSourceResult.awardsUnverified > 0 && (
               <>
                 {' · awards: '}
-                <span className="text-[--rag-green]">
+                <span className="text-[var(--rag-green)]">
                   {crossSourceResult.awardsVerified} verified
                 </span>
                 {crossSourceResult.awardsUnverified > 0 && (
                   <>
                     {' / '}
-                    <span className="text-[--rag-red]">
+                    <span className="text-[var(--rag-red)]">
                       {crossSourceResult.awardsUnverified} unverified
                     </span>
                   </>
@@ -351,13 +351,13 @@ export function EntityClient({
         )}
 
         {crossSourceError && (
-          <div className="mb-4 rounded-lg border border-[--rag-red]/30 bg-[--rag-red-bg] px-3 py-2 text-xs text-[--rag-red]">
+          <div className="mb-4 rounded-lg border border-[var(--rag-red)]/30 bg-[var(--rag-red-bg)] px-3 py-2 text-xs text-[var(--rag-red)]">
             {crossSourceError}
           </div>
         )}
 
         {initialCrossSource.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-white/10 bg-[--bg-secondary]/50 p-6 text-sm text-white/55">
+          <div className="rounded-xl border border-dashed border-white/10 bg-[var(--bg-secondary)]/50 p-6 text-sm text-white/55">
             No cross-source signals yet. Add directory profile URLs to your
             Brand Truth (Brand Truth editor →{' '}
             <code className="font-[family-name:var(--font-geist-mono)] text-[11px]">
@@ -396,17 +396,17 @@ export function EntityClient({
 function CrossSourceRow({ row }: { row: CrossSourceHealthRow }) {
   const alignmentClass =
     row.alignment === 'divergent'
-      ? 'text-[--rag-red]'
+      ? 'text-[var(--rag-red)]'
       : row.alignment === 'drift'
-        ? 'text-[--rag-yellow]'
+        ? 'text-[var(--rag-yellow)]'
         : row.alignment === 'aligned'
-          ? 'text-[--rag-green]'
+          ? 'text-[var(--rag-green)]'
           : 'text-white/40';
   const badgeClass =
     row.badgeStatus === 'verified'
-      ? 'text-[--rag-green]'
+      ? 'text-[var(--rag-green)]'
       : row.badgeStatus === 'unverified'
-        ? 'text-[--rag-red]'
+        ? 'text-[var(--rag-red)]'
         : 'text-white/30';
   return (
     <tr className="border-b border-white/5 last:border-b-0">
@@ -531,14 +531,14 @@ function HealthPanel({
     state === 'ok' ? CheckCircle2 : state === 'warn' ? AlertCircle : XCircle;
   const iconColor =
     state === 'ok'
-      ? 'text-[--rag-green]'
+      ? 'text-[var(--rag-green)]'
       : state === 'warn'
-      ? 'text-[--rag-yellow]'
+      ? 'text-[var(--rag-yellow)]'
       : state === 'bad'
-      ? 'text-[--rag-red]'
+      ? 'text-[var(--rag-red)]'
       : 'text-white/40';
   return (
-    <div className="rounded-xl border border-white/10 bg-[--bg-secondary] p-5">
+    <div className="rounded-xl border border-white/10 bg-[var(--bg-secondary)] p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2">
           <Icon size={16} strokeWidth={1.5} className="text-white/55" />
@@ -557,7 +557,7 @@ function HealthPanel({
           href={linkUrl}
           target="_blank"
           rel="noreferrer"
-          className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-[--accent] hover:underline"
+          className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-[var(--accent)] hover:underline"
         >
           View entity <ExternalLink size={12} strokeWidth={1.5} />
         </a>
@@ -575,10 +575,10 @@ function TypePill({
 }) {
   const styles =
     tone === 'ok'
-      ? 'border-[--rag-green]/30 bg-[--rag-green-bg] text-[--rag-green]'
+      ? 'border-[var(--rag-green)]/30 bg-[var(--rag-green-bg)] text-[var(--rag-green)]'
       : tone === 'warn'
-      ? 'border-[--rag-yellow]/30 bg-[--rag-yellow-bg] text-[--rag-yellow]'
-      : 'border-[--rag-red]/30 bg-[--rag-red-bg] text-[--rag-red]';
+      ? 'border-[var(--rag-yellow)]/30 bg-[var(--rag-yellow-bg)] text-[var(--rag-yellow)]'
+      : 'border-[var(--rag-red)]/30 bg-[var(--rag-red-bg)] text-[var(--rag-red)]';
   return (
     <span
       className={`rounded-full border px-3 py-1 font-[family-name:var(--font-geist-mono)] text-xs ${styles}`}
@@ -601,10 +601,10 @@ function PatchBlock({ patch }: { patch: EntityHealth['patches'][number] }) {
   };
 
   return (
-    <div className="rounded-xl border border-white/10 bg-[--bg-secondary]">
+    <div className="rounded-xl border border-white/10 bg-[var(--bg-secondary)]">
       <div className="flex items-center justify-between border-b border-white/10 px-5 py-3">
         <div className="flex items-center gap-3">
-          <span className="rounded-full bg-[--accent]/15 px-3 py-1 text-[10px] font-medium uppercase tracking-wider text-[--accent]">
+          <span className="rounded-full bg-[var(--accent)]/15 px-3 py-1 text-[10px] font-medium uppercase tracking-wider text-[var(--accent)]">
             {patch.type}
           </span>
           <span className="text-xs text-white/55">{patch.reason}</span>

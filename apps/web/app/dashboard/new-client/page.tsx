@@ -24,7 +24,7 @@ export default function NewClientPage() {
         </p>
       </div>
 
-      <div className="rounded-2xl border border-white/10 bg-[--bg-secondary] p-8">
+      <div className="rounded-2xl border border-white/10 bg-[var(--bg-secondary)] p-8">
         <NewClientForm />
       </div>
     </div>

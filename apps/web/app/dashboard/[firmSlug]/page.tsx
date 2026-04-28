@@ -87,7 +87,7 @@ export default async function FirmOverviewPage({
       {/* Header */}
       <div className="mb-10 flex items-start gap-4">
         <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-white/5">
-          <Icon size={28} strokeWidth={1.5} className="text-[--accent]" />
+          <Icon size={28} strokeWidth={1.5} className="text-[var(--accent)]" />
         </div>
         <div className="flex-1">
           <div className="mb-2 flex items-center gap-3">
@@ -246,7 +246,7 @@ function StatTile({
   detail: string;
 }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-[--bg-secondary] p-5">
+    <div className="rounded-xl border border-white/10 bg-[var(--bg-secondary)] p-5">
       <div className="text-[10px] font-medium uppercase tracking-widest text-white/40">
         {label}
       </div>
@@ -269,7 +269,7 @@ function StatTile({
 function BudgetTile({ budget }: { budget: FirmBudgetStatus | null }) {
   if (!budget) {
     return (
-      <div className="rounded-xl border border-white/10 bg-[--bg-secondary] p-5">
+      <div className="rounded-xl border border-white/10 bg-[var(--bg-secondary)] p-5">
         <div className="text-[10px] font-medium uppercase tracking-widest text-white/40">
           LLM Budget
         </div>
@@ -311,7 +311,7 @@ function BudgetTile({ budget }: { budget: FirmBudgetStatus | null }) {
           : 'this month (default cap)';
 
   return (
-    <div className={`rounded-xl border bg-[--bg-secondary] p-5 ${borderClass}`}>
+    <div className={`rounded-xl border bg-[var(--bg-secondary)] p-5 ${borderClass}`}>
       <div className="text-[10px] font-medium uppercase tracking-widest text-white/40">
         LLM Budget
       </div>
@@ -438,7 +438,7 @@ function AlignmentTrendStrip({
   trend: AlignmentTrendPoint[];
 }) {
   return (
-    <div className="mb-8 rounded-xl border border-white/10 bg-[--bg-secondary] p-5">
+    <div className="mb-8 rounded-xl border border-white/10 bg-[var(--bg-secondary)] p-5">
       <div className="mb-3 flex items-center justify-between">
         <div>
           <div className="text-[10px] font-medium uppercase tracking-widest text-white/40">
@@ -449,9 +449,9 @@ function AlignmentTrendStrip({
           </div>
         </div>
         <div className="flex items-center gap-3 text-[10px] text-white/40">
-          <LegendSwatch className="bg-[--rag-green]" label="green" />
-          <LegendSwatch className="bg-[--rag-yellow]" label="yellow" />
-          <LegendSwatch className="bg-[--rag-red]" label="red" />
+          <LegendSwatch className="bg-[var(--rag-green)]" label="green" />
+          <LegendSwatch className="bg-[var(--rag-yellow)]" label="yellow" />
+          <LegendSwatch className="bg-[var(--rag-red)]" label="red" />
         </div>
       </div>
       <div className="flex items-end gap-1.5" style={{ height: 80 }}>
@@ -465,15 +465,15 @@ function AlignmentTrendStrip({
           >
             {/* green (top), yellow (middle), red (bottom) so "more red" visually weighs down */}
             <div
-              className="w-full bg-[--rag-green] opacity-80 group-hover:opacity-100"
+              className="w-full bg-[var(--rag-green)] opacity-80 group-hover:opacity-100"
               style={{ height: `${point.greenPct}%` }}
             />
             <div
-              className="w-full bg-[--rag-yellow] opacity-80 group-hover:opacity-100"
+              className="w-full bg-[var(--rag-yellow)] opacity-80 group-hover:opacity-100"
               style={{ height: `${point.yellowPct}%` }}
             />
             <div
-              className="w-full bg-[--rag-red] opacity-80 group-hover:opacity-100"
+              className="w-full bg-[var(--rag-red)] opacity-80 group-hover:opacity-100"
               style={{ height: `${point.redPct}%` }}
             />
           </Link>
@@ -508,16 +508,16 @@ function ModuleCard({
   return (
     <Link
       href={href}
-      className="group flex flex-col gap-3 rounded-xl border border-white/10 bg-[--bg-secondary] p-6 transition-colors hover:border-[--accent]/30"
+      className="group flex flex-col gap-3 rounded-xl border border-white/10 bg-[var(--bg-secondary)] p-6 transition-colors hover:border-[var(--accent)]/30"
     >
       <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/5">
-        <Icon size={20} strokeWidth={1.5} className="text-[--accent]" />
+        <Icon size={20} strokeWidth={1.5} className="text-[var(--accent)]" />
       </div>
       <h3 className="font-[family-name:var(--font-jakarta)] text-lg font-bold text-white">
         {title}
       </h3>
       <p className="flex-1 text-sm text-white/55">{description}</p>
-      <div className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-[--accent] transition-transform group-hover:translate-x-0.5">
+      <div className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--accent)] transition-transform group-hover:translate-x-0.5">
         {cta}
         <ArrowRight size={14} strokeWidth={2} />
       </div>

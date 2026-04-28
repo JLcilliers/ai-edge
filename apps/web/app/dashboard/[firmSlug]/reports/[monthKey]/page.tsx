@@ -60,7 +60,7 @@ export default async function MonthlyReportDetailPage({
 
       <div className="mb-8 flex items-start gap-4">
         <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/5">
-          <FileBarChart size={24} strokeWidth={1.5} className="text-[--accent]" />
+          <FileBarChart size={24} strokeWidth={1.5} className="text-[var(--accent)]" />
         </div>
         <div className="flex-1">
           <h1 className="font-[family-name:var(--font-jakarta)] text-3xl font-extrabold tracking-tight text-white">
@@ -83,7 +83,7 @@ export default async function MonthlyReportDetailPage({
             href={row.blobUrl}
             target="_blank"
             rel="noreferrer"
-            className="flex items-center gap-1.5 rounded-full border border-white/10 px-4 py-2 text-xs text-white transition-colors hover:border-[--accent]"
+            className="flex items-center gap-1.5 rounded-full border border-white/10 px-4 py-2 text-xs text-white transition-colors hover:border-[var(--accent)]"
             title="Download JSON from Vercel Blob"
           >
             <Download size={14} strokeWidth={1.75} />

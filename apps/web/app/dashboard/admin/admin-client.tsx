@@ -63,7 +63,7 @@ function CronHealthSection({ rows }: { rows: CronHealthRow[] }) {
           message="No cron runs recorded yet. The first scheduled execution will populate this table."
         />
       ) : (
-        <div className="overflow-hidden rounded-xl border border-white/10 bg-[--bg-secondary]">
+        <div className="overflow-hidden rounded-xl border border-white/10 bg-[var(--bg-secondary)]">
           <table className="w-full text-sm">
             <thead className="border-b border-white/10 bg-white/[0.02]">
               <tr className="text-left text-[10px] uppercase tracking-widest text-white/40">
@@ -167,7 +167,7 @@ function CronRow({
               <CheckCircle2
                 size={14}
                 strokeWidth={1.5}
-                className="text-[--rag-green]"
+                className="text-[var(--rag-green)]"
               />
             )}
             {isExpanded ? (
@@ -210,7 +210,7 @@ function CronRunDetail({ run }: { run: CronRunRow }) {
   );
 
   return (
-    <div className="rounded-lg border border-white/10 bg-[--bg-secondary]/50 p-3">
+    <div className="rounded-lg border border-white/10 bg-[var(--bg-secondary)]/50 p-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <StatusDot status={run.status} />
@@ -262,7 +262,7 @@ function CronRunDetail({ run }: { run: CronRunRow }) {
 function StatusDot({ status }: { status: CronStatus }) {
   const color =
     status === 'ok'
-      ? 'bg-[--rag-green]'
+      ? 'bg-[var(--rag-green)]'
       : status === 'error'
         ? 'bg-red-400'
         : status === 'stalled'
@@ -301,7 +301,7 @@ function FirmHealthSection({ rows }: { rows: FirmHealthRow[] }) {
       {rows.length === 0 ? (
         <EmptyState message="No firms yet. Add one from the clients page." />
       ) : (
-        <div className="overflow-hidden rounded-xl border border-white/10 bg-[--bg-secondary]">
+        <div className="overflow-hidden rounded-xl border border-white/10 bg-[var(--bg-secondary)]">
           <table className="w-full text-sm">
             <thead className="border-b border-white/10 bg-white/[0.02]">
               <tr className="text-left text-[10px] uppercase tracking-widest text-white/40">
@@ -349,7 +349,7 @@ function FirmRow({ row }: { row: FirmHealthRow }) {
           href={`/dashboard/${row.slug}`}
           className="group flex flex-col"
         >
-          <span className="font-semibold text-white group-hover:text-[--accent]">
+          <span className="font-semibold text-white group-hover:text-[var(--accent)]">
             {row.name}
           </span>
           <span className="font-[family-name:var(--font-geist-mono)] text-[10px] text-white/40">
@@ -384,7 +384,7 @@ function FirmRow({ row }: { row: FirmHealthRow }) {
         {row.openTicketCount > 0 ? (
           <Link
             href={`/dashboard/${row.slug}/tickets?status=open`}
-            className="inline-flex items-center gap-1.5 rounded-full bg-[--accent]/15 px-2.5 py-0.5 font-semibold text-[--accent] underline-offset-2 hover:underline"
+            className="inline-flex items-center gap-1.5 rounded-full bg-[var(--accent)]/15 px-2.5 py-0.5 font-semibold text-[var(--accent)] underline-offset-2 hover:underline"
             title="Open the unified remediation queue for this firm"
           >
             {row.openTicketCount}
@@ -408,7 +408,7 @@ function FirmRow({ row }: { row: FirmHealthRow }) {
       </td>
       <td className="px-4 py-3">
         {row.monthlyReportGenerated ? (
-          <span className="inline-flex items-center gap-1.5 text-xs text-[--rag-green]">
+          <span className="inline-flex items-center gap-1.5 text-xs text-[var(--rag-green)]">
             <CheckCircle2 size={12} strokeWidth={1.5} />
             generated
           </span>
@@ -433,7 +433,7 @@ function FirmRow({ row }: { row: FirmHealthRow }) {
                 ? 'bg-red-500'
                 : row.budget.utilizationPct >= 90
                   ? 'bg-amber-500'
-                  : 'bg-[--accent]'
+                  : 'bg-[var(--accent)]'
             }`}
             style={{ width: `${row.budget.utilizationPct}%` }}
           />
@@ -488,13 +488,13 @@ function WorkspaceSpendSection({
         />
       </div>
 
-      <div className="mt-6 rounded-xl border border-white/10 bg-[--bg-secondary] p-5">
+      <div className="mt-6 rounded-xl border border-white/10 bg-[var(--bg-secondary)] p-5">
         <div className="mb-4 flex items-center justify-between">
           <div className="text-[10px] font-medium uppercase tracking-widest text-white/40">
             12-month workspace spend
           </div>
           <div className="flex items-center gap-3 text-[10px] text-white/55">
-            <LegendSwatch color="bg-[--accent]" label="Audits" />
+            <LegendSwatch color="bg-[var(--accent)]" label="Audits" />
             <LegendSwatch color="bg-purple-400" label="Rewrites" />
           </div>
         </div>
@@ -523,9 +523,9 @@ function CostTile({
   value: number;
   tone: 'accent' | 'neutral';
 }) {
-  const valueClass = tone === 'accent' ? 'text-[--accent]' : 'text-white';
+  const valueClass = tone === 'accent' ? 'text-[var(--accent)]' : 'text-white';
   return (
-    <div className="rounded-xl border border-white/10 bg-[--bg-secondary] p-5">
+    <div className="rounded-xl border border-white/10 bg-[var(--bg-secondary)] p-5">
       <div className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-widest text-white/40">
         <Icon size={12} strokeWidth={1.5} />
         {label}
@@ -561,7 +561,7 @@ function BarColumn({
               title={`Rewrites: $${month.rewrites.toFixed(2)}`}
             />
             <div
-              className={`w-full bg-[--accent] ${rewritesPct === 0 ? 'rounded-t-sm' : ''}`}
+              className={`w-full bg-[var(--accent)] ${rewritesPct === 0 ? 'rounded-t-sm' : ''}`}
               style={{ height: `${auditsPct}%` }}
               title={`Audits: $${month.audits.toFixed(2)}`}
             />
@@ -597,10 +597,10 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-white/10 bg-[--bg-secondary]/40 p-6">
+    <section className="rounded-2xl border border-white/10 bg-[var(--bg-secondary)]/40 p-6">
       <div className="mb-5 flex items-start gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/5">
-          <Icon size={18} strokeWidth={1.5} className="text-[--accent]" />
+          <Icon size={18} strokeWidth={1.5} className="text-[var(--accent)]" />
         </div>
         <div>
           <h2 className="font-[family-name:var(--font-jakarta)] text-lg font-semibold text-white">
@@ -616,7 +616,7 @@ function SectionCard({
 
 function EmptyState({ message }: { message: string }) {
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-dashed border-white/10 bg-[--bg-secondary]/50 px-6 py-8 text-sm text-white/50">
+    <div className="flex items-center gap-3 rounded-xl border border-dashed border-white/10 bg-[var(--bg-secondary)]/50 px-6 py-8 text-sm text-white/50">
       <AlertCircle size={16} strokeWidth={1.5} />
       {message}
     </div>

@@ -80,7 +80,7 @@ export function SuppressionClient({
         <button
           onClick={handleStartScan}
           disabled={isPending || !!runningId}
-          className="rounded-full bg-[--accent] px-6 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-[--accent-hover] disabled:opacity-50"
+          className="rounded-full bg-[var(--accent)] px-6 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-[var(--accent-hover)] disabled:opacity-50"
         >
           {isPending
             ? 'Starting...'
@@ -105,9 +105,9 @@ export function SuppressionClient({
       )}
 
       {runningId && (
-        <div className="mt-4 flex items-center gap-3 rounded-xl border border-[--accent]/30 bg-[--accent]/10 px-4 py-3">
-          <div className="h-3 w-3 animate-pulse rounded-full bg-[--accent]" />
-          <span className="text-sm text-[--accent]">
+        <div className="mt-4 flex items-center gap-3 rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-4 py-3">
+          <div className="h-3 w-3 animate-pulse rounded-full bg-[var(--accent)]" />
+          <span className="text-sm text-[var(--accent)]">
             Crawling sitemap + embedding pages... polling every 5s
           </span>
         </div>
@@ -170,7 +170,7 @@ function FindingRow({
   return (
     <Link
       href={`/dashboard/${firmSlug}/suppression/${finding.findingId}`}
-      className="group flex items-start justify-between gap-4 rounded-xl border border-white/10 bg-[--bg-secondary] px-5 py-4 transition-colors hover:border-[--accent]/30"
+      className="group flex items-start justify-between gap-4 rounded-xl border border-white/10 bg-[var(--bg-secondary)] px-5 py-4 transition-colors hover:border-[var(--accent)]/30"
     >
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
@@ -216,7 +216,7 @@ function FindingRow({
           <p className="mt-1 line-clamp-2 text-xs text-white/55">{finding.rationale}</p>
         )}
       </div>
-      <div className="flex shrink-0 items-center gap-2 pl-2 pt-1 text-[--accent]/70 group-hover:text-[--accent]">
+      <div className="flex shrink-0 items-center gap-2 pl-2 pt-1 text-[var(--accent)]/70 group-hover:text-[var(--accent)]">
         {finding.action === 'rewrite' ? (
           <Wand2 size={14} strokeWidth={1.5} />
         ) : null}
@@ -228,9 +228,9 @@ function FindingRow({
 
 function ActionBadge({ action }: { action: string }) {
   const styles: Record<string, string> = {
-    noindex: 'bg-[--rag-red-bg] text-[--rag-red]',
-    redirect: 'bg-[--rag-red-bg] text-[--rag-red]',
-    rewrite: 'bg-[--rag-yellow-bg] text-[--rag-yellow]',
+    noindex: 'bg-[var(--rag-red-bg)] text-[var(--rag-red)]',
+    redirect: 'bg-[var(--rag-red-bg)] text-[var(--rag-red)]',
+    rewrite: 'bg-[var(--rag-yellow-bg)] text-[var(--rag-yellow)]',
   };
   return (
     <span
@@ -256,7 +256,7 @@ function EmptyState({ onStart, disabled }: { onStart: () => void; disabled: bool
       <button
         onClick={onStart}
         disabled={disabled}
-        className="rounded-full bg-[--accent] px-6 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-[--accent-hover] disabled:opacity-50"
+        className="rounded-full bg-[var(--accent)] px-6 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-[var(--accent-hover)] disabled:opacity-50"
       >
         Run First Scan
       </button>
@@ -267,7 +267,7 @@ function EmptyState({ onStart, disabled }: { onStart: () => void; disabled: bool
 function AllAligned({ count }: { count: number }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
-      <CheckCircle2 className="mb-4 h-12 w-12 text-[--rag-green]" strokeWidth={1.5} />
+      <CheckCircle2 className="mb-4 h-12 w-12 text-[var(--rag-green)]" strokeWidth={1.5} />
       <h3 className="mb-2 text-lg font-semibold text-white/70">All pages aligned</h3>
       <p className="max-w-md text-sm text-white/40">
         The latest scan found no pages drifting from your Brand Truth across{' '}
@@ -289,16 +289,16 @@ function StatCard({
 }) {
   const color =
     tone === 'green'
-      ? 'text-[--rag-green]'
+      ? 'text-[var(--rag-green)]'
       : tone === 'red'
-      ? 'text-[--rag-red]'
+      ? 'text-[var(--rag-red)]'
       : tone === 'yellow'
-      ? 'text-[--rag-yellow]'
+      ? 'text-[var(--rag-yellow)]'
       : 'text-white/60';
   return (
-    <div className="rounded-xl border border-white/10 bg-[--bg-secondary] px-4 py-3">
+    <div className="rounded-xl border border-white/10 bg-[var(--bg-secondary)] px-4 py-3">
       <div className="flex items-center gap-2">
-        {tone === 'red' && <FileX size={14} className="text-[--rag-red]" strokeWidth={1.5} />}
+        {tone === 'red' && <FileX size={14} className="text-[var(--rag-red)]" strokeWidth={1.5} />}
         {tone === 'gray' && <FileText size={14} className="text-white/40" strokeWidth={1.5} />}
         <div className="text-[10px] uppercase tracking-wider text-white/40">{label}</div>
       </div>

@@ -120,7 +120,7 @@ export function AuditListClient({
         onClick={handleStartAudit}
         disabled={disabled}
         title={overBudget ? 'Monthly budget cap reached — adjust in Settings to run another audit.' : undefined}
-        className="rounded-full bg-[--accent] px-6 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-[--accent-hover] disabled:cursor-not-allowed disabled:opacity-50"
+        className="rounded-full bg-[var(--accent)] px-6 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-50"
       >
         {isPending ? 'Starting...' : runningId ? 'Audit Running...' : overBudget ? 'Over Budget' : 'Run New Audit'}
       </button>
@@ -132,10 +132,10 @@ export function AuditListClient({
       )}
 
       {runningId && (
-        <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-[--accent]/30 bg-[--accent]/10 px-4 py-3">
+        <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-4 py-3">
           <div className="flex items-center gap-3">
-            <div className="h-3 w-3 animate-pulse rounded-full bg-[--accent]" />
-            <span className="text-sm text-[--accent]">
+            <div className="h-3 w-3 animate-pulse rounded-full bg-[var(--accent)]" />
+            <span className="text-sm text-[var(--accent)]">
               Audit in progress
               {progress && progress.queriesCompleted > 0 && (
                 <>
@@ -153,7 +153,7 @@ export function AuditListClient({
                   )}
                 </>
               )}
-              <span className="ml-2 text-[--accent]/70">polling every 5s</span>
+              <span className="ml-2 text-[var(--accent)]/70">polling every 5s</span>
             </span>
           </div>
           <button
@@ -183,7 +183,7 @@ export function AuditListClient({
           <Link
             key={run.id}
             href={`/dashboard/${firmSlug}/audits/${run.id}`}
-            className="flex items-center justify-between rounded-xl border border-white/10 bg-[--bg-secondary] px-5 py-4 transition-colors hover:border-white/20"
+            className="flex items-center justify-between rounded-xl border border-white/10 bg-[var(--bg-secondary)] px-5 py-4 transition-colors hover:border-white/20"
           >
             <div className="flex items-center gap-3">
               <StatusBadge status={run.status} />
@@ -214,10 +214,10 @@ export function AuditListClient({
 
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
-    completed: 'bg-[--rag-green-bg] text-[--rag-green]',
+    completed: 'bg-[var(--rag-green-bg)] text-[var(--rag-green)]',
     completed_budget_truncated: 'bg-amber-500/15 text-amber-300',
-    running: 'bg-[--accent]/15 text-[--accent] animate-pulse',
-    failed: 'bg-[--rag-red-bg] text-[--rag-red]',
+    running: 'bg-[var(--accent)]/15 text-[var(--accent)] animate-pulse',
+    failed: 'bg-[var(--rag-red-bg)] text-[var(--rag-red)]',
     cancelled: 'bg-white/10 text-white/60',
     pending: 'bg-white/10 text-white/55',
   };
@@ -265,14 +265,14 @@ function BudgetPanel({
       ? 'border-red-500/30 bg-red-500/5'
       : tone === 'amber'
         ? 'border-amber-500/30 bg-amber-500/5'
-        : 'border-white/10 bg-[--bg-secondary]';
+        : 'border-white/10 bg-[var(--bg-secondary)]';
 
   const barClass =
     tone === 'red'
       ? 'bg-red-500'
       : tone === 'amber'
         ? 'bg-amber-400'
-        : 'bg-[--accent]';
+        : 'bg-[var(--accent)]';
 
   const labelToneClass =
     tone === 'red'
