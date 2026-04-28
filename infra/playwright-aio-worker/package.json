@@ -1,0 +1,17 @@
+{
+  "name": "playwright-aio-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Reference Playwright worker for Clixsy Intercept's AIO panel capture (Phase B #7 / ADR-0010 fallback).",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "playwright-core": "^1.49.0"
+  }
+}

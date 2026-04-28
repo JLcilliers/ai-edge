@@ -203,16 +203,121 @@ class DataForSEOAioProvider implements AioProvider {
   }
 }
 
-// ── Playwright stub ───────────────────────────────────────────────────
+// ── Playwright (remote-worker HTTP client) ────────────────────────────
 
+interface PlaywrightWorkerResponse {
+  ok: boolean;
+  has_aio?: boolean;
+  overview_text?: string | null;
+  sources?: Array<{ url?: string; title?: string; domain?: string }>;
+  error?: string;
+}
+
+/**
+ * Talks to a separate Playwright worker (per ADR-0010, deployed on
+ * Fly.io with a Bright Data residential proxy attached). The Vercel
+ * runtime can't run Playwright reliably — Fluid Compute has no
+ * persistent browser state, no proxy chain, and Google's bot detection
+ * eats vanilla browser automation in seconds.
+ *
+ * Reference worker implementation lives at infra/playwright-aio-worker/
+ * — operator deploys the Docker image to Fly.io once, sets
+ * PLAYWRIGHT_AIO_WORKER_URL + PLAYWRIGHT_AIO_WORKER_SECRET on Vercel,
+ * and this provider lights up.
+ *
+ * Why HTTP and not stdin/argv. The Playwright capture takes 30-90
+ * seconds per query (cold proxy IP, AIO render, source extraction);
+ * sending it over HTTP keeps the boundary clean — Vercel waits on a
+ * remote service, no Playwright deps in the Vercel build, and we can
+ * scale the worker independently.
+ *
+ * Auth. Shared bearer token in PLAYWRIGHT_AIO_WORKER_SECRET — same
+ * pattern as the cron auth. The worker checks Authorization on every
+ * request; mismatched/missing returns 401.
+ *
+ * Failure modes. Network errors, non-200 responses, and any thrown
+ * inside the fetch all collapse to ok:false with a descriptive
+ * `reason`. The caller persists this as a provider-error row so the
+ * operator can see "Playwright tried, here's why it failed" rather
+ * than a silent skip.
+ */
 class PlaywrightAioProvider implements AioProvider {
   name = 'playwright';
-  async capture(): Promise<{ ok: false; reason: string }> {
-    return {
-      ok: false,
-      reason:
-        'Playwright AIO capture not yet implemented — requires Fly.io worker + Bright Data residential proxies per ADR-0010',
-    };
+  private workerUrl: string;
+  private workerSecret: string;
+  private timeoutMs: number;
+  constructor(workerUrl: string, workerSecret: string, timeoutMs: number = 90_000) {
+    // Drop trailing slash so the path concatenation below is clean.
+    this.workerUrl = workerUrl.replace(/\/$/, '');
+    this.workerSecret = workerSecret;
+    this.timeoutMs = timeoutMs;
+  }
+
+  async capture(args: { query: string; country?: string; language?: string }) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+    try {
+      const res = await fetch(`${this.workerUrl}/capture-aio`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this.workerSecret}`,
+          'Content-Type': 'application/json',
+          // Helpful for the worker's logs.
+          'User-Agent': 'ai-edge-aio-client/0.1',
+        },
+        body: JSON.stringify({
+          query: args.query,
+          country: args.country ?? 'us',
+          language: args.language ?? 'en',
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        return {
+          ok: false as const,
+          reason: `playwright worker returned ${res.status}: ${body.slice(0, 240)}`,
+        };
+      }
+
+      const json = (await res.json()) as PlaywrightWorkerResponse;
+      if (!json.ok) {
+        return {
+          ok: false as const,
+          reason: `playwright worker reported failure: ${json.error ?? 'unknown'}`,
+        };
+      }
+
+      const sources: AioSource[] = (json.sources ?? [])
+        .filter((s): s is { url: string; title?: string; domain?: string } => !!s.url)
+        .map((s) => ({
+          url: s.url,
+          title: s.title,
+          domain: s.domain ?? safeHost(s.url),
+        }));
+
+      return {
+        ok: true as const,
+        result: {
+          hasAio: !!json.has_aio,
+          overviewText: json.overview_text ?? null,
+          sources,
+          raw: json,
+          provider: this.name,
+        },
+      };
+    } catch (e) {
+      clearTimeout(timer);
+      const reason =
+        e instanceof Error
+          ? e.name === 'AbortError'
+            ? `playwright worker timed out after ${this.timeoutMs}ms`
+            : e.message
+          : String(e);
+      return { ok: false as const, reason };
+    }
   }
 }
 
@@ -228,14 +333,32 @@ class NullAioProvider implements AioProvider {
 // ── Resolver ──────────────────────────────────────────────────────────
 
 export function getAioProvider(): AioProvider {
+  // DataForSEO is the primary AIO path per ADR-0009 — paid, licensed,
+  // hides the bot-detection mess. Used whenever credentials are set.
   if (process.env.DATAFORSEO_LOGIN && process.env.DATAFORSEO_PASSWORD) {
     return new DataForSEOAioProvider(
       process.env.DATAFORSEO_LOGIN,
       process.env.DATAFORSEO_PASSWORD,
     );
   }
-  if (process.env.PLAYWRIGHT_AIO_WORKER_URL) {
-    return new PlaywrightAioProvider();
+  // Playwright fallback per ADR-0010. Activates when both the worker
+  // URL and shared secret are configured. The worker itself runs
+  // separately (reference impl at infra/playwright-aio-worker/).
+  if (
+    process.env.PLAYWRIGHT_AIO_WORKER_URL &&
+    process.env.PLAYWRIGHT_AIO_WORKER_SECRET
+  ) {
+    const timeoutMs = process.env.PLAYWRIGHT_AIO_WORKER_TIMEOUT_MS
+      ? Math.max(
+          5_000,
+          Math.min(180_000, parseInt(process.env.PLAYWRIGHT_AIO_WORKER_TIMEOUT_MS, 10)),
+        )
+      : 90_000;
+    return new PlaywrightAioProvider(
+      process.env.PLAYWRIGHT_AIO_WORKER_URL,
+      process.env.PLAYWRIGHT_AIO_WORKER_SECRET,
+      timeoutMs,
+    );
   }
   return new NullAioProvider();
 }

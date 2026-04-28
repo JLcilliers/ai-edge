@@ -163,9 +163,9 @@ function AioView({
 
   const providerLabel =
     provider === 'dataforseo'
-      ? 'DataForSEO'
+      ? 'DataForSEO (primary, paid)'
       : provider === 'playwright'
-        ? 'Playwright'
+        ? 'Playwright fallback (remote worker)'
         : 'none configured';
   const providerTone = provider === 'none' ? 'warn' : 'ok';
 
@@ -194,8 +194,15 @@ function AioView({
             >
               {providerLabel}
             </span>
-            {provider === 'none' &&
-              ' — set DATAFORSEO_LOGIN + DATAFORSEO_PASSWORD on Vercel to enable real capture.'}
+            {provider === 'none' && (
+              <>
+                {' — '}set <code>DATAFORSEO_LOGIN</code> +{' '}
+                <code>DATAFORSEO_PASSWORD</code> for the primary path, or
+                deploy <code>infra/playwright-aio-worker/</code> on Fly.io
+                and set <code>PLAYWRIGHT_AIO_WORKER_URL</code> +{' '}
+                <code>PLAYWRIGHT_AIO_WORKER_SECRET</code> for the fallback.
+              </>
+            )}
           </p>
         </div>
         <button
