@@ -177,6 +177,11 @@ export function TicketsClient({
         )}
       </div>
 
+      {/* Per-source explainer — surfaces only when a specific source filter
+          is active so the operator knows what the underlying scanner is
+          flagging and what the typical action is. */}
+      {activeSource && <SourceExplainer source={activeSource} />}
+
       {/* Ticket list */}
       <div className="mt-6 flex flex-col gap-2">
         {tickets.length === 0 ? (
@@ -620,6 +625,31 @@ const SOURCE_LABEL: Record<TicketSource, string> = {
   reddit: 'Reddit',
   entity: 'Entity',
 };
+
+// Operator explainer for each source — what kind of finding lands in
+// this filter and what action it usually wants. Renders below the filter
+// row when a source is active.
+const SOURCE_EXPLAINER: Record<TicketSource, string> = {
+  audit:
+    'Findings from Trust Alignment Audits — LLM answers that contradicted Brand Truth (banned claim, hallucinated fact, drifted positioning). Typical action: approve a rewrite draft or flag the source the LLM was using.',
+  legacy:
+    'Findings from the Legacy Content Suppression scan — pages on the firm\'s site whose copy diverges from Brand Truth (semantic distance > 0.55). Typical action: noindex, 301-redirect to the closest aligned page, or rewrite.',
+  reddit:
+    'Findings from Reddit sentiment scans — high-karma negative mentions or recurring questions where the firm or its competitors are named. Typical action: triage and decide whether to engage on-thread or surface to client comms.',
+  entity:
+    'Findings from the Entity & Structured Signals scan — schema gaps, Wikidata absence, or Knowledge Graph misses on the home page. Typical action: ship the JSON-LD patch, claim Google Business Profile, or open a Wikidata entry.',
+};
+
+function SourceExplainer({ source }: { source: TicketSource }) {
+  return (
+    <div className="mt-3 rounded-xl border border-white/10 bg-[var(--bg-secondary)]/60 p-4">
+      <p className="text-sm leading-relaxed text-white/75">
+        <span className="font-medium text-white">{SOURCE_LABEL[source]} tickets. </span>
+        {SOURCE_EXPLAINER[source]}
+      </p>
+    </div>
+  );
+}
 
 const SOURCE_ICON: Record<TicketSource, typeof ClipboardCheck> = {
   audit: ClipboardCheck,

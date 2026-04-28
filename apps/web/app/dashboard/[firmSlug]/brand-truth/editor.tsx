@@ -6,12 +6,20 @@ import type { BrandTruth } from '@ai-edge/shared';
 import { saveBrandTruth, getBrandTruthVersion } from '../../../actions/brand-truth-actions';
 
 // ── Collapsible Section ───────────────────────────────────
+// Each Section is a category of Brand Truth ("Headquarters", "Awards &
+// Badges", etc.). The optional `description` renders a short operator-
+// facing line right below the title bar when expanded so it's always
+// clear what to put here. Operators were treating every section as a
+// blank field — the description gives them the prompt without making
+// them read the parent docs.
 function Section({
   title,
+  description,
   defaultOpen = false,
   children,
 }: {
   title: string;
+  description?: string;
   defaultOpen?: boolean;
   children: React.ReactNode;
 }) {
@@ -26,7 +34,16 @@ function Section({
         {title}
         <span className="text-white/55">{open ? '−' : '+'}</span>
       </button>
-      {open && <div className="border-t border-white/10 px-4 py-4">{children}</div>}
+      {open && (
+        <div className="border-t border-white/10 px-4 py-4">
+          {description && (
+            <p className="mb-4 text-xs leading-relaxed text-white/55">
+              {description}
+            </p>
+          )}
+          {children}
+        </div>
+      )}
     </div>
   );
 }
@@ -177,7 +194,11 @@ export function BrandTruthEditor({
         </div>
       )}
       {/* Core identity */}
-      <Section title="Core Identity" defaultOpen>
+      <Section
+        title="Core Identity"
+        description="The firm's canonical name, type, legal entity, and primary URL. Audits and entity scans treat these as the source of truth — name variants and common misspellings here let the LLM-citation matcher catch mentions that aren't an exact string match."
+        defaultOpen
+      >
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Firm Name" value={data.firm_name ?? ''} onChange={(v) => set('firm_name', v)} />
           <Field label="Firm Type" value={data.firm_type ?? ''} onChange={(v) => set('firm_type', v)} />
@@ -208,7 +229,10 @@ export function BrandTruthEditor({
       </Section>
 
       {/* Headquarters */}
-      <Section title="Headquarters">
+      <Section
+        title="Headquarters"
+        description="The firm's principal office address and any satellite locations. Used for jurisdiction-aware compliance checks (e.g. legal-firm bar rules), Google Business Profile claims, and the PostalAddress JSON-LD patch the Entity scan generates."
+      >
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Street" value={data.headquarters?.street ?? ''} onChange={(v) => set('headquarters', { ...data.headquarters, street: v })} />
           <Field label="City" value={data.headquarters?.city ?? ''} onChange={(v) => set('headquarters', { ...data.headquarters, city: v })} />
@@ -222,7 +246,11 @@ export function BrandTruthEditor({
 
       {/* Practice Areas (law_firm / dental_practice — required, min 1) */}
       {(data.firm_type === 'law_firm' || data.firm_type === 'dental_practice') && (
-        <Section title="Practice Areas" defaultOpen>
+        <Section
+          title="Practice Areas"
+          description="The legal practices this firm wants to win in LLM answers (e.g. personal injury, premises liability, wrongful death). Audits compare LLM citation rates per practice area against competitors. Each entry seeds at least one query in the audit pipeline."
+          defaultOpen
+        >
           <StringArray
             label="Practice Areas"
             items={data.practice_areas ?? []}
@@ -233,7 +261,11 @@ export function BrandTruthEditor({
 
       {/* Geographies Served (law_firm / dental_practice — required, min 1) */}
       {(data.firm_type === 'law_firm' || data.firm_type === 'dental_practice') && (
-        <Section title="Geographies Served" defaultOpen>
+        <Section
+          title="Geographies Served"
+          description="Cities, counties, or states this firm actively takes cases in. Drives local SERP capture in Scenario Lab and feeds geo-modifiers to audit queries (e.g. 'personal injury attorney Tampa FL')."
+          defaultOpen
+        >
           <p className="mb-3 text-xs text-white/55">
             Each entry must have a city and 2–3 letter state. Radius is a positive integer in miles (max 500).
           </p>
@@ -314,7 +346,10 @@ export function BrandTruthEditor({
 
       {/* Attorney Bios (law_firm) */}
       {data.firm_type === 'law_firm' && (
-        <Section title="Attorney Bios">
+        <Section
+          title="Attorney Bios"
+          description="One row per attorney with name, role, bar admissions, and bio paragraph. The Entity scan emits a Person JSON-LD block per attorney so LLMs attribute quotes correctly. The Cross-Source scan compares the firm's site bio pages against these to flag drift."
+        >
           {(data.attorney_bios ?? []).map((ab: any, i: number) => (
             <div key={i} className="mb-3 rounded border border-white/10 p-3">
               <div className="grid gap-2 sm:grid-cols-2">
@@ -405,7 +440,10 @@ export function BrandTruthEditor({
 
       {/* Notable Cases (law_firm) */}
       {data.firm_type === 'law_firm' && (
-        <Section title="Notable Cases">
+        <Section
+          title="Notable Cases"
+          description="Public-record case outcomes the firm wants the LLMs to credit them with — settlement amounts, verdicts, jurisdictions. Each case becomes a citable fact the audit pipeline checks for in LLM answers; missing or hallucinated cases fire as audit tickets."
+        >
           {(data.notable_cases ?? []).map((nc: any, i: number) => (
             <div key={i} className="mb-3 rounded border border-white/10 p-3">
               <textarea
@@ -482,7 +520,10 @@ export function BrandTruthEditor({
 
       {/* Provider Bios (dental_practice) */}
       {data.firm_type === 'dental_practice' && (
-        <Section title="Provider Bios">
+        <Section
+          title="Provider Bios"
+          description="Practitioner roster for non-legal firm types (medical, dental, accounting, etc.) — name, role, credentials, specialties. Same Person JSON-LD generation as Attorney Bios, gated on firm_type."
+        >
           {(data.provider_bios ?? []).map((pb: any, i: number) => (
             <div key={i} className="mb-3 rounded border border-white/10 p-3">
               <div className="grid gap-2 sm:grid-cols-2">
@@ -570,7 +611,10 @@ export function BrandTruthEditor({
 
       {/* Service Offerings (marketing_agency / other) */}
       {(data.firm_type === 'marketing_agency' || data.firm_type === 'other') && (
-      <Section title="Service Offerings">
+      <Section
+        title="Service Offerings"
+        description="The bundled services the firm sells (for agencies / non-legal firms). Each offering is a description + a list of deliverables. Surfaces in audit queries like 'best <firm-type> for <offering>' and feeds the LLM context window when scoring relevance."
+      >
         {(data.service_offerings ?? []).map((so: any, i: number) => (
           <div key={i} className="mb-3 flex gap-2">
             <input
@@ -613,7 +657,10 @@ export function BrandTruthEditor({
       )}
 
       {/* Positioning */}
-      <Section title="Positioning & Differentiators">
+      <Section
+        title="Positioning & Differentiators"
+        description="The two- or three-line answer to 'why pick this firm over the competitor next door?'. The audit pipeline scores LLM answers on whether the differentiators surface — if they don't, the firm is being described generically, which is a worse outcome than negative coverage."
+      >
         <StringArray label="Unique Differentiators" items={data.unique_differentiators ?? []} onChange={(v) => set('unique_differentiators', v)} />
         <div className="mt-4">
           <StringArray label="Required Positioning Phrases" items={data.required_positioning_phrases ?? []} onChange={(v) => set('required_positioning_phrases', v)} />
@@ -624,7 +671,10 @@ export function BrandTruthEditor({
       </Section>
 
       {/* Banned Claims */}
-      <Section title="Banned Claims">
+      <Section
+        title="Banned Claims"
+        description="Specific phrases or facts that must NOT appear in copy or LLM answers (wrong jurisdictions, retired attorneys, unverified case results, comparative-superlative claims that violate bar rules). Compliance Check flags these on any pasted draft; Audit pipeline raises tickets if an LLM emits one."
+      >
         {(data.banned_claims ?? []).map((bc: any, i: number) => (
           <div key={i} className="mb-3 rounded border border-white/10 p-3">
             <div className="grid gap-2 sm:grid-cols-2">
@@ -679,7 +729,10 @@ export function BrandTruthEditor({
       </Section>
 
       {/* Tone Guidelines */}
-      <Section title="Tone Guidelines">
+      <Section
+        title="Tone Guidelines"
+        description="How the firm wants to sound when an LLM speaks for them: formal vs. conversational, plain-English vs. technical, optimistic vs. cautious. Audit pipeline scores tone match alongside factual match — high factual accuracy with the wrong tone still degrades the brand."
+      >
         <Field label="Voice" value={data.tone_guidelines?.voice ?? ''} onChange={(v) => set('tone_guidelines', { ...data.tone_guidelines, voice: v })} />
         <div className="mt-3">
           <Field label="Register" value={data.tone_guidelines?.register ?? ''} onChange={(v) => set('tone_guidelines', { ...data.tone_guidelines, register: v })} />
@@ -690,7 +743,10 @@ export function BrandTruthEditor({
       </Section>
 
       {/* Audience */}
-      <Section title="Target Audience">
+        <Section
+        title="Target Audience"
+        description="The kinds of clients/cases this firm wants more of (and the kinds it doesn't). Used by Scenario Lab to score speculative content ideas, and by the audit pipeline to weight queries — a personal-injury firm that doesn't take bicycle accidents shouldn't care if the LLMs cite a competitor for that query."
+      >
         <StringArray label="Primary Verticals" items={data.target_audience?.primary_verticals ?? []} onChange={(v) => set('target_audience', { ...data.target_audience, primary_verticals: v })} />
         <div className="mt-3">
           <StringArray label="Secondary Verticals" items={data.target_audience?.secondary_verticals ?? []} onChange={(v) => set('target_audience', { ...data.target_audience, secondary_verticals: v })} />
@@ -701,7 +757,10 @@ export function BrandTruthEditor({
       </Section>
 
       {/* Competitors & Queries */}
-      <Section title="Competitors & Seed Queries">
+      <Section
+        title="Competitors & Seed Queries"
+        description="The 3-7 rival firms tracked alongside this one (Share-of-Voice charts pin to these), plus the 8-15 seed queries the weekly audit asks every LLM. Seed queries are the single biggest lever — pick the questions a real client would ask, in the wording they'd use."
+      >
         <StringArray label="Competitors for LLM Monitoring" items={data.competitors_for_llm_monitoring ?? []} onChange={(v) => set('competitors_for_llm_monitoring', v)} />
         <div className="mt-4">
           <StringArray label="Seed Query Intents" items={data.seed_query_intents ?? []} onChange={(v) => set('seed_query_intents', v)} />
@@ -710,7 +769,10 @@ export function BrandTruthEditor({
 
       {/* Key Clients (Public) — marketing_agency only */}
       {data.firm_type === 'marketing_agency' && (
-      <Section title="Key Clients (Public)">
+      <Section
+        title="Key Clients (Public)"
+        description="Named clients the firm is publicly OK to discuss. Used as social proof in audit context windows ('this firm has worked with X, Y, Z') and as input to credibility scoring. Leave blank if you want the LLMs to speak generically about the client base."
+      >
         {(data.key_clients_public ?? []).map((kc: any, i: number) => (
           <div key={i} className="mb-3 rounded border border-white/10 p-3">
             <div className="grid gap-2 sm:grid-cols-2">
@@ -729,7 +791,10 @@ export function BrandTruthEditor({
       )}
 
       {/* Awards & Badges */}
-      <Section title="Awards & Badges">
+      <Section
+        title="Awards & Badges"
+        description="Recognized industry awards (Super Lawyers, Best Lawyers, Avvo rating, Inc. 5000, etc.) the firm is entitled to claim. The Cross-Source scan independently verifies each badge against the issuer's site — an unverified claim becomes a Compliance ticket so the firm can either remove it or substantiate it before regulators do."
+      >
         {(data.awards ?? []).map((aw: any, i: number) => (
           <div key={i} className="mb-3 rounded border border-white/10 p-3">
             <div className="grid gap-2 sm:grid-cols-2">
@@ -758,7 +823,10 @@ export function BrandTruthEditor({
           centroid; divergent listings open a remediation ticket. The
           `source` value should match what entity_signal expects so admin
           aggregations stay consistent. */}
-      <Section title="Third-Party Directory Listings">
+      <Section
+        title="Third-Party Directory Listings"
+        description="The directories the firm wants the LLMs to cite alongside the home page (Avvo, Justia, Yelp, Google Business Profile, BBB, Chambers, etc.). The Citation Sources sub-tab shows which of these the LLMs are actually pulling from — gaps here are the cheapest visibility wins."
+      >
         <p className="mb-2 text-xs text-white/55">
           One entry per BBB / Super Lawyers / Avvo / Justia / Findlaw / Healthgrades /
           Zocdoc / Yelp / Clutch / G2 profile page. The cross-source scan checks each
@@ -829,7 +897,10 @@ export function BrandTruthEditor({
       {/* Service Areas + Compliance
           - Service Areas (strings) only live on marketing_agency / other schemas.
           - Compliance Jurisdictions is a base field and always available. */}
-      <Section title="Service Areas & Compliance">
+      <Section
+        title="Service Areas & Compliance"
+        description="Jurisdiction-specific rules that constrain how the firm can be described — bar advertising rules, no-superlative restrictions, mandatory disclaimers, prohibited claims by state. The Compliance Check tab matches pasted copy against this rulebook before anything ships; banned-claim violations from Audits trace back here."
+      >
         {(data.firm_type === 'marketing_agency' || data.firm_type === 'other') && (
           <StringArray label="Service Areas" items={data.service_areas ?? []} onChange={(v) => set('service_areas', v)} />
         )}
