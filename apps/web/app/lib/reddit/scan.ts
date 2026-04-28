@@ -86,11 +86,17 @@ export async function runRedditScan(firmId: string): Promise<string> {
       for (const post of posts) {
         if (seenPostIds.has(post.id)) continue;
 
-        // Substring verify — Reddit's fuzzy search returns lots of false
-        // positives. We only keep posts where the brand name actually
-        // appears in title or body.
-        const combined = `${post.title}\n${post.selftext}`.toLowerCase();
-        if (!combined.includes(term.toLowerCase())) continue;
+        // Word-boundary verify — Reddit's fuzzy search returns lots of false
+        // positives. Substring match was naive ("APL" matched "APLE", "APRIL"
+        // didn't but "APL boss" did legitimately and "APL Bioengineering"
+        // also got through). Word boundaries kill the substring class but
+        // legitimately-ambiguous short tokens (APL = Australian Premier
+        // League, Asia-Pacific Logistics, Applied Physics Lab, ...) still
+        // match. The MIN_TERM_LENGTH guard in collectSearchTerms stops
+        // those from ever being searched.
+        const combined = `${post.title}\n${post.selftext}`;
+        const pattern = new RegExp(`\\b${escapeRegex(term)}\\b`, 'i');
+        if (!pattern.test(combined)) continue;
 
         seenPostIds.add(post.id);
         const sentiment = await classifySentiment({
@@ -167,22 +173,59 @@ export async function runRedditScan(firmId: string): Promise<string> {
   return runId;
 }
 
+/**
+ * Minimum length for a Reddit search term. 3-character abbreviations like
+ * "APL" / "IBM" / "KFC" match dozens of unrelated subreddits — the cost of
+ * letting them through is hundreds of NEUTRAL rows that the operator has
+ * to dismiss before reaching real signal. The firm_name itself is exempt
+ * from this filter because it's the root identity (and is always long
+ * enough in practice).
+ *
+ * 4 characters is the floor. "Avvo" (4), "Yelp" (4), "Pickett" (7) all
+ * pass. "APL" (3), "AB" (2), "X" (1) are skipped with a console warning
+ * the operator can grep in vercel logs.
+ */
+const MIN_TERM_LENGTH = 4;
+
+/** Escape regex metacharacters in a literal string. */
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function collectSearchTerms(bt: BrandTruth): string[] {
+  // The firm_name always passes through — it's the canonical identity, and
+  // it'd be wrong to silently skip it on a length technicality.
+  const firmName = bt.firm_name?.trim();
   const raw = [
-    bt.firm_name,
+    firmName,
     ...(bt.name_variants ?? []),
     ...(bt.common_misspellings ?? []),
   ];
-  // Dedupe case-insensitive, drop empties, trim
+  // Dedupe case-insensitive, drop empties, trim, skip too-ambiguous terms
   const seen = new Set<string>();
   const out: string[] = [];
+  const skipped: string[] = [];
   for (const term of raw) {
     const trimmed = term?.trim();
     if (!trimmed) continue;
+    // Floor: skip terms shorter than 4 chars unless it's the firm_name
+    // itself (which the operator presumably can't change without renaming
+    // their firm).
+    if (trimmed !== firmName && trimmed.length < MIN_TERM_LENGTH) {
+      skipped.push(trimmed);
+      continue;
+    }
     const key = trimmed.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(trimmed);
+  }
+  if (skipped.length > 0) {
+    console.warn(
+      `[reddit:scan] skipped ${skipped.length} too-ambiguous search term(s) ` +
+        `(< ${MIN_TERM_LENGTH} chars): ${skipped.join(', ')}. ` +
+        `Add a longer variant in Brand Truth to capture mentions of these.`,
+    );
   }
   return out;
 }

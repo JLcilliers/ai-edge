@@ -75,40 +75,71 @@ function Field({
 }
 
 // ── String Array Editor ───────────────────────────────────
+// `ambiguousMinLength` (optional) flags any item shorter than this with a
+// soft warning underneath the row. Used by Name Variants + Common
+// Misspellings: 3-letter tokens like "APL" trigger torrents of false-
+// positive Reddit mentions because they collide with Australian Premier
+// League / Asia-Pacific Logistics / Applied Physics Lab / etc. Server-
+// side, the Reddit listener silently skips terms shorter than 4 chars
+// (with a vercel-logs warning) — this UI surfaces the same rule before
+// the operator hits Save.
 function StringArray({
   label,
   items,
   onChange,
+  ambiguousMinLength,
 }: {
   label: string;
   items: string[];
   onChange: (items: string[]) => void;
+  ambiguousMinLength?: number;
 }) {
   return (
     <div>
       <span className="text-xs text-white/55">{label}</span>
       <div className="mt-1 flex flex-col gap-1">
-        {items.map((item, i) => (
-          <div key={i} className="flex gap-2">
-            <input
-              type="text"
-              value={item}
-              onChange={(e) => {
-                const copy = [...items];
-                copy[i] = e.target.value;
-                onChange(copy);
-              }}
-              className="flex-1 rounded-lg border border-white/10 bg-[var(--bg-tertiary)] px-3 py-1.5 text-sm text-white focus:border-[var(--accent)] focus:outline-none"
-            />
-            <button
-              type="button"
-              onClick={() => onChange(items.filter((_, j) => j !== i))}
-              className="rounded px-2 text-xs text-red-400 hover:bg-red-950/30"
-            >
-              Remove
-            </button>
-          </div>
-        ))}
+        {items.map((item, i) => {
+          const trimmed = item.trim();
+          const tooShort =
+            ambiguousMinLength !== undefined &&
+            trimmed.length > 0 &&
+            trimmed.length < ambiguousMinLength;
+          return (
+            <div key={i} className="flex flex-col gap-1">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={item}
+                  onChange={(e) => {
+                    const copy = [...items];
+                    copy[i] = e.target.value;
+                    onChange(copy);
+                  }}
+                  className={`flex-1 rounded-lg border bg-[var(--bg-tertiary)] px-3 py-1.5 text-sm text-white focus:border-[var(--accent)] focus:outline-none ${
+                    tooShort
+                      ? 'border-amber-500/50'
+                      : 'border-white/10'
+                  }`}
+                />
+                <button
+                  type="button"
+                  onClick={() => onChange(items.filter((_, j) => j !== i))}
+                  className="rounded px-2 text-xs text-red-400 hover:bg-red-950/30"
+                >
+                  Remove
+                </button>
+              </div>
+              {tooShort && (
+                <p className="px-1 text-[11px] text-amber-300/85">
+                  &quot;{trimmed}&quot; is short enough that the Reddit
+                  listener will skip it (collides with too many unrelated
+                  acronyms — APL, IBM, KFC, etc.). Add a longer phrase that
+                  uniquely identifies the firm.
+                </p>
+              )}
+            </div>
+          );
+        })}
       </div>
       <button
         type="button"
@@ -221,10 +252,20 @@ export function BrandTruthEditor({
           />
         </div>
         <div className="mt-4">
-          <StringArray label="Name Variants" items={data.name_variants ?? []} onChange={(v) => set('name_variants', v)} />
+          <StringArray
+            label="Name Variants"
+            items={data.name_variants ?? []}
+            onChange={(v) => set('name_variants', v)}
+            ambiguousMinLength={4}
+          />
         </div>
         <div className="mt-4">
-          <StringArray label="Common Misspellings" items={data.common_misspellings ?? []} onChange={(v) => set('common_misspellings', v)} />
+          <StringArray
+            label="Common Misspellings"
+            items={data.common_misspellings ?? []}
+            onChange={(v) => set('common_misspellings', v)}
+            ambiguousMinLength={4}
+          />
         </div>
       </Section>
 
