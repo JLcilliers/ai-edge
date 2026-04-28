@@ -33,6 +33,7 @@ import { encryptToken, decryptToken } from './crypto';
 const SCOPES = ['https://www.googleapis.com/auth/webmasters.readonly'];
 const AUTH_ENDPOINT = 'https://accounts.google.com/o/oauth2/v2/auth';
 const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
+const SITES_ENDPOINT = 'https://www.googleapis.com/webmasters/v3/sites';
 
 export interface OAuthEnv {
   clientId: string;
@@ -81,7 +82,7 @@ export function buildAuthorizeUrl(firmSlug: string): string {
   return url.toString();
 }
 
-interface TokenResponse {
+export interface TokenResponse {
   access_token: string;
   refresh_token?: string;
   expires_in: number;
@@ -89,7 +90,63 @@ interface TokenResponse {
   token_type: string;
 }
 
-async function exchangeCode(code: string): Promise<TokenResponse> {
+/**
+ * One Search Console property the granted token can read. Returned by
+ * `fetchAccessibleSites()`; the operator picks one of these on the
+ * post-OAuth dropdown.
+ *
+ * `permissionLevel` is one of:
+ *   - `siteOwner`           — verified owner, full access
+ *   - `siteFullUser`        — full user (delegated)
+ *   - `siteRestrictedUser`  — restricted user (limited write, but can read)
+ *   - `siteUnverifiedUser`  — visible in sites.list but cannot query
+ *                             SearchAnalytics. We surface these in the
+ *                             dropdown but mark them so the operator
+ *                             knows the connection will fail on first sync.
+ */
+export interface AccessibleSite {
+  siteUrl: string;
+  permissionLevel: string;
+}
+
+/**
+ * Fetch the Search Console properties the granted access token can see.
+ * Used immediately after OAuth code exchange to render a "pick property"
+ * dropdown — the operator usually has more than one property in their
+ * account and we need them to confirm which one this firm is anchored to.
+ */
+export async function fetchAccessibleSites(
+  accessToken: string,
+): Promise<AccessibleSite[]> {
+  const res = await fetch(SITES_ENDPOINT, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(
+      `Search Console sites.list failed: ${res.status} ${body.slice(0, 200)}`,
+    );
+  }
+  const json = (await res.json()) as { siteEntry?: AccessibleSite[] };
+  return json.siteEntry ?? [];
+}
+
+/**
+ * Update only the `site_url` on an existing connection — used by the
+ * "pick property" follow-up step. The OAuth tokens are already stored
+ * by then; we just point the connection at the operator's chosen
+ * property. Idempotent and safe to call repeatedly (operators may
+ * re-pick if they realize they chose the wrong property).
+ */
+export async function updateSiteUrl(firmId: string, siteUrl: string): Promise<void> {
+  const db = getDb();
+  await db
+    .update(gscConnections)
+    .set({ site_url: siteUrl })
+    .where(eq(gscConnections.firm_id, firmId));
+}
+
+export async function exchangeCode(code: string): Promise<TokenResponse> {
   const env = getOAuthEnv();
   const body = new URLSearchParams({
     code,
