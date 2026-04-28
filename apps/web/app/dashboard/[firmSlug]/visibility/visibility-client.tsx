@@ -16,6 +16,7 @@ import {
   Sparkles,
   Loader2,
   Search,
+  LineChart,
 } from 'lucide-react';
 import type {
   ShareOfVoiceResult,
@@ -28,8 +29,9 @@ import {
   type AioCaptureRow,
   type AioCaptureUiOutcome,
 } from '../../../actions/aio-actions';
+import type { VisibilityCorrelation } from '../../../actions/visibility-correlation-actions';
 
-type Tab = 'share' | 'sources' | 'drift' | 'aio';
+type Tab = 'share' | 'sources' | 'drift' | 'aio' | 'correlation';
 
 function formatDate(d: Date | null | undefined): string {
   if (!d) return '—';
@@ -58,6 +60,7 @@ export function VisibilityClient({
   regression,
   aioCaptures,
   aioProvider,
+  correlation,
 }: {
   firmSlug: string;
   firmName: string;
@@ -67,6 +70,7 @@ export function VisibilityClient({
   regression: AlignmentRegression;
   aioCaptures: AioCaptureRow[];
   aioProvider: string;
+  correlation: VisibilityCorrelation | null;
 }) {
   const [tab, setTab] = useState<Tab>('share');
 
@@ -114,6 +118,13 @@ export function VisibilityClient({
         <TabButton active={tab === 'aio'} onClick={() => setTab('aio')} icon={Sparkles}>
           AI Overviews
         </TabButton>
+        <TabButton
+          active={tab === 'correlation'}
+          onClick={() => setTab('correlation')}
+          icon={LineChart}
+        >
+          Correlation
+        </TabButton>
       </div>
 
       {tab === 'share' && (
@@ -128,6 +139,7 @@ export function VisibilityClient({
           provider={aioProvider}
         />
       )}
+      {tab === 'correlation' && <CorrelationView correlation={correlation} />}
     </>
   );
 }
@@ -603,6 +615,324 @@ function DriftView({ history, firmSlug }: { history: CitationDriftRow[]; firmSlu
         </div>
       ))}
     </div>
+  );
+}
+
+// ─── Correlation view (Phase B #6 visualization) ───────────
+function CorrelationView({
+  correlation,
+}: {
+  correlation: VisibilityCorrelation | null;
+}) {
+  if (!correlation) {
+    return (
+      <div className="rounded-xl border border-dashed border-white/10 bg-[--bg-secondary] p-10 text-center text-sm text-white/55">
+        Could not load correlation data — check the GSC and AIO crons in the
+        admin dashboard.
+      </div>
+    );
+  }
+
+  const c = correlation;
+
+  // Empty state when neither side is connected. We render a single banner
+  // explaining the chart's purpose so the operator knows what they're
+  // missing rather than seeing a blank canvas.
+  if (!c.gscConnected && !c.hasAioCaptures) {
+    return (
+      <div className="rounded-xl border border-dashed border-white/10 bg-[--bg-secondary] p-10 text-sm text-white/55">
+        <h3 className="mb-2 font-[family-name:var(--font-jakarta)] text-base font-semibold text-white">
+          What this chart will show
+        </h3>
+        <p className="max-w-2xl">
+          Daily organic clicks/impressions from Search Console plotted alongside
+          AI Overview capture markers — so you can see whether Google&apos;s AIO
+          panel triggering correlates with drops in organic traffic for this
+          firm&apos;s queries. Connect Search Console (Settings → Search Console)
+          and let the AIO cron run for at least a week to populate this view.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* Tile row — totals over the requested window */}
+      <div className="grid gap-3 sm:grid-cols-4">
+        <StatTile
+          label="Clicks (30d)"
+          value={c.totalClicks.toLocaleString('en-US')}
+          detail={c.gscConnected ? 'sum across all queries' : 'GSC not connected'}
+          tone={c.totalClicks > 0 ? 'good' : 'neutral'}
+        />
+        <StatTile
+          label="Impressions (30d)"
+          value={c.totalImpressions.toLocaleString('en-US')}
+          detail={
+            c.avgPosition != null
+              ? `avg position ${c.avgPosition.toFixed(1)}`
+              : c.gscConnected
+                ? 'no impressions yet'
+                : 'GSC not connected'
+          }
+          tone={c.totalImpressions > 0 ? 'good' : 'neutral'}
+        />
+        <StatTile
+          label="AIO triggers"
+          value={`${c.totalAioTriggered} / ${c.totalAioCaptures}`}
+          detail={
+            c.totalAioCaptures === 0
+              ? 'no captures yet'
+              : `${Math.round((c.totalAioTriggered / Math.max(1, c.totalAioCaptures)) * 100)}% of captures had AIO`
+          }
+          tone={c.totalAioTriggered > 0 ? 'bad' : 'neutral'}
+        />
+        <StatTile
+          label="AIO firm cited"
+          value={String(c.totalAioFirmCited)}
+          detail={
+            c.totalAioTriggered === 0
+              ? 'no AIO triggers'
+              : c.totalAioFirmCited > 0
+                ? `cited in ${Math.round((c.totalAioFirmCited / c.totalAioTriggered) * 100)}% of AIO triggers`
+                : 'firm not cited in any AIO yet'
+          }
+          tone={c.totalAioFirmCited > 0 ? 'good' : 'bad'}
+        />
+      </div>
+
+      {/* Connection-state banners */}
+      {!c.gscConnected && (
+        <div className="rounded-xl border border-[--rag-yellow]/30 bg-[--rag-yellow-bg] px-4 py-3 text-sm text-[--rag-yellow]">
+          GSC isn&apos;t connected — clicks/impressions will read 0. Connect
+          Search Console from <strong>Settings → Search Console</strong> to
+          light up the GSC line on this chart.
+        </div>
+      )}
+      {!c.hasAioCaptures && c.gscConnected && (
+        <div className="rounded-xl border border-white/10 bg-[--bg-secondary] px-4 py-3 text-sm text-white/55">
+          No AIO captures in the last 30 days. The weekly capture cron runs
+          Tuesdays 10:00 UTC; you can also trigger ad-hoc captures from the
+          <strong> AI Overviews </strong> tab.
+        </div>
+      )}
+
+      {/* The chart itself */}
+      <CorrelationChart daily={c.daily} />
+
+      {/* Honest framing footer */}
+      <p className="font-[family-name:var(--font-geist-mono)] text-[11px] text-white/40">
+        Daily clicks line is computed from <code>gsc_daily_metric</code> (UTC
+        days). AIO markers are bucketed by capture <code>fetched_at</code> —
+        sparse by design (one capture per query per scheduled run). Not a
+        causal model: a coincident click drop and AIO trigger doesn&apos;t mean
+        AIO ate the clicks; it&apos;s a useful prompt for an investigation.
+      </p>
+    </div>
+  );
+}
+
+function CorrelationChart({
+  daily,
+}: {
+  daily: VisibilityCorrelation['daily'];
+}) {
+  // Chart geometry. Use viewBox-based SVG so it scales responsively.
+  const W = 1200;
+  const H = 280;
+  const PAD_L = 50;
+  const PAD_R = 16;
+  const PAD_T = 16;
+  const PAD_B = 28;
+  const innerW = W - PAD_L - PAD_R;
+  const innerH = H - PAD_T - PAD_B;
+
+  if (daily.length === 0) {
+    return (
+      <div className="rounded-xl border border-white/10 bg-[--bg-secondary] p-6 text-sm text-white/55">
+        No daily rows in the requested window.
+      </div>
+    );
+  }
+
+  const maxClicks = Math.max(1, ...daily.map((d) => d.clicks));
+  const maxImpressions = Math.max(1, ...daily.map((d) => d.impressions));
+
+  const xFor = (i: number) =>
+    PAD_L + (innerW * i) / Math.max(1, daily.length - 1);
+  const yForClicks = (v: number) =>
+    PAD_T + innerH * (1 - v / maxClicks);
+  const yForImpressions = (v: number) =>
+    PAD_T + innerH * (1 - v / maxImpressions);
+
+  // Build the line paths
+  const clicksPath = daily
+    .map((d, i) => `${i === 0 ? 'M' : 'L'} ${xFor(i).toFixed(1)} ${yForClicks(d.clicks).toFixed(1)}`)
+    .join(' ');
+  const impressionsPath = daily
+    .map(
+      (d, i) =>
+        `${i === 0 ? 'M' : 'L'} ${xFor(i).toFixed(1)} ${yForImpressions(d.impressions).toFixed(1)}`,
+    )
+    .join(' ');
+
+  // Y-axis tick positions (left axis = clicks; right unused in v1).
+  const tickValues = [0, 0.25, 0.5, 0.75, 1].map((p) => p * maxClicks);
+
+  // X-axis labels — pick ~6 evenly spaced dates so we don't crowd.
+  const xLabelStep = Math.max(1, Math.floor(daily.length / 6));
+
+  return (
+    <div className="rounded-xl border border-white/10 bg-[--bg-secondary] p-4">
+      <div className="mb-3 flex flex-wrap items-center gap-4 text-xs">
+        <LegendDot color="rgba(250, 204, 21, 0.95)" label="Daily clicks (left axis)" />
+        <LegendDot color="rgba(255,255,255,0.35)" label="Daily impressions (scaled)" />
+        <LegendDot color="rgba(248, 113, 113, 0.9)" label="AIO triggered" shape="square" />
+        <LegendDot color="rgba(34, 197, 94, 0.95)" label="AIO firm cited" shape="square" />
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img">
+        {/* Grid */}
+        {tickValues.map((tv, i) => {
+          const y = yForClicks(tv);
+          return (
+            <g key={`g-${i}`}>
+              <line
+                x1={PAD_L}
+                x2={W - PAD_R}
+                y1={y}
+                y2={y}
+                stroke="rgba(255,255,255,0.06)"
+                strokeWidth={1}
+              />
+              <text
+                x={PAD_L - 6}
+                y={y + 4}
+                textAnchor="end"
+                fontSize="10"
+                fill="rgba(255,255,255,0.45)"
+                fontFamily="ui-monospace, Consolas, monospace"
+              >
+                {Math.round(tv).toLocaleString('en-US')}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* Impressions line (faint background) */}
+        <path
+          d={impressionsPath}
+          stroke="rgba(255,255,255,0.18)"
+          strokeWidth="1.5"
+          fill="none"
+          strokeDasharray="3 3"
+        />
+
+        {/* Clicks line (foreground) */}
+        <path
+          d={clicksPath}
+          stroke="rgba(250, 204, 21, 0.95)"
+          strokeWidth="2"
+          fill="none"
+        />
+
+        {/* AIO markers — small squares above the chart base for any day with captures */}
+        {daily.map((d, i) => {
+          if (d.aioCaptureCount === 0) return null;
+          const x = xFor(i);
+          // Triggered = red square; firm cited = green square overlapping;
+          // we render both so an "AIO triggered AND we got cited" day looks
+          // like the green dot.
+          return (
+            <g key={`aio-${i}`}>
+              {d.aioTriggeredCount > 0 && (
+                <rect
+                  x={x - 4}
+                  y={PAD_T - 2}
+                  width={8}
+                  height={8}
+                  fill="rgba(248, 113, 113, 0.9)"
+                  rx={1.5}
+                />
+              )}
+              {d.aioFirmCitedCount > 0 && (
+                <rect
+                  x={x - 3}
+                  y={PAD_T - 1}
+                  width={6}
+                  height={6}
+                  fill="rgba(34, 197, 94, 0.95)"
+                  rx={1}
+                />
+              )}
+            </g>
+          );
+        })}
+
+        {/* X-axis tick labels */}
+        {daily.map((d, i) => {
+          if (i % xLabelStep !== 0 && i !== daily.length - 1) return null;
+          const x = xFor(i);
+          // YYYY-MM-DD → MM-DD for compactness
+          const label = d.date.slice(5);
+          return (
+            <text
+              key={`x-${i}`}
+              x={x}
+              y={H - PAD_B + 16}
+              textAnchor="middle"
+              fontSize="10"
+              fill="rgba(255,255,255,0.45)"
+              fontFamily="ui-monospace, Consolas, monospace"
+            >
+              {label}
+            </text>
+          );
+        })}
+
+        {/* Axis lines */}
+        <line
+          x1={PAD_L}
+          x2={W - PAD_R}
+          y1={H - PAD_B}
+          y2={H - PAD_B}
+          stroke="rgba(255,255,255,0.15)"
+          strokeWidth={1}
+        />
+        <line
+          x1={PAD_L}
+          x2={PAD_L}
+          y1={PAD_T}
+          y2={H - PAD_B}
+          stroke="rgba(255,255,255,0.15)"
+          strokeWidth={1}
+        />
+      </svg>
+    </div>
+  );
+}
+
+function LegendDot({
+  color,
+  label,
+  shape = 'circle',
+}: {
+  color: string;
+  label: string;
+  shape?: 'circle' | 'square';
+}) {
+  return (
+    <span className="inline-flex items-center gap-1.5 text-[11px] text-white/55">
+      <span
+        className="inline-block"
+        style={{
+          width: 10,
+          height: 10,
+          background: color,
+          borderRadius: shape === 'circle' ? '50%' : 2,
+        }}
+      />
+      {label}
+    </span>
   );
 }
 
