@@ -11,6 +11,7 @@ import {
   listAioCaptures,
   getAioProviderName,
 } from '../../../actions/aio-actions';
+import { getVisibilityCorrelation } from '../../../actions/visibility-correlation-actions';
 import { VisibilityClient } from './visibility-client';
 
 export const dynamic = 'force-dynamic';
@@ -34,15 +35,23 @@ export default async function VisibilityPage({
   const firm = await getFirmBySlug(firmSlug);
   if (!firm) notFound();
 
-  const [shareOfVoice, sourceGraph, driftHistory, regression, aioCaptures, aioProvider] =
-    await Promise.all([
-      getShareOfVoice(firmSlug),
-      getCitationSourceGraph(firmSlug),
-      getCitationDriftHistory(firmSlug),
-      getAlignmentRegression(firmSlug),
-      listAioCaptures(firmSlug).catch(() => []),
-      getAioProviderName().catch(() => 'none'),
-    ]);
+  const [
+    shareOfVoice,
+    sourceGraph,
+    driftHistory,
+    regression,
+    aioCaptures,
+    aioProvider,
+    correlation,
+  ] = await Promise.all([
+    getShareOfVoice(firmSlug),
+    getCitationSourceGraph(firmSlug),
+    getCitationDriftHistory(firmSlug),
+    getAlignmentRegression(firmSlug),
+    listAioCaptures(firmSlug).catch(() => []),
+    getAioProviderName().catch(() => 'none'),
+    getVisibilityCorrelation(firmSlug, 30).catch(() => null),
+  ]);
 
   return (
     <div>
@@ -72,6 +81,7 @@ export default async function VisibilityPage({
         regression={regression}
         aioCaptures={aioCaptures}
         aioProvider={aioProvider}
+        correlation={correlation}
       />
     </div>
   );
