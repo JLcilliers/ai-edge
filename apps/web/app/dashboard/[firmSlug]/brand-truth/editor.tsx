@@ -21,7 +21,7 @@ function Section({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-semibold text-black hover:bg-[--bg-tertiary]/50"
+        className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-semibold text-white hover:bg-[--bg-tertiary]/50"
       >
         {title}
         <span className="text-white/55">{open ? '−' : '+'}</span>
@@ -876,7 +876,7 @@ export function BrandTruthEditor({
 
     {/* Version history sidebar */}
     <aside className="w-64 shrink-0">
-      <h2 className="text-sm font-semibold text-black/55">Version History</h2>
+      <h2 className="text-sm font-semibold text-white/55">Version History</h2>
       {isLoadingVersion && <p className="mt-2 text-xs text-white/40 animate-pulse">Loading version...</p>}
       <div className="mt-3 flex flex-col gap-1">
         {versions.length === 0 ? (
