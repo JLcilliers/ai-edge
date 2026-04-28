@@ -46,7 +46,7 @@ export default async function AdminPage() {
         </div>
         <Link
           href="/dashboard"
-          className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-[--bg-secondary] px-4 py-2 text-xs font-medium text-white/70 transition-colors hover:border-white/20 hover:text-white"
+          className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-[var(--bg-secondary)] px-4 py-2 text-xs font-medium text-white/70 transition-colors hover:border-white/20 hover:text-white"
         >
           <ArrowLeft size={14} strokeWidth={1.5} />
           Back to clients
@@ -55,7 +55,7 @@ export default async function AdminPage() {
 
       <div className="mb-8 flex items-start gap-4">
         <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/5">
-          <Shield size={24} strokeWidth={1.5} className="text-[--accent]" />
+          <Shield size={24} strokeWidth={1.5} className="text-[var(--accent)]" />
         </div>
         <div>
           <h1 className="font-[family-name:var(--font-jakarta)] text-3xl font-extrabold tracking-tight text-white">

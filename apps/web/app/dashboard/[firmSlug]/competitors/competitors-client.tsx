@@ -78,9 +78,9 @@ export function CompetitorsClient({
   return (
     <div>
       {/* Add competitor form */}
-      <div className="rounded-xl border border-white/10 bg-[--bg-secondary] p-6">
+      <div className="rounded-xl border border-white/10 bg-[var(--bg-secondary)] p-6">
         <div className="mb-4 flex items-center gap-2">
-          <Plus size={18} strokeWidth={1.5} className="text-[--accent]" />
+          <Plus size={18} strokeWidth={1.5} className="text-[var(--accent)]" />
           <h2 className="font-[family-name:var(--font-jakarta)] text-lg font-bold text-white">
             Add Competitor
           </h2>
@@ -91,26 +91,26 @@ export function CompetitorsClient({
             placeholder="Firm name"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="rounded-lg border border-white/10 bg-[--bg-primary] px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-[--accent]/50 focus:outline-none"
+            className="rounded-lg border border-white/10 bg-[var(--bg-primary)] px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-[var(--accent)]/50 focus:outline-none"
           />
           <input
             type="url"
             placeholder="https://example.com"
             value={website}
             onChange={(e) => setWebsite(e.target.value)}
-            className="rounded-lg border border-white/10 bg-[--bg-primary] px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-[--accent]/50 focus:outline-none"
+            className="rounded-lg border border-white/10 bg-[var(--bg-primary)] px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-[var(--accent)]/50 focus:outline-none"
           />
           <input
             type="text"
             placeholder="Notes (optional)"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            className="rounded-lg border border-white/10 bg-[--bg-primary] px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-[--accent]/50 focus:outline-none"
+            className="rounded-lg border border-white/10 bg-[var(--bg-primary)] px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-[var(--accent)]/50 focus:outline-none"
           />
           <button
             onClick={handleAdd}
             disabled={isPending}
-            className="rounded-full bg-[--accent] px-5 py-2 text-sm font-semibold text-black transition-colors hover:bg-[--accent-hover] disabled:opacity-50"
+            className="rounded-full bg-[var(--accent)] px-5 py-2 text-sm font-semibold text-black transition-colors hover:bg-[var(--accent-hover)] disabled:opacity-50"
           >
             {isPending ? 'Adding...' : 'Add'}
           </button>
@@ -173,7 +173,7 @@ export function CompetitorsClient({
         </div>
 
         {initialRoster.length === 0 && (
-          <div className="flex flex-col items-center justify-center rounded-xl border border-white/10 bg-[--bg-secondary] py-16 text-center">
+          <div className="flex flex-col items-center justify-center rounded-xl border border-white/10 bg-[var(--bg-secondary)] py-16 text-center">
             <Users className="mb-4 h-12 w-12 text-white/20" strokeWidth={1.5} />
             <h3 className="mb-2 text-lg font-semibold text-white/60">
               No competitors tracked yet
@@ -187,7 +187,7 @@ export function CompetitorsClient({
         )}
 
         {initialRoster.length > 0 && (
-          <div className="overflow-hidden rounded-xl border border-white/10 bg-[--bg-secondary]">
+          <div className="overflow-hidden rounded-xl border border-white/10 bg-[var(--bg-secondary)]">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-white/10 text-left text-[10px] font-medium uppercase tracking-widest text-white/40">
@@ -243,7 +243,7 @@ export function CompetitorsClient({
                       </td>
                       <td className="px-5 py-4 text-right">
                         {share.praiseCount > 0 ? (
-                          <span className="rounded-full bg-[--rag-green-bg] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-[--rag-green]">
+                          <span className="rounded-full bg-[var(--rag-green-bg)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-[var(--rag-green)]">
                             {share.praiseCount}
                           </span>
                         ) : (
@@ -288,7 +288,7 @@ function ShareBar({ value }: { value: number }) {
     <div className="inline-flex items-center gap-2">
       <div className="h-1.5 w-24 overflow-hidden rounded-full bg-white/10">
         <div
-          className="h-full rounded-full bg-[--accent]"
+          className="h-full rounded-full bg-[var(--accent)]"
           style={{ width: `${pct}%` }}
         />
       </div>
@@ -311,7 +311,7 @@ function StatCard({
   icon: typeof Trophy;
 }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-[--bg-secondary] p-5">
+    <div className="rounded-xl border border-white/10 bg-[var(--bg-secondary)] p-5">
       <div className="flex items-center gap-2">
         <Icon size={14} strokeWidth={1.5} className="text-white/40" />
         <div className="text-[10px] font-medium uppercase tracking-widest text-white/40">

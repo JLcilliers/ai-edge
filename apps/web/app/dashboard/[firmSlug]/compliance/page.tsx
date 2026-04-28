@@ -31,7 +31,7 @@ export default async function CompliancePage({
             jurisdictional rulebook and this firm&apos;s own Brand Truth.
           </p>
         </div>
-        <div className="rounded-xl border border-amber-500/40 bg-[--bg-secondary] p-6">
+        <div className="rounded-xl border border-amber-500/40 bg-[var(--bg-secondary)] p-6">
           <div className="flex items-start gap-3">
             <AlertTriangle
               size={18}
@@ -53,7 +53,7 @@ export default async function CompliancePage({
               </p>
               <Link
                 href={`/dashboard/${firmSlug}/brand-truth`}
-                className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-white/10 px-4 py-1.5 text-xs text-white transition hover:border-[--accent]"
+                className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-white/10 px-4 py-1.5 text-xs text-white transition hover:border-[var(--accent)]"
               >
                 Configure Brand Truth
               </Link>
@@ -68,7 +68,7 @@ export default async function CompliancePage({
     <div>
       <div className="mb-8 flex items-start gap-4">
         <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/5">
-          <ShieldCheck size={24} strokeWidth={1.5} className="text-[--accent]" />
+          <ShieldCheck size={24} strokeWidth={1.5} className="text-[var(--accent)]" />
         </div>
         <div>
           <h1 className="font-[family-name:var(--font-jakarta)] text-3xl font-extrabold tracking-tight text-white">
@@ -84,7 +84,7 @@ export default async function CompliancePage({
 
       {/* Active ruleset summary */}
       <div className="mb-8 grid gap-4 sm:grid-cols-2">
-        <div className="rounded-xl border border-white/10 bg-[--bg-secondary] p-5">
+        <div className="rounded-xl border border-white/10 bg-[var(--bg-secondary)] p-5">
           <div className="text-[10px] font-medium uppercase tracking-widest text-white/40">
             Jurisdictions Active
           </div>
@@ -116,7 +116,7 @@ export default async function CompliancePage({
             ))}
           </div>
         </div>
-        <div className="rounded-xl border border-white/10 bg-[--bg-secondary] p-5">
+        <div className="rounded-xl border border-white/10 bg-[var(--bg-secondary)] p-5">
           <div className="text-[10px] font-medium uppercase tracking-widest text-white/40">
             Firm-Specific Banned Phrases
           </div>

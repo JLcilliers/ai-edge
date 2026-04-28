@@ -87,7 +87,7 @@ export function ScenariosClient({
               onClick={() => setTab(t.id)}
               className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
                 active
-                  ? 'bg-[--bg-secondary] text-white'
+                  ? 'bg-[var(--bg-secondary)] text-white'
                   : 'text-white/55 hover:text-white/80'
               }`}
             >
@@ -173,12 +173,12 @@ function Tile({
 }) {
   const valueColor =
     tone === 'ok'
-      ? 'text-[--rag-green]'
+      ? 'text-[var(--rag-green)]'
       : tone === 'warn'
-        ? 'text-[--rag-yellow]'
+        ? 'text-[var(--rag-yellow)]'
         : 'text-white';
   return (
-    <div className="rounded-xl border border-white/10 bg-[--bg-secondary] p-4">
+    <div className="rounded-xl border border-white/10 bg-[var(--bg-secondary)] p-4">
       <div className="text-[10px] font-medium uppercase tracking-widest text-white/40">
         {label}
       </div>
@@ -214,7 +214,7 @@ function ScenariosTab({
   return (
     <div className="flex flex-col gap-4">
       {!weightsPresent && (
-        <div className="rounded-xl border border-[--rag-yellow]/30 bg-[--rag-yellow-bg] p-4 text-sm text-[--rag-yellow]">
+        <div className="rounded-xl border border-[var(--rag-yellow)]/30 bg-[var(--rag-yellow-bg)] p-4 text-sm text-[var(--rag-yellow)]">
           <div className="flex items-start gap-2">
             <AlertTriangle size={14} strokeWidth={2} className="mt-0.5 shrink-0" />
             <div>
@@ -236,7 +236,7 @@ function ScenariosTab({
         <button
           type="button"
           onClick={() => setShowForm((v) => !v)}
-          className="inline-flex items-center gap-2 rounded-full bg-[--accent] px-4 py-2 text-sm font-semibold text-black transition-colors hover:bg-[--accent-hover]"
+          className="inline-flex items-center gap-2 rounded-full bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-black transition-colors hover:bg-[var(--accent-hover)]"
         >
           <PlusCircle size={14} strokeWidth={2} />
           {showForm ? 'Cancel' : 'New scenario'}
@@ -313,7 +313,7 @@ function ScenarioRowCard({
   };
 
   return (
-    <div className="rounded-xl border border-white/10 bg-[--bg-secondary] p-5">
+    <div className="rounded-xl border border-white/10 bg-[var(--bg-secondary)] p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
@@ -378,14 +378,14 @@ function ScenarioRowCard({
             type="button"
             onClick={onDelete}
             disabled={isPending}
-            className="inline-flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-xs text-white/55 transition-colors hover:border-[--rag-red]/50 hover:text-[--rag-red] disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-xs text-white/55 transition-colors hover:border-[var(--rag-red)]/50 hover:text-[var(--rag-red)] disabled:opacity-50"
           >
             <Trash2 size={12} strokeWidth={2} />
           </button>
         </div>
       </div>
       {error && (
-        <div className="mt-3 rounded-lg border border-[--rag-red]/30 bg-[--rag-red-bg] px-3 py-2 text-xs text-[--rag-red]">
+        <div className="mt-3 rounded-lg border border-[var(--rag-red)]/30 bg-[var(--rag-red-bg)] px-3 py-2 text-xs text-[var(--rag-red)]">
           {error}
         </div>
       )}
@@ -397,15 +397,15 @@ function ConfidencePill({ label }: { label: string | null }) {
   if (!label) return null;
   const map: Record<string, { tone: string; text: string }> = {
     directional: {
-      tone: 'border-[--rag-green]/30 bg-[--rag-green-bg] text-[--rag-green]',
+      tone: 'border-[var(--rag-green)]/30 bg-[var(--rag-green-bg)] text-[var(--rag-green)]',
       text: 'directional',
     },
     low_confidence: {
-      tone: 'border-[--rag-yellow]/30 bg-[--rag-yellow-bg] text-[--rag-yellow]',
+      tone: 'border-[var(--rag-yellow)]/30 bg-[var(--rag-yellow-bg)] text-[var(--rag-yellow)]',
       text: 'low confidence',
     },
     no_calibration: {
-      tone: 'border-[--rag-red]/30 bg-[--rag-red-bg] text-[--rag-red]',
+      tone: 'border-[var(--rag-red)]/30 bg-[var(--rag-red-bg)] text-[var(--rag-red)]',
       text: 'no calibration',
     },
   };
@@ -445,9 +445,9 @@ function DeltaPill({
   const good = positiveIsGood ? positive : negative;
   const bad = positiveIsGood ? negative : positive;
   const tone = good
-    ? 'border-[--rag-green]/30 bg-[--rag-green-bg] text-[--rag-green]'
+    ? 'border-[var(--rag-green)]/30 bg-[var(--rag-green-bg)] text-[var(--rag-green)]'
     : bad
-      ? 'border-[--rag-red]/30 bg-[--rag-red-bg] text-[--rag-red]'
+      ? 'border-[var(--rag-red)]/30 bg-[var(--rag-red-bg)] text-[var(--rag-red)]'
       : 'border-white/10 bg-white/5 text-white/55';
   return (
     <span
@@ -664,7 +664,7 @@ function NewScenarioForm({
   };
 
   return (
-    <div className="rounded-xl border border-white/10 bg-[--bg-secondary] p-5">
+    <div className="rounded-xl border border-white/10 bg-[var(--bg-secondary)] p-5">
       <h3 className="mb-4 font-[family-name:var(--font-jakarta)] text-base font-semibold text-white">
         New scenario
       </h3>
@@ -676,14 +676,14 @@ function NewScenarioForm({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. Add LegalService schema to /personal-injury"
-            className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-[--accent] focus:outline-none"
+            className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-[var(--accent)] focus:outline-none"
           />
         </Field>
         <Field label="Target query">
           <select
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white focus:border-[--accent] focus:outline-none"
+            className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white focus:border-[var(--accent)] focus:outline-none"
           >
             <option value="">— pick a query —</option>
             {queryOptions.map((q) => (
@@ -697,14 +697,14 @@ function NewScenarioForm({
 
       <Field label="Baseline URL" className="mt-3">
         {pagesWithFeatures.length === 0 ? (
-          <div className="rounded-lg border border-[--rag-yellow]/30 bg-[--rag-yellow-bg] px-3 py-2 text-xs text-[--rag-yellow]">
+          <div className="rounded-lg border border-[var(--rag-yellow)]/30 bg-[var(--rag-yellow-bg)] px-3 py-2 text-xs text-[var(--rag-yellow)]">
             No pages with features yet. Run feature extraction (Calibration tab).
           </div>
         ) : (
           <select
             value={baselineUrl}
             onChange={(e) => setBaselineUrl(e.target.value)}
-            className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white focus:border-[--accent] focus:outline-none"
+            className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white focus:border-[var(--accent)] focus:outline-none"
           >
             {pagesWithFeatures.map((p) => (
               <option key={p.url} value={p.url}>
@@ -721,7 +721,7 @@ function NewScenarioForm({
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Why are you running this scenario?"
-          className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-[--accent] focus:outline-none"
+          className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-[var(--accent)] focus:outline-none"
         />
       </Field>
 
@@ -747,7 +747,7 @@ function NewScenarioForm({
             onChange={(e) => setCustomChange(e.target.value)}
             rows={5}
             placeholder='{"has_jsonld_legalservice": true, "word_count_log": "+0.15"}'
-            className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 font-[family-name:var(--font-geist-mono)] text-xs text-white placeholder:text-white/30 focus:border-[--accent] focus:outline-none"
+            className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 font-[family-name:var(--font-geist-mono)] text-xs text-white placeholder:text-white/30 focus:border-[var(--accent)] focus:outline-none"
           />
         ) : (
           <div className="grid gap-2 sm:grid-cols-2">
@@ -760,7 +760,7 @@ function NewScenarioForm({
                   onClick={() => setSelectedTemplate(active ? null : t.id)}
                   className={`rounded-lg border px-3 py-2 text-left transition-colors ${
                     active
-                      ? 'border-[--accent] bg-[--accent]/10'
+                      ? 'border-[var(--accent)] bg-[var(--accent)]/10'
                       : 'border-white/10 bg-black/20 hover:border-white/20'
                   }`}
                 >
@@ -817,9 +817,9 @@ function NewScenarioForm({
                     <span
                       className={
                         c.contribution > 0
-                          ? 'text-[--rag-green]'
+                          ? 'text-[var(--rag-green)]'
                           : c.contribution < 0
-                            ? 'text-[--rag-red]'
+                            ? 'text-[var(--rag-red)]'
                             : 'text-white/40'
                       }
                     >
@@ -835,7 +835,7 @@ function NewScenarioForm({
       )}
 
       {error && (
-        <div className="mt-4 rounded-lg border border-[--rag-red]/30 bg-[--rag-red-bg] px-3 py-2 text-xs text-[--rag-red]">
+        <div className="mt-4 rounded-lg border border-[var(--rag-red)]/30 bg-[var(--rag-red-bg)] px-3 py-2 text-xs text-[var(--rag-red)]">
           {error}
         </div>
       )}
@@ -866,7 +866,7 @@ function NewScenarioForm({
           type="button"
           onClick={onSubmit}
           disabled={isPending || !name.trim()}
-          className="inline-flex items-center gap-2 rounded-full bg-[--accent] px-5 py-2 text-sm font-semibold text-black transition-colors hover:bg-[--accent-hover] disabled:opacity-50"
+          className="inline-flex items-center gap-2 rounded-full bg-[var(--accent)] px-5 py-2 text-sm font-semibold text-black transition-colors hover:bg-[var(--accent-hover)] disabled:opacity-50"
         >
           {isPending ? (
             <Loader2 size={14} className="animate-spin" />
@@ -978,7 +978,7 @@ function CalibrationTab({
   return (
     <div className="flex flex-col gap-4">
       {/* Step 1 — Extract features */}
-      <div className="rounded-xl border border-white/10 bg-[--bg-secondary] p-5">
+      <div className="rounded-xl border border-white/10 bg-[var(--bg-secondary)] p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <h3 className="font-[family-name:var(--font-jakarta)] text-base font-semibold text-white">
@@ -1018,7 +1018,7 @@ function CalibrationTab({
               type="button"
               onClick={onRecrawl}
               disabled={isPending}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-[--accent] px-4 py-2 text-sm font-semibold text-black transition-colors hover:bg-[--accent-hover] disabled:opacity-50"
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-black transition-colors hover:bg-[var(--accent-hover)] disabled:opacity-50"
               title="Re-fetches each page's HTML — slower but fills all 22 features"
             >
               {isPending ? (
@@ -1031,7 +1031,7 @@ function CalibrationTab({
           </div>
         </div>
         {extractResult && (
-          <div className="mt-3 rounded-lg border border-[--rag-green]/30 bg-[--rag-green-bg] px-3 py-2 text-xs text-[--rag-green]">
+          <div className="mt-3 rounded-lg border border-[var(--rag-green)]/30 bg-[var(--rag-green-bg)] px-3 py-2 text-xs text-[var(--rag-green)]">
             Fast extracted {extractResult.extracted} of {extractResult.total} pages
             {extractResult.skipped > 0
               ? ` (${extractResult.skipped} skipped — no main_content)`
@@ -1042,7 +1042,7 @@ function CalibrationTab({
         )}
         {recrawlResult && (
           <div className="mt-3 flex flex-col gap-2">
-            <div className="rounded-lg border border-[--rag-green]/30 bg-[--rag-green-bg] px-3 py-2 text-xs text-[--rag-green]">
+            <div className="rounded-lg border border-[var(--rag-green)]/30 bg-[var(--rag-green-bg)] px-3 py-2 text-xs text-[var(--rag-green)]">
               Recrawled {recrawlResult.pagesWithFullFeatures} of{' '}
               {recrawlResult.pagesScanned} pages with full feature vectors
               {recrawlResult.pagesSkippedNetworkError > 0
@@ -1074,7 +1074,7 @@ function CalibrationTab({
       </div>
 
       {/* Step 2 — Run calibration */}
-      <div className="rounded-xl border border-white/10 bg-[--bg-secondary] p-5">
+      <div className="rounded-xl border border-white/10 bg-[var(--bg-secondary)] p-5">
         <div className="flex items-start justify-between gap-3">
           <div>
             <h3 className="font-[family-name:var(--font-jakarta)] text-base font-semibold text-white">
@@ -1096,7 +1096,7 @@ function CalibrationTab({
             type="button"
             onClick={onCalibrate}
             disabled={isPending || overview.serpCount === 0}
-            className="inline-flex shrink-0 items-center gap-2 rounded-full bg-[--accent] px-4 py-2 text-sm font-semibold text-black transition-colors hover:bg-[--accent-hover] disabled:opacity-50"
+            className="inline-flex shrink-0 items-center gap-2 rounded-full bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-black transition-colors hover:bg-[var(--accent-hover)] disabled:opacity-50"
           >
             {isPending ? (
               <Loader2 size={14} className="animate-spin" />
@@ -1107,7 +1107,7 @@ function CalibrationTab({
           </button>
         </div>
         {calibResult && (
-          <div className="mt-3 rounded-lg border border-[--rag-green]/30 bg-[--rag-green-bg] px-3 py-2 text-xs text-[--rag-green]">
+          <div className="mt-3 rounded-lg border border-[var(--rag-green)]/30 bg-[var(--rag-green-bg)] px-3 py-2 text-xs text-[var(--rag-green)]">
             Trained generation {calibResult.generation} · ρ={calibResult.fitness.toFixed(3)} ·{' '}
             {calibResult.observationCount} observations ·{' '}
             {calibResult.resultsConsidered} ranked URLs
@@ -1120,7 +1120,7 @@ function CalibrationTab({
 
       {/* Latest weights summary */}
       {overview.latestWeights && (
-        <div className="rounded-xl border border-white/10 bg-[--bg-secondary] p-5">
+        <div className="rounded-xl border border-white/10 bg-[var(--bg-secondary)] p-5">
           <h3 className="mb-3 font-[family-name:var(--font-jakarta)] text-base font-semibold text-white">
             Current weights (generation {overview.latestWeights.generation})
           </h3>
@@ -1149,7 +1149,7 @@ function CalibrationTab({
       )}
 
       {error && (
-        <div className="rounded-xl border border-[--rag-red]/30 bg-[--rag-red-bg] p-4 text-sm text-[--rag-red]">
+        <div className="rounded-xl border border-[var(--rag-red)]/30 bg-[var(--rag-red-bg)] p-4 text-sm text-[var(--rag-red)]">
           <div className="flex items-start gap-2">
             <AlertTriangle size={14} strokeWidth={2} className="mt-0.5 shrink-0" />
             <div>{error}</div>
@@ -1254,7 +1254,7 @@ function SerpsTab({
           <button
             type="button"
             onClick={() => setShowForm((v) => !v)}
-            className="inline-flex items-center gap-2 rounded-full bg-[--accent] px-4 py-2 text-sm font-semibold text-black transition-colors hover:bg-[--accent-hover]"
+            className="inline-flex items-center gap-2 rounded-full bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-black transition-colors hover:bg-[var(--accent-hover)]"
           >
             <ListPlus size={14} strokeWidth={2} />
             {showForm ? 'Cancel' : 'Add SERP'}
@@ -1263,7 +1263,7 @@ function SerpsTab({
       </div>
 
       {bingResult && (
-        <div className="rounded-lg border border-[--rag-green]/30 bg-[--rag-green-bg] px-3 py-2 text-xs text-[--rag-green]">
+        <div className="rounded-lg border border-[var(--rag-green)]/30 bg-[var(--rag-green-bg)] px-3 py-2 text-xs text-[var(--rag-green)]">
           Bing capture: {bingResult.succeeded} succeeded · {bingResult.skipped} skipped
           {bingResult.failed > 0 ? ` · ${bingResult.failed} failed` : ''}
           {bingResult.skipped > 0 && (
@@ -1274,7 +1274,7 @@ function SerpsTab({
         </div>
       )}
       {bingError && (
-        <div className="rounded-lg border border-[--rag-red]/30 bg-[--rag-red-bg] px-3 py-2 text-xs text-[--rag-red]">
+        <div className="rounded-lg border border-[var(--rag-red)]/30 bg-[var(--rag-red-bg)] px-3 py-2 text-xs text-[var(--rag-red)]">
           {bingError}
         </div>
       )}
@@ -1332,7 +1332,7 @@ function SerpsTab({
                       type="button"
                       onClick={() => onDelete(s.id)}
                       disabled={isPending}
-                      className="inline-flex items-center gap-1 rounded-full border border-white/10 px-2 py-1 text-[11px] text-white/55 transition-colors hover:border-[--rag-red]/50 hover:text-[--rag-red] disabled:opacity-50"
+                      className="inline-flex items-center gap-1 rounded-full border border-white/10 px-2 py-1 text-[11px] text-white/55 transition-colors hover:border-[var(--rag-red)]/50 hover:text-[var(--rag-red)] disabled:opacity-50"
                     >
                       <Trash2 size={10} strokeWidth={2} />
                       Delete
@@ -1384,7 +1384,7 @@ function NewSerpForm({
   };
 
   return (
-    <div className="rounded-xl border border-white/10 bg-[--bg-secondary] p-5">
+    <div className="rounded-xl border border-white/10 bg-[var(--bg-secondary)] p-5">
       <h3 className="mb-3 font-[family-name:var(--font-jakarta)] text-base font-semibold text-white">
         Paste an observed SERP
       </h3>
@@ -1394,7 +1394,7 @@ function NewSerpForm({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="e.g. personal injury lawyer melbourne fl"
-          className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-[--accent] focus:outline-none"
+          className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-[var(--accent)] focus:outline-none"
         />
       </Field>
       <Field label="SERP results (one URL per line)" className="mt-3">
@@ -1403,7 +1403,7 @@ function NewSerpForm({
           onChange={(e) => setPasted(e.target.value)}
           rows={8}
           placeholder={`1\thttps://example.com/page\n2\thttps://another.com\nhttps://no-rank-line.com`}
-          className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 font-[family-name:var(--font-geist-mono)] text-xs text-white placeholder:text-white/30 focus:border-[--accent] focus:outline-none"
+          className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 font-[family-name:var(--font-geist-mono)] text-xs text-white placeholder:text-white/30 focus:border-[var(--accent)] focus:outline-none"
         />
         <p className="mt-1 text-[11px] text-white/40">
           Format: `position[TAB]url[TAB]title` or `1. url` or just URL per line. Position auto-numbers if omitted.
@@ -1415,12 +1415,12 @@ function NewSerpForm({
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           placeholder="Where was this captured? incognito Google, Brave, etc."
-          className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-[--accent] focus:outline-none"
+          className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-[var(--accent)] focus:outline-none"
         />
       </Field>
 
       {error && (
-        <div className="mt-3 rounded-lg border border-[--rag-red]/30 bg-[--rag-red-bg] px-3 py-2 text-xs text-[--rag-red]">
+        <div className="mt-3 rounded-lg border border-[var(--rag-red)]/30 bg-[var(--rag-red-bg)] px-3 py-2 text-xs text-[var(--rag-red)]">
           {error}
         </div>
       )}
@@ -1438,7 +1438,7 @@ function NewSerpForm({
           type="button"
           onClick={onSubmit}
           disabled={isPending}
-          className="inline-flex items-center gap-2 rounded-full bg-[--accent] px-5 py-2 text-sm font-semibold text-black transition-colors hover:bg-[--accent-hover] disabled:opacity-50"
+          className="inline-flex items-center gap-2 rounded-full bg-[var(--accent)] px-5 py-2 text-sm font-semibold text-black transition-colors hover:bg-[var(--accent-hover)] disabled:opacity-50"
         >
           {isPending ? (
             <Loader2 size={14} className="animate-spin" />
@@ -1466,9 +1466,9 @@ function EmptyHint({
   body: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-dashed border-white/10 bg-[--bg-secondary]/50 p-6">
+    <div className="rounded-xl border border-dashed border-white/10 bg-[var(--bg-secondary)]/50 p-6">
       <div className="flex items-start gap-3">
-        <Icon size={20} strokeWidth={1.5} className="mt-0.5 shrink-0 text-[--accent]" />
+        <Icon size={20} strokeWidth={1.5} className="mt-0.5 shrink-0 text-[var(--accent)]" />
         <div className="min-w-0 flex-1">
           <h4 className="font-[family-name:var(--font-jakarta)] text-sm font-semibold text-white">
             {headline}

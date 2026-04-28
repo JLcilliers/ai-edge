@@ -50,7 +50,7 @@ export default async function AuditDiffPage({
 
       <div className="mb-8 flex items-start gap-4">
         <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/5">
-          <GitCompare size={24} strokeWidth={1.5} className="text-[--accent]" />
+          <GitCompare size={24} strokeWidth={1.5} className="text-[var(--accent)]" />
         </div>
         <div>
           <h1 className="font-[family-name:var(--font-jakarta)] text-3xl font-extrabold tracking-tight text-white">

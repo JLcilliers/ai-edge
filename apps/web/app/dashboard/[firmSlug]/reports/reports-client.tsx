@@ -122,15 +122,15 @@ export function ReportsClient({
         <div
           className={`mb-6 flex items-start gap-3 rounded-xl border p-5 ${
             summary.previousMonthHasReport
-              ? 'border-[--rag-green]/30 bg-[--bg-secondary]'
-              : 'border-amber-500/40 bg-[--bg-secondary]'
+              ? 'border-[var(--rag-green)]/30 bg-[var(--bg-secondary)]'
+              : 'border-amber-500/40 bg-[var(--bg-secondary)]'
           }`}
         >
           {summary.previousMonthHasReport ? (
             <CheckCircle2
               size={20}
               strokeWidth={1.5}
-              className="mt-0.5 shrink-0 text-[--rag-green]"
+              className="mt-0.5 shrink-0 text-[var(--rag-green)]"
             />
           ) : (
             <AlertTriangle
@@ -143,7 +143,7 @@ export function ReportsClient({
             <p
               className={`font-semibold ${
                 summary.previousMonthHasReport
-                  ? 'text-[--rag-green]'
+                  ? 'text-[var(--rag-green)]'
                   : 'text-amber-300'
               }`}
             >
@@ -161,7 +161,7 @@ export function ReportsClient({
             {summary.previousMonthHasReport && (
               <Link
                 href={`/dashboard/${firmSlug}/reports/${summary.previousMonthKey}`}
-                className="flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm text-white transition-colors hover:border-[--accent]"
+                className="flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm text-white transition-colors hover:border-[var(--accent)]"
               >
                 <Eye size={14} />
                 View
@@ -171,7 +171,7 @@ export function ReportsClient({
               type="button"
               onClick={() => handleRebuild(summary.previousMonthKey)}
               disabled={isPending}
-              className="flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm text-white transition-colors hover:border-[--accent] disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm text-white transition-colors hover:border-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-40"
             >
               <RotateCw
                 size={14}
@@ -192,7 +192,7 @@ export function ReportsClient({
         <div
           className={`mb-4 rounded-xl border p-4 text-sm ${
             toast.kind === 'ok'
-              ? 'border-[--rag-green]/30 text-[--rag-green]'
+              ? 'border-[var(--rag-green)]/30 text-[var(--rag-green)]'
               : 'border-red-500/40 text-red-300'
           }`}
         >
@@ -202,7 +202,7 @@ export function ReportsClient({
 
       {/* Reports list */}
       {reports.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-white/10 bg-[--bg-secondary] p-10 text-center">
+        <div className="rounded-xl border border-dashed border-white/10 bg-[var(--bg-secondary)] p-10 text-center">
           <Calendar
             size={28}
             strokeWidth={1.5}
@@ -215,8 +215,8 @@ export function ReportsClient({
           </p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-white/10 bg-[--bg-secondary]">
-          <div className="grid grid-cols-[1fr_auto_auto_auto_auto] items-center gap-4 border-b border-white/5 bg-[--bg-tertiary] px-5 py-3 text-[10px] font-medium uppercase tracking-widest text-white/55">
+        <div className="overflow-hidden rounded-xl border border-white/10 bg-[var(--bg-secondary)]">
+          <div className="grid grid-cols-[1fr_auto_auto_auto_auto] items-center gap-4 border-b border-white/5 bg-[var(--bg-tertiary)] px-5 py-3 text-[10px] font-medium uppercase tracking-widest text-white/55">
             <span>Month</span>
             <span>Audits</span>
             <span>RAG</span>
@@ -247,17 +247,17 @@ export function ReportsClient({
                   {total > 0 ? (
                     <span className="flex gap-2">
                       {r.ragTotals.red > 0 && (
-                        <span className="text-[--rag-red]">
+                        <span className="text-[var(--rag-red)]">
                           {r.ragTotals.red}R
                         </span>
                       )}
                       {r.ragTotals.yellow > 0 && (
-                        <span className="text-[--rag-yellow]">
+                        <span className="text-[var(--rag-yellow)]">
                           {r.ragTotals.yellow}Y
                         </span>
                       )}
                       {r.ragTotals.green > 0 && (
-                        <span className="text-[--rag-green]">
+                        <span className="text-[var(--rag-green)]">
                           {r.ragTotals.green}G
                         </span>
                       )}
@@ -270,7 +270,7 @@ export function ReportsClient({
                 <div className="flex items-center gap-2">
                   <Link
                     href={`/dashboard/${firmSlug}/reports/${r.monthKey}`}
-                    className="flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-xs text-white transition-colors hover:border-[--accent]"
+                    className="flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-xs text-white transition-colors hover:border-[var(--accent)]"
                     title="Open full report breakdown"
                   >
                     <Eye size={12} />
@@ -281,7 +281,7 @@ export function ReportsClient({
                       href={r.blobUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-xs text-white transition-colors hover:border-[--accent]"
+                      className="flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-xs text-white transition-colors hover:border-[var(--accent)]"
                       title="Download JSON from Vercel Blob"
                     >
                       <Download size={12} />
@@ -301,7 +301,7 @@ export function ReportsClient({
                     type="button"
                     onClick={() => handleRebuild(r.monthKey)}
                     disabled={isPending}
-                    className="flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-xs text-white transition-colors hover:border-[--accent] disabled:cursor-not-allowed disabled:opacity-40"
+                    className="flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-xs text-white transition-colors hover:border-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <RotateCw
                       size={12}

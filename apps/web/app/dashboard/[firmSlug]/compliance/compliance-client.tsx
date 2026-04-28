@@ -75,7 +75,7 @@ export function ComplianceClient({ firmSlug }: { firmSlug: string }) {
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="Paste remediation copy, an ad, an email draft, or landing-page text here…"
-          className="h-72 rounded-xl border border-white/10 bg-[--bg-secondary] p-4 font-[family-name:var(--font-geist-mono)] text-sm text-white/80 outline-none transition focus:border-[--accent]/50"
+          className="h-72 rounded-xl border border-white/10 bg-[var(--bg-secondary)] p-4 font-[family-name:var(--font-geist-mono)] text-sm text-white/80 outline-none transition focus:border-[var(--accent)]/50"
         />
         <div className="mt-3 flex items-center justify-between">
           <span className="text-xs text-white/40">
@@ -85,7 +85,7 @@ export function ComplianceClient({ firmSlug }: { firmSlug: string }) {
             type="button"
             onClick={runCheck}
             disabled={!text.trim() || isPending}
-            className="flex items-center gap-2 rounded-full bg-[--accent] px-5 py-2.5 text-sm font-semibold text-black transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex items-center gap-2 rounded-full bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-black transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {isPending || state.kind === 'checking' ? (
               <>
@@ -127,7 +127,7 @@ function ResultsPanel({
 }) {
   if (state.kind === 'idle' || state.kind === 'checking') {
     return (
-      <div className="flex h-72 items-center justify-center rounded-xl border border-dashed border-white/10 bg-[--bg-secondary] p-6 text-center">
+      <div className="flex h-72 items-center justify-center rounded-xl border border-dashed border-white/10 bg-[var(--bg-secondary)] p-6 text-center">
         <p className="text-sm text-white/40">
           {state.kind === 'checking'
             ? 'Scanning against jurisdictional rulebook + firm banned phrases…'
@@ -139,7 +139,7 @@ function ResultsPanel({
 
   if (state.kind === 'error') {
     return (
-      <div className="rounded-xl border border-red-500/40 bg-[--bg-secondary] p-5">
+      <div className="rounded-xl border border-red-500/40 bg-[var(--bg-secondary)] p-5">
         <p className="font-semibold text-red-300">Check failed</p>
         <p className="mt-1 font-[family-name:var(--font-geist-mono)] text-xs text-white/60">
           {state.message}
@@ -151,15 +151,15 @@ function ResultsPanel({
   // state.kind === 'result'
   if (state.hits.length === 0) {
     return (
-      <div className="rounded-xl border border-[--rag-green]/30 bg-[--bg-secondary] p-5">
+      <div className="rounded-xl border border-[var(--rag-green)]/30 bg-[var(--bg-secondary)] p-5">
         <div className="flex items-start gap-3">
           <CheckCircle2
             size={20}
             strokeWidth={1.5}
-            className="mt-0.5 shrink-0 text-[--rag-green]"
+            className="mt-0.5 shrink-0 text-[var(--rag-green)]"
           />
           <div>
-            <p className="font-semibold text-[--rag-green]">
+            <p className="font-semibold text-[var(--rag-green)]">
               No violations detected
             </p>
             <p className="mt-1 text-sm text-white/60">
@@ -175,7 +175,7 @@ function ResultsPanel({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="rounded-xl border border-red-500/40 bg-[--bg-secondary] p-5">
+      <div className="rounded-xl border border-red-500/40 bg-[var(--bg-secondary)] p-5">
         <div className="flex items-start gap-3">
           <AlertCircle
             size={20}
@@ -196,7 +196,7 @@ function ResultsPanel({
       </div>
 
       {annotated && (
-        <div className="rounded-xl border border-white/10 bg-[--bg-secondary] p-4">
+        <div className="rounded-xl border border-white/10 bg-[var(--bg-secondary)] p-4">
           <div className="mb-2 text-[10px] font-medium uppercase tracking-widest text-white/40">
             Annotated copy
           </div>
@@ -218,8 +218,8 @@ function ResultsPanel({
         </div>
       )}
 
-      <div className="rounded-xl border border-white/10 bg-[--bg-secondary]">
-        <div className="grid grid-cols-[auto_1fr_auto] gap-4 border-b border-white/5 bg-[--bg-tertiary] px-5 py-3 text-[10px] font-medium uppercase tracking-widest text-white/55">
+      <div className="rounded-xl border border-white/10 bg-[var(--bg-secondary)]">
+        <div className="grid grid-cols-[auto_1fr_auto] gap-4 border-b border-white/5 bg-[var(--bg-tertiary)] px-5 py-3 text-[10px] font-medium uppercase tracking-widest text-white/55">
           <span>Source</span>
           <span>Phrase</span>
           <span>Reason</span>
@@ -250,7 +250,7 @@ function ResultsPanel({
                     href={h.sourceUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-[--accent] underline"
+                    className="text-[var(--accent)] underline"
                   >
                     ref
                   </a>

@@ -83,7 +83,7 @@ export function VisibilityClient({
 
       {/* Empty state when no audits have ever run */}
       {!hasRuns && (
-        <div className="mb-6 rounded-xl border border-dashed border-white/10 bg-[--bg-secondary] p-10 text-center">
+        <div className="mb-6 rounded-xl border border-dashed border-white/10 bg-[var(--bg-secondary)] p-10 text-center">
           <TrendingUp
             size={28}
             strokeWidth={1.5}
@@ -96,7 +96,7 @@ export function VisibilityClient({
           </p>
           <Link
             href={`/dashboard/${firmSlug}/audits`}
-            className="mt-3 inline-flex items-center gap-1.5 text-sm text-[--accent] hover:underline"
+            className="mt-3 inline-flex items-center gap-1.5 text-sm text-[var(--accent)] hover:underline"
           >
             Go to Audits
             <ExternalLink size={12} />
@@ -183,7 +183,7 @@ function AioView({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-white/10 bg-[--bg-secondary] p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-white/10 bg-[var(--bg-secondary)] p-4">
         <div className="min-w-0 flex-1">
           <h3 className="font-[family-name:var(--font-jakarta)] text-base font-semibold text-white">
             Google AI Overview capture
@@ -200,8 +200,8 @@ function AioView({
             <span
               className={
                 providerTone === 'warn'
-                  ? 'text-[--rag-yellow]'
-                  : 'text-[--rag-green]'
+                  ? 'text-[var(--rag-yellow)]'
+                  : 'text-[var(--rag-green)]'
               }
             >
               {providerLabel}
@@ -221,7 +221,7 @@ function AioView({
           type="button"
           onClick={onCapture}
           disabled={isPending}
-          className="inline-flex shrink-0 items-center gap-2 rounded-full bg-[--accent] px-4 py-2 text-sm font-semibold text-black transition-colors hover:bg-[--accent-hover] disabled:opacity-50"
+          className="inline-flex shrink-0 items-center gap-2 rounded-full bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-black transition-colors hover:bg-[var(--accent-hover)] disabled:opacity-50"
         >
           {isPending ? (
             <Loader2 size={14} className="animate-spin" />
@@ -233,7 +233,7 @@ function AioView({
       </div>
 
       {result && (
-        <div className="rounded-lg border border-[--rag-green]/30 bg-[--rag-green-bg] px-3 py-2 text-xs text-[--rag-green]">
+        <div className="rounded-lg border border-[var(--rag-green)]/30 bg-[var(--rag-green-bg)] px-3 py-2 text-xs text-[var(--rag-green)]">
           Attempted {result.attempted} ·{' '}
           <span>{result.hasAio} had AIO</span>
           {result.firmCited > 0 && (
@@ -245,19 +245,19 @@ function AioView({
           {result.errors > 0 && (
             <>
               {' · '}
-              <span className="text-[--rag-red]">{result.errors} errors</span>
+              <span className="text-[var(--rag-red)]">{result.errors} errors</span>
             </>
           )}
         </div>
       )}
       {error && (
-        <div className="rounded-lg border border-[--rag-red]/30 bg-[--rag-red-bg] px-3 py-2 text-xs text-[--rag-red]">
+        <div className="rounded-lg border border-[var(--rag-red)]/30 bg-[var(--rag-red-bg)] px-3 py-2 text-xs text-[var(--rag-red)]">
           {error}
         </div>
       )}
 
       {captures.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-white/10 bg-[--bg-secondary]/50 p-6 text-sm text-white/55">
+        <div className="rounded-xl border border-dashed border-white/10 bg-[var(--bg-secondary)]/50 p-6 text-sm text-white/55">
           No AIO captures yet. Click <em>Capture now</em> to run an
           ad-hoc capture, or wait for the weekly cron (Tuesday 10:00 UTC).
         </div>
@@ -280,14 +280,14 @@ function AioView({
                   <td className="px-4 py-3 text-white">{c.query}</td>
                   <td className="px-4 py-3 text-xs">
                     {c.hasAio ? (
-                      <span className="text-[--rag-green]">yes</span>
+                      <span className="text-[var(--rag-green)]">yes</span>
                     ) : (
                       <span className="text-white/40">no</span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-xs">
                     {c.firmCited ? (
-                      <span className="font-semibold text-[--rag-green]">cited</span>
+                      <span className="font-semibold text-[var(--rag-green)]">cited</span>
                     ) : (
                       <span className="text-white/40">—</span>
                     )}
@@ -324,7 +324,7 @@ function RegressionBanner({ regression }: { regression: AlignmentRegression }) {
 
   if (severity === 'insufficient_data') {
     return (
-      <div className="mb-6 flex items-start gap-3 rounded-xl border border-white/10 bg-[--bg-secondary] p-5">
+      <div className="mb-6 flex items-start gap-3 rounded-xl border border-white/10 bg-[var(--bg-secondary)] p-5">
         <Minus size={20} strokeWidth={1.5} className="mt-0.5 shrink-0 text-white/40" />
         <div>
           <p className="font-semibold text-white/80">Regression check needs more data</p>
@@ -355,9 +355,9 @@ function RegressionBanner({ regression }: { regression: AlignmentRegression }) {
       subLabel: `Red rose ${redDeltaPp.toFixed(1)}pp since the previous run.`,
     },
     improving: {
-      border: 'border-[--rag-green]/30',
-      iconColor: 'text-[--rag-green]',
-      textColor: 'text-[--rag-green]',
+      border: 'border-[var(--rag-green)]/30',
+      iconColor: 'text-[var(--rag-green)]',
+      textColor: 'text-[var(--rag-green)]',
       Icon: ArrowDownRight,
       label: 'Alignment improving',
       subLabel: `Red fell ${Math.abs(redDeltaPp).toFixed(1)}pp since the previous run.`,
@@ -374,7 +374,7 @@ function RegressionBanner({ regression }: { regression: AlignmentRegression }) {
 
   const C = config;
   return (
-    <div className={`mb-6 flex items-start gap-3 rounded-xl border bg-[--bg-secondary] p-5 ${C.border}`}>
+    <div className={`mb-6 flex items-start gap-3 rounded-xl border bg-[var(--bg-secondary)] p-5 ${C.border}`}>
       <C.Icon size={20} strokeWidth={1.5} className={`mt-0.5 shrink-0 ${C.iconColor}`} />
       <div>
         <p className={`font-semibold ${C.textColor}`}>{C.label}</p>
@@ -410,7 +410,7 @@ function TabButton({
       onClick={onClick}
       className={`-mb-px flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
         active
-          ? 'border-[--accent] text-white'
+          ? 'border-[var(--accent)] text-white'
           : 'border-transparent text-white/55 hover:text-white/80'
       }`}
     >
@@ -465,7 +465,7 @@ function ShareOfVoiceView({
       </div>
 
       {/* Bar chart */}
-      <div className="overflow-hidden rounded-xl border border-white/10 bg-[--bg-secondary]">
+      <div className="overflow-hidden rounded-xl border border-white/10 bg-[var(--bg-secondary)]">
         <div className="border-b border-white/5 px-5 py-3 text-xs font-medium uppercase tracking-widest text-white/55">
           Share breakdown
         </div>
@@ -476,7 +476,7 @@ function ShareOfVoiceView({
                 <p className="truncate text-sm text-white/90">
                   {e.isSelf ? firmName : e.name}
                   {e.isSelf && (
-                    <span className="ml-2 rounded-full border border-[--accent]/40 px-2 py-0.5 text-[9px] font-medium uppercase tracking-wider text-[--accent]">
+                    <span className="ml-2 rounded-full border border-[var(--accent)]/40 px-2 py-0.5 text-[9px] font-medium uppercase tracking-wider text-[var(--accent)]">
                       You
                     </span>
                   )}
@@ -485,7 +485,7 @@ function ShareOfVoiceView({
               <div className="flex-1">
                 <div className="h-2 overflow-hidden rounded-full bg-white/5">
                   <div
-                    className={e.isSelf ? 'bg-[--accent]' : 'bg-white/40'}
+                    className={e.isSelf ? 'bg-[var(--accent)]' : 'bg-white/40'}
                     style={{
                       width: `${Math.max(e.sharePct, 1)}%`,
                       height: '100%',
@@ -525,8 +525,8 @@ function CitationSourcesView({ data }: { data: CitationSourceGraph }) {
         describing the firm.
       </p>
 
-      <div className="overflow-hidden rounded-xl border border-white/10 bg-[--bg-secondary]">
-        <div className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-4 border-b border-white/5 bg-[--bg-tertiary] px-5 py-3 text-[10px] font-medium uppercase tracking-widest text-white/55">
+      <div className="overflow-hidden rounded-xl border border-white/10 bg-[var(--bg-secondary)]">
+        <div className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-4 border-b border-white/5 bg-[var(--bg-tertiary)] px-5 py-3 text-[10px] font-medium uppercase tracking-widest text-white/55">
           <span>Domain</span>
           <span>Citations</span>
           <span>Queries</span>
@@ -545,7 +545,7 @@ function CitationSourcesView({ data }: { data: CitationSourceGraph }) {
                   href={`https://${row.domain}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="truncate text-sm text-white/80 hover:text-[--accent] hover:underline"
+                  className="truncate text-sm text-white/80 hover:text-[var(--accent)] hover:underline"
                   title={row.domain}
                 >
                   {row.domain}
@@ -553,7 +553,7 @@ function CitationSourcesView({ data }: { data: CitationSourceGraph }) {
                 <div className="hidden flex-1 sm:block">
                   <div className="h-1.5 overflow-hidden rounded-full bg-white/5">
                     <div
-                      className="h-full bg-[--accent]/60"
+                      className="h-full bg-[var(--accent)]/60"
                       style={{ width: `${barPct}%` }}
                     />
                   </div>
@@ -595,7 +595,7 @@ function DriftView({ history, firmSlug }: { history: CitationDriftRow[]; firmSlu
       {history.map((row) => (
         <div
           key={row.id}
-          className="rounded-xl border border-white/10 bg-[--bg-secondary] p-5"
+          className="rounded-xl border border-white/10 bg-[var(--bg-secondary)] p-5"
         >
           <div className="mb-3 flex items-center justify-between gap-4">
             <div
@@ -605,11 +605,11 @@ function DriftView({ history, firmSlug }: { history: CitationDriftRow[]; firmSlu
               detected {formatDateTime(row.detectedAt)}
             </div>
             <div className="flex items-center gap-3 text-xs">
-              <span className="flex items-center gap-1 text-[--rag-green]">
+              <span className="flex items-center gap-1 text-[var(--rag-green)]">
                 <ArrowUpRight size={12} />
                 {row.gainedCount} gained
               </span>
-              <span className="flex items-center gap-1 text-[--rag-red]">
+              <span className="flex items-center gap-1 text-[var(--rag-red)]">
                 <ArrowDownRight size={12} />
                 {row.lostCount} lost
               </span>
@@ -633,7 +633,7 @@ function CorrelationView({
 }) {
   if (!correlation) {
     return (
-      <div className="rounded-xl border border-dashed border-white/10 bg-[--bg-secondary] p-10 text-center text-sm text-white/55">
+      <div className="rounded-xl border border-dashed border-white/10 bg-[var(--bg-secondary)] p-10 text-center text-sm text-white/55">
         Could not load correlation data — check the GSC and AIO crons in the
         admin dashboard.
       </div>
@@ -647,7 +647,7 @@ function CorrelationView({
   // missing rather than seeing a blank canvas.
   if (!c.gscConnected && !c.hasAioCaptures) {
     return (
-      <div className="rounded-xl border border-dashed border-white/10 bg-[--bg-secondary] p-10 text-sm text-white/55">
+      <div className="rounded-xl border border-dashed border-white/10 bg-[var(--bg-secondary)] p-10 text-sm text-white/55">
         <h3 className="mb-2 font-[family-name:var(--font-jakarta)] text-base font-semibold text-white">
           What this chart will show
         </h3>
@@ -710,14 +710,14 @@ function CorrelationView({
 
       {/* Connection-state banners */}
       {!c.gscConnected && (
-        <div className="rounded-xl border border-[--rag-yellow]/30 bg-[--rag-yellow-bg] px-4 py-3 text-sm text-[--rag-yellow]">
+        <div className="rounded-xl border border-[var(--rag-yellow)]/30 bg-[var(--rag-yellow-bg)] px-4 py-3 text-sm text-[var(--rag-yellow)]">
           GSC isn&apos;t connected — clicks/impressions will read 0. Connect
           Search Console from <strong>Settings → Search Console</strong> to
           light up the GSC line on this chart.
         </div>
       )}
       {!c.hasAioCaptures && c.gscConnected && (
-        <div className="rounded-xl border border-white/10 bg-[--bg-secondary] px-4 py-3 text-sm text-white/55">
+        <div className="rounded-xl border border-white/10 bg-[var(--bg-secondary)] px-4 py-3 text-sm text-white/55">
           No AIO captures in the last 30 days. The weekly capture cron runs
           Tuesdays 10:00 UTC; you can also trigger ad-hoc captures from the
           <strong> AI Overviews </strong> tab.
@@ -756,7 +756,7 @@ function CorrelationChart({
 
   if (daily.length === 0) {
     return (
-      <div className="rounded-xl border border-white/10 bg-[--bg-secondary] p-6 text-sm text-white/55">
+      <div className="rounded-xl border border-white/10 bg-[var(--bg-secondary)] p-6 text-sm text-white/55">
         No daily rows in the requested window.
       </div>
     );
@@ -790,7 +790,7 @@ function CorrelationChart({
   const xLabelStep = Math.max(1, Math.floor(daily.length / 6));
 
   return (
-    <div className="rounded-xl border border-white/10 bg-[--bg-secondary] p-4">
+    <div className="rounded-xl border border-white/10 bg-[var(--bg-secondary)] p-4">
       <div className="mb-3 flex flex-wrap items-center gap-4 text-xs">
         <LegendDot color="rgba(250, 204, 21, 0.95)" label="Daily clicks (left axis)" />
         <LegendDot color="rgba(255,255,255,0.35)" label="Daily impressions (scaled)" />
@@ -952,7 +952,7 @@ function DomainList({
   color: 'green' | 'red';
   domains: string[];
 }) {
-  const accent = color === 'green' ? 'text-[--rag-green]' : 'text-[--rag-red]';
+  const accent = color === 'green' ? 'text-[var(--rag-green)]' : 'text-[var(--rag-red)]';
   return (
     <div>
       <p className={`mb-2 text-xs font-medium uppercase tracking-widest ${accent}`}>
@@ -994,12 +994,12 @@ function StatTile({
 }) {
   const toneClass =
     tone === 'good'
-      ? 'text-[--rag-green]'
+      ? 'text-[var(--rag-green)]'
       : tone === 'bad'
-        ? 'text-[--rag-red]'
+        ? 'text-[var(--rag-red)]'
         : 'text-white';
   return (
-    <div className="rounded-xl border border-white/10 bg-[--bg-secondary] p-5">
+    <div className="rounded-xl border border-white/10 bg-[var(--bg-secondary)] p-5">
       <div className="text-[10px] font-medium uppercase tracking-widest text-white/40">
         {label}
       </div>
@@ -1019,12 +1019,12 @@ function EmptyTab({
   cta?: { href: string; label: string };
 }) {
   return (
-    <div className="rounded-xl border border-dashed border-white/10 bg-[--bg-secondary] p-10 text-center">
+    <div className="rounded-xl border border-dashed border-white/10 bg-[var(--bg-secondary)] p-10 text-center">
       <p className="text-sm text-white/55">{message}</p>
       {cta && (
         <Link
           href={cta.href}
-          className="mt-3 inline-flex items-center gap-1.5 text-sm text-[--accent] hover:underline"
+          className="mt-3 inline-flex items-center gap-1.5 text-sm text-[var(--accent)] hover:underline"
         >
           {cta.label}
           <ExternalLink size={12} />

@@ -134,8 +134,8 @@ export function FirmSidebarNav({
               <span
                 className={`rounded-full px-2 py-0.5 font-[family-name:var(--font-geist-mono)] text-[10px] font-semibold ${
                   active
-                    ? 'bg-[--accent]/20 text-[--accent]'
-                    : 'bg-[--accent]/15 text-[--accent]/90'
+                    ? 'bg-[var(--accent)]/20 text-[var(--accent)]'
+                    : 'bg-[var(--accent)]/15 text-[var(--accent)]/90'
                 }`}
               >
                 {badgeValue > 99 ? '99+' : badgeValue}

@@ -149,7 +149,7 @@ export function RedditListClient({
         <button
           onClick={handleStartScan}
           disabled={isPending || !!runningId}
-          className="rounded-full bg-[--accent] px-6 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-[--accent-hover] disabled:opacity-50"
+          className="rounded-full bg-[var(--accent)] px-6 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-[var(--accent-hover)] disabled:opacity-50"
         >
           {isPending && !pendingRowId
             ? 'Starting...'
@@ -174,9 +174,9 @@ export function RedditListClient({
       )}
 
       {runningId && (
-        <div className="mt-4 flex items-center gap-3 rounded-xl border border-[--accent]/30 bg-[--accent]/10 px-4 py-3">
-          <div className="h-3 w-3 animate-pulse rounded-full bg-[--accent]" />
-          <span className="text-sm text-[--accent]">Scanning Reddit... polling every 5s</span>
+        <div className="mt-4 flex items-center gap-3 rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-4 py-3">
+          <div className="h-3 w-3 animate-pulse rounded-full bg-[var(--accent)]" />
+          <span className="text-sm text-[var(--accent)]">Scanning Reddit... polling every 5s</span>
         </div>
       )}
 
@@ -217,7 +217,7 @@ export function RedditListClient({
             <button
               onClick={handleBulkDismissNeutral}
               disabled={isPending}
-              className="rounded-full border border-white/10 bg-[--bg-secondary] px-3 py-1.5 text-xs font-medium text-white/60 transition-colors hover:border-white/20 hover:text-white disabled:opacity-50"
+              className="rounded-full border border-white/10 bg-[var(--bg-secondary)] px-3 py-1.5 text-xs font-medium text-white/60 transition-colors hover:border-white/20 hover:text-white disabled:opacity-50"
               title="Dismiss every open mention with sentiment = neutral"
             >
               Dismiss all neutral
@@ -270,7 +270,7 @@ function MentionRow({
   const isOpen = mention.triageStatus === 'open';
   return (
     <div
-      className={`group flex flex-col gap-3 rounded-xl border bg-[--bg-secondary] px-5 py-4 transition-colors ${
+      className={`group flex flex-col gap-3 rounded-xl border bg-[var(--bg-secondary)] px-5 py-4 transition-colors ${
         mention.triageStatus === 'dismissed'
           ? 'border-white/5 opacity-60'
           : mention.triageStatus === 'escalated'
@@ -452,9 +452,9 @@ function FilterPill({
       : tone === 'dismissed'
       ? 'border-white/40 bg-white/10 text-white/80'
       : tone === 'open'
-      ? 'border-[--accent]/60 bg-[--accent]/15 text-[--accent]'
+      ? 'border-[var(--accent)]/60 bg-[var(--accent)]/15 text-[var(--accent)]'
       : 'border-white/40 bg-white/10 text-white'
-    : 'border-white/10 bg-[--bg-secondary] text-white/60 hover:border-white/20 hover:text-white';
+    : 'border-white/10 bg-[var(--bg-secondary)] text-white/60 hover:border-white/20 hover:text-white';
   return (
     <Link
       href={href}
@@ -498,9 +498,9 @@ function summarize(mentions: RedditMentionRow[]) {
 function SentimentBadge({ sentiment }: { sentiment: string | null }) {
   const label = sentiment ?? 'neutral';
   const styles: Record<string, string> = {
-    praise: 'bg-[--rag-green-bg] text-[--rag-green]',
-    complaint: 'bg-[--rag-red-bg] text-[--rag-red]',
-    recommendation_request: 'bg-[--accent]/15 text-[--accent]',
+    praise: 'bg-[var(--rag-green-bg)] text-[var(--rag-green)]',
+    complaint: 'bg-[var(--rag-red-bg)] text-[var(--rag-red)]',
+    recommendation_request: 'bg-[var(--accent)]/15 text-[var(--accent)]',
     neutral: 'bg-white/10 text-white/55',
   };
   const display = label === 'recommendation_request' ? 'rec request' : label;
@@ -526,14 +526,14 @@ function StatCard({
 }) {
   const color =
     tone === 'green'
-      ? 'text-[--rag-green]'
+      ? 'text-[var(--rag-green)]'
       : tone === 'red'
-      ? 'text-[--rag-red]'
+      ? 'text-[var(--rag-red)]'
       : tone === 'accent'
-      ? 'text-[--accent]'
+      ? 'text-[var(--accent)]'
       : 'text-white/60';
   return (
-    <div className="rounded-xl border border-white/10 bg-[--bg-secondary] px-4 py-3">
+    <div className="rounded-xl border border-white/10 bg-[var(--bg-secondary)] px-4 py-3">
       <div className="text-[10px] uppercase tracking-wider text-white/40">{label}</div>
       <div className={`mt-1 font-[family-name:var(--font-jakarta)] text-2xl font-bold ${color}`}>
         {value}

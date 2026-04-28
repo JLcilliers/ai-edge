@@ -35,9 +35,9 @@ type Detail = {
 };
 
 const RAG_BADGE: Record<string, string> = {
-  red: 'bg-[--rag-red-bg] text-[--rag-red]',
-  yellow: 'bg-[--rag-yellow-bg] text-[--rag-yellow]',
-  green: 'bg-[--rag-green-bg] text-[--rag-green]',
+  red: 'bg-[var(--rag-red-bg)] text-[var(--rag-red)]',
+  yellow: 'bg-[var(--rag-yellow-bg)] text-[var(--rag-yellow)]',
+  green: 'bg-[var(--rag-green-bg)] text-[var(--rag-green)]',
 };
 
 export function AuditDetailClient({
@@ -93,14 +93,14 @@ export function AuditDetailClient({
         <div className="flex items-center gap-2">
           <Link
             href={`/dashboard/${firmSlug}/audits/${auditId}/diff`}
-            className="flex items-center gap-2 rounded-full border border-white/10 bg-transparent px-5 py-2.5 text-sm text-white transition-colors hover:border-[--accent]"
+            className="flex items-center gap-2 rounded-full border border-white/10 bg-transparent px-5 py-2.5 text-sm text-white transition-colors hover:border-[var(--accent)]"
           >
             <GitCompare size={16} strokeWidth={1.5} />
             Compare to previous
           </Link>
           <a
             href={csvHref}
-            className="flex items-center gap-2 rounded-full border border-white/10 bg-transparent px-5 py-2.5 text-sm text-white transition-colors hover:border-[--accent]"
+            className="flex items-center gap-2 rounded-full border border-white/10 bg-transparent px-5 py-2.5 text-sm text-white transition-colors hover:border-[var(--accent)]"
           >
             <Download size={16} strokeWidth={1.5} />
             Export CSV
@@ -110,26 +110,26 @@ export function AuditDetailClient({
 
       {/* RAG summary stats */}
       <div className="mb-6 grid grid-cols-3 gap-4">
-        <div className="rounded-xl border border-white/10 bg-[--bg-secondary] p-6">
+        <div className="rounded-xl border border-white/10 bg-[var(--bg-secondary)] p-6">
           <span className="text-xs font-medium uppercase tracking-widest text-white/55">Red</span>
-          <p className="mt-1 font-[family-name:var(--font-geist-mono)] text-3xl font-bold tracking-tight text-[--rag-red]">{summary.red}</p>
+          <p className="mt-1 font-[family-name:var(--font-geist-mono)] text-3xl font-bold tracking-tight text-[var(--rag-red)]">{summary.red}</p>
         </div>
-        <div className="rounded-xl border border-white/10 bg-[--bg-secondary] p-6">
+        <div className="rounded-xl border border-white/10 bg-[var(--bg-secondary)] p-6">
           <span className="text-xs font-medium uppercase tracking-widest text-white/55">Yellow</span>
-          <p className="mt-1 font-[family-name:var(--font-geist-mono)] text-3xl font-bold tracking-tight text-[--rag-yellow]">{summary.yellow}</p>
+          <p className="mt-1 font-[family-name:var(--font-geist-mono)] text-3xl font-bold tracking-tight text-[var(--rag-yellow)]">{summary.yellow}</p>
         </div>
-        <div className="rounded-xl border border-white/10 bg-[--bg-secondary] p-6">
+        <div className="rounded-xl border border-white/10 bg-[var(--bg-secondary)] p-6">
           <span className="text-xs font-medium uppercase tracking-widest text-white/55">Green</span>
-          <p className="mt-1 font-[family-name:var(--font-geist-mono)] text-3xl font-bold tracking-tight text-[--rag-green]">{summary.green}</p>
+          <p className="mt-1 font-[family-name:var(--font-geist-mono)] text-3xl font-bold tracking-tight text-[var(--rag-green)]">{summary.green}</p>
         </div>
       </div>
 
       {/* RAG distribution bar */}
       {total > 0 && (
         <div className="mb-8 flex h-3 overflow-hidden rounded-full bg-white/5">
-          {summary.red > 0 && <div className="bg-[--rag-red]" style={{ width: `${(summary.red / total) * 100}%` }} />}
-          {summary.yellow > 0 && <div className="bg-[--rag-yellow]" style={{ width: `${(summary.yellow / total) * 100}%` }} />}
-          {summary.green > 0 && <div className="bg-[--rag-green]" style={{ width: `${(summary.green / total) * 100}%` }} />}
+          {summary.red > 0 && <div className="bg-[var(--rag-red)]" style={{ width: `${(summary.red / total) * 100}%` }} />}
+          {summary.yellow > 0 && <div className="bg-[var(--rag-yellow)]" style={{ width: `${(summary.yellow / total) * 100}%` }} />}
+          {summary.green > 0 && <div className="bg-[var(--rag-green)]" style={{ width: `${(summary.green / total) * 100}%` }} />}
         </div>
       )}
 
@@ -151,9 +151,9 @@ export function AuditDetailClient({
       </div>
 
       {/* Results */}
-      <div className="overflow-hidden rounded-xl border border-white/10 bg-[--bg-secondary]">
+      <div className="overflow-hidden rounded-xl border border-white/10 bg-[var(--bg-secondary)]">
         {/* Table header */}
-        <div className="flex items-center gap-4 bg-[--bg-tertiary] px-5 py-3 text-xs font-medium uppercase tracking-widest text-white/55">
+        <div className="flex items-center gap-4 bg-[var(--bg-tertiary)] px-5 py-3 text-xs font-medium uppercase tracking-widest text-white/55">
           <span className="w-16">Label</span>
           <span className="flex-1">Query</span>
           <span className="w-24">Provider</span>
@@ -202,7 +202,7 @@ export function AuditDetailClient({
             </button>
 
             {expandedRow === i && (
-              <div className="border-t border-white/5 bg-[--bg-tertiary] p-6">
+              <div className="border-t border-white/5 bg-[var(--bg-tertiary)] p-6">
                 <div className="mb-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/40">
                   <span>{r.mentioned ? '✓ Mentioned' : '✗ Not mentioned'}</span>
                   <span>Provider: {r.provider}</span>
@@ -228,7 +228,7 @@ export function AuditDetailClient({
                 {r.gapReasons.length > 0 && (
                   <div className="mb-4">
                     <span className="text-xs font-medium uppercase tracking-widest text-white/55">Gap Reasons</span>
-                    <ul className="mt-2 list-inside list-disc text-sm text-[--rag-yellow]">
+                    <ul className="mt-2 list-inside list-disc text-sm text-[var(--rag-yellow)]">
                       {r.gapReasons.map((g, j) => <li key={j}>{g}</li>)}
                     </ul>
                   </div>
@@ -237,7 +237,7 @@ export function AuditDetailClient({
                 {r.factualErrors.length > 0 && (
                   <div className="mb-4">
                     <span className="text-xs font-medium uppercase tracking-widest text-white/55">Factual Errors</span>
-                    <ul className="mt-2 list-inside list-disc text-sm text-[--rag-red]">
+                    <ul className="mt-2 list-inside list-disc text-sm text-[var(--rag-red)]">
                       {r.factualErrors.map((e, j) => <li key={j}>{e}</li>)}
                     </ul>
                   </div>
@@ -246,7 +246,7 @@ export function AuditDetailClient({
                 {r.citationUrls.length > 0 && (
                   <div>
                     <span className="text-xs font-medium uppercase tracking-widest text-white/55">Citations</span>
-                    <ul className="mt-2 list-inside list-disc text-sm text-[--accent]">
+                    <ul className="mt-2 list-inside list-disc text-sm text-[var(--accent)]">
                       {r.citationUrls.map((url, j) => (
                         <li key={j}>
                           <a href={url} target="_blank" rel="noopener noreferrer" className="underline">{url}</a>
