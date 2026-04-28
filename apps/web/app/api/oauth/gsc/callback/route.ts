@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server';
 import { getDb, firms } from '@ai-edge/db';
 import { eq } from 'drizzle-orm';
-import { handleOAuthCallback, isOAuthConfigured } from '../../../../lib/gsc/oauth';
+import {
+  exchangeCode,
+  fetchAccessibleSites,
+  isOAuthConfigured,
+  persistTokens,
+} from '../../../../lib/gsc/oauth';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,25 +14,33 @@ export const dynamic = 'force-dynamic';
  * Google OAuth 2.0 callback for Search Console (Phase B #6).
  *
  * Reached via the redirect from Google's consent screen. URL params:
- *   code   — the authorization code we exchange for tokens
- *   state  — the firm slug (we set this in buildAuthorizeUrl)
+ *   code   — the authorization code we exchange for tokens (single-use)
+ *   state  — the firm slug we set on the auth URL
  *   error  — present if the user denied or Google rejected the request
  *
- * The callback can't ask the operator which Search Console site to
- * connect (Google's consent screen scopes the grant to one property
- * implicitly, but the API requires us to specify the property URL on
- * every query). For v1, we accept the property URL via a follow-up
- * query param `siteUrl=`. Operators paste it from Search Console:
- *   https://search.google.com/search-console → property selector
- *   → "Settings" → "Property settings" → "Property type"
+ * Flow.
+ *   1. Validate firm slug against our DB.
+ *   2. Exchange code → tokens (single-use; must do this before any other
+ *      step that could fail and force a retry).
+ *   3. Call SearchConsole sites.list to get every property this account
+ *      can see. We need this for the dropdown — operators almost always
+ *      have multiple properties and must confirm which one anchors this
+ *      firm.
+ *   4. Persist tokens with the FIRST returned site as a default. The
+ *      `gsc_connections.site_url` column is NOT NULL so we always store
+ *      *something*; the operator confirms or changes it on the next page.
+ *   5. If the account has exactly one site, we're done — redirect to
+ *      settings with `?gsc=connected`.
+ *   6. If two or more sites, redirect to /api/oauth/gsc/pick-site which
+ *      renders a dropdown of all accessible properties.
  *
- * Hardening note. We don't validate `state` against a server-side
- * nonce because (a) the slug isn't user-controlled in any meaningful
- * way (it's a known firm in OUR DB), (b) the redirect URI is locked
- * server-side at the Google Cloud project level, and (c) a CSRF here
- * would just connect a different firm's GSC to itself, which is
- * detectable via the `connected_by` field. If we surface this to
- * end-clients in the future we'll add a server-side nonce.
+ * Hardening note. We don't validate `state` against a server-side nonce
+ * because (a) the slug isn't user-controlled in any meaningful way (it's
+ * a known firm in OUR DB), (b) the redirect URI is locked server-side at
+ * the Google Cloud project level, and (c) a CSRF here would just connect
+ * a different firm's GSC to itself, which is detectable via the
+ * `connected_by` field. If we surface this to end-clients in the future
+ * we'll add a server-side nonce.
  */
 export async function GET(request: Request) {
   if (!isOAuthConfigured()) {
@@ -42,13 +55,12 @@ export async function GET(request: Request) {
   const code = url.searchParams.get('code');
   const state = url.searchParams.get('state');
   const errorParam = url.searchParams.get('error');
-  const siteUrl = url.searchParams.get('siteUrl');
 
   // Don't log the auth code itself — it's a one-time bearer credential.
   console.log(
-    `[oauth:gsc:callback] state=${state} hasCode=${!!code} siteUrl=${
-      siteUrl ? 'provided' : 'missing'
-    } error=${errorParam ?? 'none'}`,
+    `[oauth:gsc:callback] state=${state} hasCode=${!!code} error=${
+      errorParam ?? 'none'
+    }`,
   );
 
   if (errorParam) {
@@ -61,40 +73,6 @@ export async function GET(request: Request) {
     return NextResponse.json(
       { error: 'Missing code or state in callback URL' },
       { status: 400 },
-    );
-  }
-  if (!siteUrl) {
-    // The first half of the dance succeeded but we need the operator
-    // to confirm the property URL. Render a tiny HTML form that
-    // POSTs back to ?code=&state=&siteUrl=… so we can complete.
-    const safeState = encodeURIComponent(state);
-    const safeCode = encodeURIComponent(code);
-    return new NextResponse(
-      `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>Connect Search Console — pick property</title>
-<style>
-body{margin:0;background:#0b0b0b;color:#fafafa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px}
-.card{max-width:420px;width:100%;background:#171717;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:28px}
-h1{font-size:18px;margin:0 0 8px;font-weight:600}
-p{font-size:14px;color:rgba(255,255,255,.6);line-height:1.5;margin:0 0 18px}
-label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.55);margin-bottom:6px}
-input{width:100%;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:10px 12px;color:#fafafa;font-family:ui-monospace,Consolas,monospace;font-size:13px;box-sizing:border-box}
-button{margin-top:16px;width:100%;background:#facc15;color:#000;border:0;border-radius:999px;padding:10px 16px;font-weight:600;font-size:14px;cursor:pointer}
-small{display:block;margin-top:12px;color:rgba(255,255,255,.4);font-size:11px}
-</style></head>
-<body><div class="card">
-<h1>Pick your Search Console property</h1>
-<p>Paste the exact property URL from Search Console → Settings → Property type. Format: <code>https://www.example.com/</code> for URL prefix, or <code>sc-domain:example.com</code> for domain property.</p>
-<form method="GET" action="">
-  <input type="hidden" name="code" value="${safeCode}">
-  <input type="hidden" name="state" value="${safeState}">
-  <label for="siteUrl">Property URL</label>
-  <input type="text" name="siteUrl" id="siteUrl" placeholder="https://www.example.com/" autofocus required>
-  <button type="submit">Complete connection</button>
-  <small>This page never leaves your browser; the form posts back to the same callback so we can finish exchanging the code.</small>
-</form>
-</div></body></html>`,
-      { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } },
     );
   }
 
@@ -112,25 +90,83 @@ small{display:block;margin-top:12px;color:rgba(255,255,255,.4);font-size:11px}
     );
   }
 
-  const result = await handleOAuthCallback({
-    code,
-    firmId: firm.id,
-    siteUrl,
-    connectedBy: 'oauth-callback',
-  });
-
-  if (!result.ok) {
+  // Step 1 — exchange the (single-use) auth code for tokens.
+  let tokens;
+  try {
+    tokens = await exchangeCode(code);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(
+      `[oauth:gsc:callback] firm=${firm.slug} step=exchangeCode error="${msg}"`,
+    );
     return new NextResponse(
-      `Connection failed: ${result.error}. Try again from /dashboard/${firm.slug}/settings.`,
+      `Token exchange failed: ${msg}. Try again from /dashboard/${firm.slug}/settings.`,
       { status: 500 },
     );
   }
 
-  // Success → redirect back to the firm's settings page with a flash
-  // hint via query param.
-  const redirectUrl = new URL(
-    `/dashboard/${firm.slug}/settings?gsc=connected`,
-    request.url,
+  // Step 2 — list properties this account can see in Search Console.
+  let sites;
+  try {
+    sites = await fetchAccessibleSites(tokens.access_token);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(
+      `[oauth:gsc:callback] firm=${firm.slug} step=fetchSites error="${msg}"`,
+    );
+    return new NextResponse(
+      `Failed to list Search Console properties: ${msg}. Try again from /dashboard/${firm.slug}/settings.`,
+      { status: 500 },
+    );
+  }
+
+  if (sites.length === 0) {
+    console.warn(
+      `[oauth:gsc:callback] firm=${firm.slug} step=fetchSites siteCount=0`,
+    );
+    return new NextResponse(
+      `No Search Console properties found for this Google account. Make sure the account has access to at least one verified property in Search Console (search.google.com/search-console), then try again from /dashboard/${firm.slug}/settings.`,
+      { status: 400 },
+    );
+  }
+
+  // Step 3 — persist tokens with the first site as a default. The
+  // operator confirms or changes the choice on the next page; this just
+  // satisfies the NOT NULL constraint and gives the cron a working URL
+  // even if the operator never visits the picker.
+  const defaultSite = sites[0]!.siteUrl;
+  try {
+    await persistTokens({
+      firmId: firm.id,
+      siteUrl: defaultSite,
+      tokens,
+      connectedBy: 'oauth-callback',
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(
+      `[oauth:gsc:callback] firm=${firm.slug} step=persistTokens defaultSite="${defaultSite}" error="${msg}"`,
+    );
+    return new NextResponse(
+      `Failed to persist connection: ${msg}. Try again from /dashboard/${firm.slug}/settings.`,
+      { status: 500 },
+    );
+  }
+  console.log(
+    `[oauth:gsc:callback] firm=${firm.slug} step=persisted siteCount=${sites.length} defaultSite="${defaultSite}"`,
   );
-  return NextResponse.redirect(redirectUrl);
+
+  // Step 4 — if there's only one site, we're done. Otherwise route to
+  // the dropdown page.
+  if (sites.length === 1) {
+    const redirectUrl = new URL(
+      `/dashboard/${firm.slug}/settings?gsc=connected`,
+      request.url,
+    );
+    return NextResponse.redirect(redirectUrl);
+  }
+
+  const pickUrl = new URL('/api/oauth/gsc/pick-site', request.url);
+  pickUrl.searchParams.set('slug', firm.slug);
+  return NextResponse.redirect(pickUrl);
 }
