@@ -21,10 +21,12 @@ import { and, desc, eq, inArray, sql } from 'drizzle-orm';
  *    them separate keeps the query shapes smaller and lets callers import only
  *    what they need.
  *
- * All readers treat both `completed` and `completed_budget_truncated` as valid
- * sources — a budget-truncated run still produced real scored rows, so we'd
- * rather show partial data than hide a regression behind an opaque "no data"
- * state.
+ * All readers treat `completed`, `completed_budget_truncated`, and
+ * `completed_partial` as valid sources. A budget-truncated run still produced
+ * real scored rows; a partial run was promoted by the audit-sweep watchdog
+ * because at least one consensus_response landed before the function crashed.
+ * Either way we'd rather show the rows that exist than hide a regression behind
+ * an opaque "no data" state.
  *
  * Movement taxonomy (per query × provider):
  *  - regressed: label dropped a rank (green→yellow/red, yellow→red)
@@ -51,7 +53,11 @@ async function resolveFirmId(slug: string): Promise<string> {
   return firm.id;
 }
 
-const COMPLETED_STATUSES = ['completed', 'completed_budget_truncated'] as const;
+const COMPLETED_STATUSES = [
+  'completed',
+  'completed_budget_truncated',
+  'completed_partial',
+] as const;
 const SCORING_AUDIT_KINDS = ['full', 'daily-priority'] as const;
 
 // ─── Alignment Trend (overview sparkline) ───────────────────

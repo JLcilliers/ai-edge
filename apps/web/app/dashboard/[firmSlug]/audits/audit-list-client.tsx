@@ -216,13 +216,22 @@ function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
     completed: 'bg-[var(--rag-green-bg)] text-[var(--rag-green)]',
     completed_budget_truncated: 'bg-amber-500/15 text-amber-300',
+    // Partial completion = the audit-sweep watchdog promoted a stuck run that
+    // had at least one scored query. Same amber tone as budget-truncated since
+    // both mean "real data, but not the full run we asked for"; the label
+    // text differentiates them.
+    completed_partial: 'bg-amber-500/15 text-amber-300',
     running: 'bg-[var(--accent)]/15 text-[var(--accent)] animate-pulse',
     failed: 'bg-[var(--rag-red-bg)] text-[var(--rag-red)]',
     cancelled: 'bg-white/10 text-white/60',
     pending: 'bg-white/10 text-white/55',
   };
-  // The DB stores snake_case status strings; render with spaces for UX.
-  const label = status.replaceAll('_', ' ');
+  // Custom labels where snake_case → spaces would read awkwardly.
+  const labels: Record<string, string> = {
+    completed_partial: 'partial',
+    completed_budget_truncated: 'over budget',
+  };
+  const label = labels[status] ?? status.replaceAll('_', ' ');
   return (
     <span className={`rounded-full px-3 py-1 text-xs font-medium uppercase tracking-wider ${styles[status] ?? 'bg-white/10 text-white/55'}`}>
       {label}
