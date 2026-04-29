@@ -27,6 +27,18 @@ import { buildCacheKey, getCachedResponse, putCachedResponse } from './cache';
 import { calculateCost, extractUsage, type ProviderName } from './pricing';
 
 /**
+ * Hard ceiling on a single provider call. The audit fan-out runs k samples
+ * × P providers in parallel, and Vercel functions cap at maxDuration=300s.
+ * If one provider hangs for the full 5 minutes we lose the whole run. 60s
+ * per call gives us plenty of headroom — the slowest non-pathological
+ * Perplexity response tops out around 25-30s — and forces a hard rejection
+ * on anything stuck in upstream queue. The error surfaces as a recorded
+ * `model_responses` row with `model='error'` and the audit completes
+ * normally with the remaining providers' samples.
+ */
+const PROVIDER_TIMEOUT_MS = 60_000;
+
+/**
  * Per-provider dispatch table. Keeps run-audit.ts clean — provider
  * selection happens here once and budget/cache wrapping is shared.
  */
@@ -130,8 +142,29 @@ export async function runProviderQuery(
     };
   }
 
-  // Miss — call the provider.
-  const result = await provider.call(userPrompt, { temperature });
+  // Miss — call the provider with a hard timeout. Some providers (Perplexity
+  // streaming, OpenRouter when an underlying model is degraded) can hang for
+  // many minutes if their upstream stalls. The audit pipeline used to wait
+  // forever — one hung provider could pin the whole audit_run in
+  // status='running' until Vercel killed the function at maxDuration=300s,
+  // and the run would never transition to 'completed' because the final
+  // UPDATE was never reached. With this race we get a clean rejection that
+  // the caller (run-audit.ts) handles via Promise.allSettled — the audit
+  // continues with the other providers and the run completes normally.
+  const result = await Promise.race([
+    provider.call(userPrompt, { temperature }),
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () =>
+          reject(
+            new Error(
+              `provider ${provider.name} timed out after ${PROVIDER_TIMEOUT_MS}ms`,
+            ),
+          ),
+        PROVIDER_TIMEOUT_MS,
+      ),
+    ),
+  ]);
 
   const usage = extractUsage(result.raw);
   const costUsd = calculateCost(provider.name, result.model, usage);
