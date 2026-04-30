@@ -2,17 +2,31 @@
  * Sitemap-first crawler for the suppression scan.
  *
  * Responsibilities:
- *  - Fetch /sitemap.xml (and nested sitemap indices) from the firm's origin.
+ *  - Discover the firm's sitemap URL(s) via robots.txt → falls back to
+ *    common paths (/sitemap.xml, /sitemap_index.xml, /wp-sitemap.xml).
+ *  - Walk sitemap indices and collect page URLs.
  *  - Dedupe + normalize URLs (drop fragments/query strings where they clearly
  *    identify the same page, limit to the firm's origin, HTML-looking only).
  *  - Cap the result at `maxUrls` so a pathological 10k-page sitemap doesn't
  *    blow the function's time/cost budget on a first pass.
  *
+ * Discovery order (first hit wins):
+ *   1. `${origin}/robots.txt` — parse `Sitemap:` directives. This is the
+ *      RFC-9309-blessed canonical location and the one most large sites
+ *      use (Nike, for example, has its sitemap at a non-standard URL but
+ *      links it from robots.txt). When robots.txt advertises multiple
+ *      sitemaps we use the first one on the same origin.
+ *   2. `${origin}/sitemap.xml` — the de-facto convention.
+ *   3. `${origin}/sitemap_index.xml` — common WordPress / Yoast convention.
+ *   4. `${origin}/wp-sitemap.xml` — newer WP core convention.
+ *   5. `${origin}/sitemap-index.xml` — variant convention.
+ *
+ * If every candidate 404s we throw with all attempted URLs in the message
+ * so operators have something concrete to debug.
+ *
  * Non-goals (intentionally deferred):
- *  - robots.txt — for v1 we're only scanning sites the firm owns; the plan
- *    contemplates this in the Python worker path.
- *  - BFS fallback — if sitemap.xml is missing we surface an error rather
- *    than crawl. Firms we target reliably have sitemaps.
+ *  - BFS fallback — if no sitemap can be discovered we surface an error
+ *    rather than crawl. Firms we target reliably have sitemaps.
  */
 
 const SITEMAP_INDEX_MATCH = /<sitemap>[\s\S]*?<loc>([^<]+)<\/loc>[\s\S]*?<\/sitemap>/g;
@@ -121,9 +135,87 @@ function normalize(url: string): string {
 }
 
 /**
- * Discover URLs from a firm's sitemap.xml. Given any URL on the site, we
- * derive the origin and try `${origin}/sitemap.xml` — the convention every
- * modern CMS honors.
+ * Best-effort sitemap-URL discovery via robots.txt. Returns the first
+ * `Sitemap:` directive that points at the same origin, or null if
+ * robots.txt itself is missing / lists no sitemap / lists only off-origin
+ * sitemaps. Off-origin sitemaps are dropped for SSRF safety + because the
+ * suppression scan only crawls the firm's own origin anyway.
+ */
+async function discoverSitemapFromRobots(origin: string): Promise<string | null> {
+  let body: string;
+  try {
+    const res = await fetch(`${origin}/robots.txt`, {
+      headers: {
+        'User-Agent': 'ai-edge-suppression/0.1 (brand audit)',
+        Accept: 'text/plain,*/*',
+      },
+    });
+    if (!res.ok) return null;
+    body = await res.text();
+  } catch {
+    return null;
+  }
+
+  // Sitemap directives are case-insensitive per the de-facto convention.
+  // One per line; we take the first that resolves to the same origin.
+  const lines = body.split(/\r?\n/);
+  for (const line of lines) {
+    const m = /^\s*sitemap:\s*(\S+)/i.exec(line);
+    if (!m || !m[1]) continue;
+    const candidate = m[1].trim();
+    try {
+      const u = new URL(candidate);
+      if (`${u.protocol}//${u.host}` === origin) return candidate;
+    } catch {
+      // Malformed Sitemap: directive — skip.
+    }
+  }
+  return null;
+}
+
+/**
+ * Common sitemap paths to probe when robots.txt fails to advertise one.
+ * Order matters — `/sitemap.xml` is the canonical path that wins when
+ * present on a CMS that supports it.
+ */
+const FALLBACK_SITEMAP_PATHS = [
+  '/sitemap.xml',
+  '/sitemap_index.xml',
+  '/wp-sitemap.xml',
+  '/sitemap-index.xml',
+];
+
+/**
+ * Try a list of sitemap URLs in order, returning the first XML body
+ * that fetches successfully. Records the URLs attempted so the error
+ * message can name each one when ALL candidates fail.
+ */
+async function fetchFirstWorkingSitemap(
+  candidates: string[],
+): Promise<{ xml: string; url: string }> {
+  const attempted: Array<{ url: string; status: string }> = [];
+  for (const url of candidates) {
+    try {
+      const xml = await fetchSitemapXml(url);
+      return { xml, url };
+    } catch (err) {
+      attempted.push({
+        url,
+        status: err instanceof Error ? err.message.replace(/^sitemap fetch \S+ /, '') : String(err),
+      });
+    }
+  }
+  throw new Error(
+    `Could not find a sitemap. Tried ${attempted.length} location(s): ` +
+      attempted.map((a) => `${a.url} (${a.status})`).join(' · ') +
+      `. Add a "Sitemap: <url>" line to robots.txt or place sitemap.xml at the site root.`,
+  );
+}
+
+/**
+ * Discover URLs from a firm's sitemap. Tries robots.txt first (RFC-9309-
+ * blessed canonical location), then falls back to common paths. Given any
+ * URL on the site, we derive the origin and probe each candidate in turn.
  */
 export async function crawlViaSitemap(args: {
   firmSiteUrl: string;
@@ -131,9 +223,16 @@ export async function crawlViaSitemap(args: {
 }): Promise<CrawlResult> {
   const maxUrls = args.maxUrls ?? 100;
   const origin = originOf(args.firmSiteUrl);
-  const sitemapUrl = `${origin}/sitemap.xml`;
 
-  const rootXml = await fetchSitemapXml(sitemapUrl);
+  // Discover candidates: robots.txt-advertised sitemap (if any), then
+  // the conventional fallback paths. Dedupe in case robots.txt happens
+  // to advertise the same path as a fallback.
+  const fromRobots = await discoverSitemapFromRobots(origin);
+  const candidateUrls = new Set<string>();
+  if (fromRobots) candidateUrls.add(fromRobots);
+  for (const path of FALLBACK_SITEMAP_PATHS) candidateUrls.add(`${origin}${path}`);
+
+  const { xml: rootXml } = await fetchFirstWorkingSitemap(Array.from(candidateUrls));
   const root = parseSitemap(rootXml);
 
   let urls: string[] = [];
