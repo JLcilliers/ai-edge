@@ -13,6 +13,7 @@ import {
   competitorMentions,
 } from '@ai-edge/db';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
+import { COMPLETED_STATUSES } from '../lib/audit/run-status';
 
 // ─── Shared helpers ─────────────────────────────────────────
 async function resolveFirmId(slug: string): Promise<string> {
@@ -27,27 +28,14 @@ async function resolveFirmId(slug: string): Promise<string> {
 }
 
 /**
- * Completed-audit predicate. Three terminal states all carry usable signal:
- *   - `completed` — every seed query × provider scored.
- *   - `completed_budget_truncated` — the run ran out of monthly LLM budget
- *     mid-loop, but the queries that did execute produced real citations
- *     and mention counts.
- *   - `completed_partial` — the function crashed (deploy cycle, OOM, hung
- *     provider) before the final UPDATE, but the audit-sweep watchdog
- *     promoted it because at least one consensus_response landed. The rows
- *     that did write are still real — visibility aggregations should count
- *     them so the operator isn't blocked by a single hung provider.
- */
-const COMPLETED_STATUSES = [
-  'completed',
-  'completed_budget_truncated',
-  'completed_partial',
-] as const;
-
-/**
  * Audit kinds that represent "the actual workload" for visibility purposes.
  * `citation-diff` heartbeat rows carry no queries/citations and must be
  * filtered out — otherwise they pollute "last audit" lookups.
+ *
+ * `COMPLETED_STATUSES` (the predicate gating which runs are read at all)
+ * lives in `lib/audit/run-status.ts` so visibility-actions, audit-diff-
+ * actions, competitor-actions, and the citation-diff cron all agree on
+ * exactly one definition.
  */
 const SCORING_AUDIT_KINDS = ['full', 'daily-priority'] as const;
 

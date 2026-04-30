@@ -10,6 +10,7 @@ import {
 import { eq, desc, and, inArray, sql } from 'drizzle-orm';
 import { isAuthorizedCronRequest, unauthorizedResponse } from '../../../lib/cron/auth';
 import { recordCronRun } from '../../../lib/cron/log';
+import { COMPLETED_STATUSES } from '../../../lib/audit/run-status';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -53,13 +54,19 @@ export async function GET(request: Request) {
 
     for (const firm of allFirms) {
       try {
-        // Pull the two most recent completed audit runs (any kind — we diff
-        // citation sets across time, not across kind).
+        // Pull the two most recent runs that landed any usable signal (any
+        // kind — we diff citation sets across time, not across kind).
+        // `COMPLETED_STATUSES` covers `completed`, `completed_budget_truncated`,
+        // and `completed_partial` so that partial / sweep-rescued runs still
+        // contribute to citation-set drift detection.
         const recentRuns = await db
           .select({ id: auditRuns.id, startedAt: auditRuns.started_at })
           .from(auditRuns)
           .where(
-            and(eq(auditRuns.firm_id, firm.id), eq(auditRuns.status, 'completed')),
+            and(
+              eq(auditRuns.firm_id, firm.id),
+              inArray(auditRuns.status, [...COMPLETED_STATUSES]),
+            ),
           )
           .orderBy(desc(auditRuns.started_at))
           .limit(2);

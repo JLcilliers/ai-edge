@@ -10,6 +10,7 @@ import {
   alignmentScores,
 } from '@ai-edge/db';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
+import { COMPLETED_STATUSES } from '../lib/audit/run-status';
 
 /**
  * audit-diff-actions: server actions for comparing audit runs and charting
@@ -53,11 +54,9 @@ async function resolveFirmId(slug: string): Promise<string> {
   return firm.id;
 }
 
-const COMPLETED_STATUSES = [
-  'completed',
-  'completed_budget_truncated',
-  'completed_partial',
-] as const;
+// `COMPLETED_STATUSES` is imported from `lib/audit/run-status` so this file,
+// `visibility-actions`, `competitor-actions`, and the citation-diff cron all
+// agree on which terminal states carry usable signal.
 const SCORING_AUDIT_KINDS = ['full', 'daily-priority'] as const;
 
 // ─── Alignment Trend (overview sparkline) ───────────────────
