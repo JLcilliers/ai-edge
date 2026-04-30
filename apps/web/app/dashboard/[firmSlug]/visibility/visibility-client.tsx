@@ -290,7 +290,16 @@ function AioView({
         </button>
       </div>
 
-      {result && (
+      {result && result.notConfigured && (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
+          AI Overviews capture isn&apos;t configured for this workspace.
+          Set <code>DATAFORSEO_LOGIN</code> + <code>DATAFORSEO_PASSWORD</code>{' '}
+          in Vercel project env (or deploy the Playwright worker per ADR-0010)
+          and the &ldquo;Capture now&rdquo; button will start populating this
+          panel. No captures were performed.
+        </div>
+      )}
+      {result && !result.notConfigured && (
         <div className="rounded-lg border border-[var(--rag-green)]/30 bg-[var(--rag-green-bg)] px-3 py-2 text-xs text-[var(--rag-green)]">
           Attempted {result.attempted} ·{' '}
           <span>{result.hasAio} had AIO</span>

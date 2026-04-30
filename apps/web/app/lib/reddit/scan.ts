@@ -163,7 +163,7 @@ export async function runRedditScan(firmId: string): Promise<string> {
     const accepted: Array<{
       post: RedditPost;
       matchedTerm: string;
-      reason: 'multi-term' | 'context-match' | 'permissive';
+      reason: 'multi-term' | 'multi-occurrence' | 'context-match' | 'permissive';
     }> = [];
     let rejected = 0;
 
@@ -192,6 +192,8 @@ export async function runRedditScan(firmId: string): Promise<string> {
       `[reddit:scan] firm=${firmId} candidates=${candidates.size} ` +
         `accepted=${accepted.length} (multi-term=${
           accepted.filter((a) => a.reason === 'multi-term').length
+        }, multi-occurrence=${
+          accepted.filter((a) => a.reason === 'multi-occurrence').length
         }, context-match=${
           accepted.filter((a) => a.reason === 'context-match').length
         }, permissive=${
@@ -535,6 +537,70 @@ function buildContextKeywords(bt: BrandTruth): string[] {
     }
   }
 
+  // 7) Competitors — when a post mentions Nike AND Adidas, that's strong
+  //    evidence the post is about the brand (not the Greek goddess Nike or
+  //    a person named Nike). Operator-curated `competitors_for_llm_monitoring`
+  //    is exactly the right list — competitors that LLMs mention alongside
+  //    this firm. Use full strings + a fallback last-token for multi-word
+  //    competitor names (so "Under Armour" matches even if a post just says
+  //    "Armour", though we keep MIN_CONTEXT_LENGTH so 2-letter cruft is
+  //    excluded).
+  if (Array.isArray(bt.competitors_for_llm_monitoring)) {
+    for (const comp of bt.competitors_for_llm_monitoring) {
+      if (typeof comp !== 'string') continue;
+      const trimmed = comp.trim();
+      if (trimmed.length >= MIN_CONTEXT_LENGTH) {
+        out.add(trimmed.toLowerCase());
+      }
+    }
+  }
+
+  // 8) Target audience — `primary_verticals` and `secondary_verticals` are
+  //    typically nouns like "athletes" / "sneakerheads" / "small business
+  //    owners" that buyers use to describe themselves. Co-occurrence with
+  //    the firm name is a strong "post is about the firm's space" signal.
+  const targetAudience = (bt as { target_audience?: { primary_verticals?: string[]; secondary_verticals?: string[] } })
+    .target_audience;
+  if (targetAudience) {
+    for (const v of [
+      ...(targetAudience.primary_verticals ?? []),
+      ...(targetAudience.secondary_verticals ?? []),
+    ]) {
+      if (typeof v === 'string' && v.trim().length >= MIN_CONTEXT_LENGTH) {
+        out.add(v.trim().toLowerCase());
+      }
+    }
+  }
+
+  // 9) Brand values — operator-tagged adjectives ("innovation", "heritage")
+  //    that the firm pitches itself with. Less unique than competitors but
+  //    cheap to include and helps disambiguate when context is otherwise
+  //    sparse.
+  if (Array.isArray(bt.brand_values)) {
+    for (const v of bt.brand_values) {
+      if (typeof v === 'string' && v.trim().length >= MIN_CONTEXT_LENGTH) {
+        out.add(v.trim().toLowerCase());
+      }
+    }
+  }
+
+  // 10) Distinctive tokens from `unique_differentiators`. The full strings
+  //     are usually long sentences ("Largest athletic footwear and apparel
+  //     brand by revenue") that almost never appear verbatim in Reddit
+  //     posts. Tokenize and keep the rare/distinctive words — i.e., not
+  //     stopwords, ≥4 chars to dodge "the/and/for", first occurrence wins.
+  if (Array.isArray(bt.unique_differentiators)) {
+    for (const phrase of bt.unique_differentiators) {
+      if (typeof phrase !== 'string') continue;
+      for (const tok of phrase.split(/[\s,/&-]+/)) {
+        const t = tok.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (t.length >= 4 && !CONTEXT_STOPWORDS.has(t)) {
+          out.add(t);
+        }
+      }
+    }
+  }
+
   return Array.from(out);
 }
 
@@ -584,34 +650,63 @@ function extractDomainRoot(rawUrl: string): string | null {
   }
 }
 
+/** Threshold for the multi-occurrence accept path. A post that says the
+ *  firm name N+ times is overwhelmingly about the firm regardless of what
+ *  other context appears — even Nike (where one mention could be the Greek
+ *  goddess) becomes unambiguous when "Nike" appears ≥3 times in the body.
+ *  Tuned conservatively: 3 hits + any decent body length avoids accepting
+ *  a one-line title that just contains the term thrice. */
+const MULTI_OCCURRENCE_THRESHOLD = 3;
+
 /**
  * Decide whether a candidate post is actually about the firm.
  *
- * Returns `{accept: true, reason: 'multi-term'}` when the post matched ≥2
- * distinct search terms (very strong co-occurrence signal — e.g., a post
- * mentioning both "Bruni" and "Campisi"). These are auto-accepted with no
- * context check.
+ * Five accept paths, in priority order:
  *
- * Returns `{accept: true, reason: 'permissive'}` when context is empty —
- * preferred to silently dropping every match. Logged at scan-start so
- * operators can populate their Brand Truth.
+ *   1. `multi-term` — post matched ≥2 distinct search terms ("Bruni" AND
+ *      "Campisi" co-occurring). Auto-accept; no context check needed.
  *
- * Returns `{accept: true, reason: 'context-match'}` when at least one
- * context keyword (excluding the matched term itself) word-boundary
- * matches in title+selftext.
+ *   2. `multi-occurrence` — same matched term appears ≥3 times in title+body.
+ *      Repetition is intent: a post that says "Nike" three times is talking
+ *      about Nike, not the Greek goddess. Lets popular brands through where
+ *      a single context keyword wouldn't fire.
  *
- * Returns `{accept: false}` otherwise — the post mentioned the firm name
- * but no other corroborating signal, so it's almost certainly a name
- * collision (Bruni the cookbook author, Pickett the historical figure).
+ *   3. `permissive` — context set is empty (sparsely-configured Brand
+ *      Truth). Preferred to silently dropping every match. Logged at scan-
+ *      start so operators can populate their Brand Truth and tighten the
+ *      gate.
+ *
+ *   4. `context-match` — ≥1 context keyword (≠ matched term) word-boundary
+ *      matches the post. The default precision-favoring path, used by
+ *      tightly-configured firms with rich Brand Truth.
+ *
+ *   5. (no accept) — single term match, sufficient context configured, no
+ *      corroborating signal. Almost always a name collision.
  */
 function evaluateRelevance(
   post: RedditPost,
   matchedTerms: string[],
   contextKeywords: string[],
   isContextEmpty: boolean,
-): { accept: true; reason: 'multi-term' | 'context-match' | 'permissive' } | { accept: false } {
+): {
+  accept: true;
+  reason: 'multi-term' | 'multi-occurrence' | 'context-match' | 'permissive';
+} | { accept: false } {
   if (matchedTerms.length >= 2) {
     return { accept: true, reason: 'multi-term' };
+  }
+
+  // Multi-occurrence: count how many times the (single) matched term
+  // appears in the haystack. Uses the same word-boundary regex with the
+  // global flag for accurate counting on overlapping fragments.
+  const haystack = `${post.title}\n${post.selftext}`;
+  const single = matchedTerms[0];
+  if (single) {
+    const re = new RegExp(`\\b${escapeRegex(single)}\\b`, 'gi');
+    const matches = haystack.match(re);
+    if (matches && matches.length >= MULTI_OCCURRENCE_THRESHOLD) {
+      return { accept: true, reason: 'multi-occurrence' };
+    }
   }
 
   if (isContextEmpty) {
@@ -619,7 +714,6 @@ function evaluateRelevance(
   }
 
   const matchedLower = new Set(matchedTerms.map((t) => t.toLowerCase()));
-  const haystack = `${post.title}\n${post.selftext}`;
 
   for (const keyword of contextKeywords) {
     // Don't let a keyword satisfy the gate if it IS the matched term —

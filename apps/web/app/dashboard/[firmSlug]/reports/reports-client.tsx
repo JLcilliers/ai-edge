@@ -29,6 +29,16 @@ function formatMonth(monthKey: string): string {
   });
 }
 
+/** Current calendar month in UTC as 'YYYY-MM'. Mirrors monthKeyFromDate
+ *  on the server but cheaper than another round-trip — operators only see
+ *  this client-side once the page has rendered. */
+function currentUtcMonthKey(): string {
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  const month = String(now.getUTCMonth() + 1).padStart(2, '0');
+  return `${year}-${month}`;
+}
+
 function formatDateTime(d: Date): string {
   return new Date(d).toLocaleString('en-US', {
     month: 'short',
@@ -208,11 +218,49 @@ export function ReportsClient({
             strokeWidth={1.5}
             className="mx-auto mb-3 text-white/30"
           />
-          <p className="text-sm text-white/55">
-            No reports yet. The first report will be generated on the 1st
-            of the following month, or click &ldquo;Rebuild&rdquo; above to
-            generate the previous month now.
+          <p className="mx-auto max-w-xl text-sm text-white/55">
+            No reports yet. The cron generates the previous month&apos;s
+            report on the 1st (05:00 UTC). For a freshly-created firm with
+            no historical audits, generate the <em>current</em> month
+            instead — that&apos;ll capture everything the firm has done so
+            far this month.
           </p>
+          <div className="mt-5 flex items-center justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => handleRebuild(currentUtcMonthKey())}
+              disabled={isPending}
+              className="flex items-center gap-2 rounded-full bg-[var(--accent)] px-5 py-2 text-sm font-semibold text-black transition-colors hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <RotateCw
+                size={14}
+                className={
+                  isPending && busyMonth === currentUtcMonthKey()
+                    ? 'animate-spin'
+                    : ''
+                }
+              />
+              Generate {formatMonth(currentUtcMonthKey())} report
+            </button>
+            {summary && !summary.previousMonthHasReport && (
+              <button
+                type="button"
+                onClick={() => handleRebuild(summary.previousMonthKey)}
+                disabled={isPending}
+                className="flex items-center gap-2 rounded-full border border-white/10 px-5 py-2 text-sm text-white transition-colors hover:border-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <RotateCw
+                  size={14}
+                  className={
+                    isPending && busyMonth === summary.previousMonthKey
+                      ? 'animate-spin'
+                      : ''
+                  }
+                />
+                Or generate {formatMonth(summary.previousMonthKey)}
+              </button>
+            )}
+          </div>
         </div>
       ) : (
         <div className="overflow-hidden rounded-xl border border-white/10 bg-[var(--bg-secondary)]">

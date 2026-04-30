@@ -38,6 +38,16 @@ export interface AioCaptureUiOutcome {
   firmCited: number;
   errors: number;
   provider: string;
+  /**
+   * `notConfigured` is true when no AIO provider is wired up (the resolver
+   * returned `NullAioProvider`). The UI uses this to suppress the
+   * "5 attempted / 5 errors" red banner and instead show a one-time
+   * "AI Overviews capture isn't configured for this workspace — set
+   * DATAFORSEO_LOGIN/PASSWORD in Vercel env to enable" hint. We return
+   * `attempted=0` in this branch so the panel doesn't pretend captures
+   * fired and the cron-health log doesn't record fake activity.
+   */
+  notConfigured: boolean;
   perQuery: Array<{
     query: string;
     ok: boolean;
@@ -54,6 +64,24 @@ export async function triggerAioCapture(
 ): Promise<AioCaptureUiOutcome> {
   const firmId = await resolveFirmId(firmSlug);
   const provider = getAioProvider();
+
+  // Short-circuit when no provider is configured. Hitting captureAioForFirm
+  // would write 5 throwaway `aio_capture` rows with raw={error:'No AIO
+  // provider configured'} — pollutes the table and surfaces in the UI as a
+  // generic "5 errors" red flag with no actionable explanation. Better to
+  // tell the operator directly that AIO isn't wired up yet.
+  if (provider.name === 'none') {
+    return {
+      attempted: 0,
+      hasAio: 0,
+      firmCited: 0,
+      errors: 0,
+      provider: provider.name,
+      notConfigured: true,
+      perQuery: [],
+    };
+  }
+
   const r = await captureAioForFirm(firmId, {
     maxQueries: options.maxQueries ?? 5,
     country: 'United States',
@@ -66,6 +94,7 @@ export async function triggerAioCapture(
     firmCited: r.firmCited,
     errors: r.errors,
     provider: provider.name,
+    notConfigured: false,
     perQuery: r.perQuery.map((p) => ({
       query: p.query,
       ok: p.outcome.ok,
