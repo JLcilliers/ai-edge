@@ -10,6 +10,7 @@ import {
 } from '@ai-edge/db';
 import { eq, desc, and, sql, inArray } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
+import { COMPLETED_STATUSES } from '../lib/audit/run-status';
 
 /** Resolve firm id from URL slug. Throws if the slug doesn't match a firm. */
 async function resolveFirmId(slug: string): Promise<string> {
@@ -201,8 +202,11 @@ export async function getCompetitorShareOfMention(
     return { latestRunId: null, latestRunFinishedAt: null, rows: [] };
   }
 
-  // Pick the most recent completed audit run — ignore reddit / citation-diff
-  // runs which don't populate competitor_mention.
+  // Pick the most recent audit run that landed any usable signal — ignore
+  // reddit / citation-diff runs which don't populate competitor_mention.
+  // `COMPLETED_STATUSES` includes `completed_partial` so a hung-provider
+  // recovery still surfaces competitor share-of-voice instead of leaving
+  // the panel empty until the next clean run.
   const [latestRun] = await db
     .select({
       id: auditRuns.id,
@@ -212,7 +216,7 @@ export async function getCompetitorShareOfMention(
     .where(
       and(
         eq(auditRuns.firm_id, firmId),
-        eq(auditRuns.status, 'completed'),
+        inArray(auditRuns.status, [...COMPLETED_STATUSES]),
         inArray(auditRuns.kind, ['full', 'daily-priority']),
       ),
     )
