@@ -85,7 +85,18 @@ export async function runRedditScan(firmId: string): Promise<string> {
     };
     const candidates = new Map<string, Candidate>();
 
+    // Track per-term outcome so we can detect "every search threw" and turn
+    // a silently-empty scan into a real `failed` audit row instead of a
+    // misleading `completed candidates=0`. Without this the dashboard says
+    // "scan ran, no new mentions" — same UX as a healthy-but-quiet firm —
+    // even when the API key is rotated, RapidAPI is down, or the host name
+    // is wrong.
+    let searchAttempts = 0;
+    let searchFailures = 0;
+    const lastSearchErrors: string[] = [];
+
     for (const term of searchTerms) {
+      searchAttempts++;
       let posts: RedditPost[] = [];
       try {
         posts = await searchReddit({
@@ -95,8 +106,15 @@ export async function runRedditScan(firmId: string): Promise<string> {
           filter: 'posts',
         });
       } catch (err) {
-        // Log but don't kill the whole scan — RapidAPI occasionally 502s.
+        // Log but don't kill the whole scan — RapidAPI occasionally 502s
+        // and a single transient term failure shouldn't lose the others.
         console.error(`Reddit search failed for "${term}":`, err);
+        searchFailures++;
+        // Keep just the most recent few error messages — the audit_run.error
+        // column truncates around 1KB and we'd rather see the last error
+        // than a dump of identical 401s.
+        const msg = err instanceof Error ? err.message : String(err);
+        if (lastSearchErrors.length < 3) lastSearchErrors.push(msg);
         continue;
       }
 
@@ -118,6 +136,17 @@ export async function runRedditScan(firmId: string): Promise<string> {
           candidate.matchedTerms.push(term);
         }
       }
+    }
+
+    // Fail loud if every attempted search threw. An empty result set on a
+    // genuine quiet firm produces 0 candidates with `searchFailures=0` —
+    // that path stays `completed`. Only the all-threw case flips to failed.
+    if (searchAttempts > 0 && searchFailures === searchAttempts) {
+      throw new Error(
+        `All ${searchAttempts} Reddit search call(s) failed — ` +
+          `last error(s): ${lastSearchErrors.join(' | ')}. ` +
+          `Check RAPIDAPI_REDDIT_KEY / RAPIDAPI_REDDIT_HOST.`,
+      );
     }
 
     // PASS 2: relevance gate. Build context once, then walk candidates.
