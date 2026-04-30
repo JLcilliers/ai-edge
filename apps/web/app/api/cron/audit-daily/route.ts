@@ -14,15 +14,37 @@ export const maxDuration = 300;
  * Cheap daily variant — runs only the top 20 seed queries per firm so we
  * catch alignment drift between the weekly full runs without burning the full
  * LLM-call budget every day.
+ *
+ * Operator override: `?firm=<slug>` runs the audit for a single firm only.
+ * Useful when the scheduled cron previously hit `maxDuration` before
+ * reaching a particular tenant (Vercel's 300s wall-clock kills the loop and
+ * later firms never get scored), or when an operator wants to re-trigger
+ * after editing Brand Truth without waiting for the next 08:00 UTC firing.
  */
 export async function GET(request: Request) {
   if (!isAuthorizedCronRequest(request)) return unauthorizedResponse();
 
   return recordCronRun('audit-daily', async () => {
-    console.log('[cron:audit-daily] start');
+    const url = new URL(request.url);
+    const firmSlugFilter = url.searchParams.get('firm')?.trim() || null;
+
+    console.log(
+      `[cron:audit-daily] start${firmSlugFilter ? ` (firm filter: ${firmSlugFilter})` : ''}`,
+    );
 
     const db = getDb();
-    const allFirms = await db.select({ id: firms.id, slug: firms.slug }).from(firms);
+    const allFirms = firmSlugFilter
+      ? await db
+          .select({ id: firms.id, slug: firms.slug })
+          .from(firms)
+          .where(eq(firms.slug, firmSlugFilter))
+      : await db.select({ id: firms.id, slug: firms.slug }).from(firms);
+
+    if (firmSlugFilter && allFirms.length === 0) {
+      console.warn(`[cron:audit-daily] no firm matches slug '${firmSlugFilter}'`);
+      // Fall through with empty firm list so the response shape stays
+      // consistent with normal cron firings — the loop just no-ops.
+    }
 
     const results: Array<{
       firmSlug: string;
