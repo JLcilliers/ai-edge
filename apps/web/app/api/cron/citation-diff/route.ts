@@ -54,8 +54,11 @@ export async function GET(request: Request) {
 
     for (const firm of allFirms) {
       try {
-        // Pull the two most recent runs that landed any usable signal (any
-        // kind — we diff citation sets across time, not across kind).
+        // Pull the two most recent SCORING runs that landed usable signal.
+        // Kind filter matters here — `reddit`, `citation-diff` heartbeat, and
+        // entity-scan rows have zero `citation` rows, so pairing them with a
+        // real `full` / `daily-priority` run computes a fake "lost all
+        // citations" diff. Restrict to kinds that actually populate citations.
         // `COMPLETED_STATUSES` covers `completed`, `completed_budget_truncated`,
         // and `completed_partial` so that partial / sweep-rescued runs still
         // contribute to citation-set drift detection.
@@ -66,6 +69,7 @@ export async function GET(request: Request) {
             and(
               eq(auditRuns.firm_id, firm.id),
               inArray(auditRuns.status, [...COMPLETED_STATUSES]),
+              inArray(auditRuns.kind, ['full', 'daily-priority']),
             ),
           )
           .orderBy(desc(auditRuns.started_at))
