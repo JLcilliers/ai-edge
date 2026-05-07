@@ -24,6 +24,19 @@ export interface JsonLdFinding {
   typesFound: string[]; // deduped, sorted
   blocks: Array<{ type: string; raw: unknown }>; // preserve per-block detail for future UI drill-downs
   errors: string[]; // non-fatal parse failures
+  /**
+   * `true` when the page fetch itself failed (HTTP non-2xx, network error,
+   * or WAF block page). Distinguishes "we couldn't see what's on the page"
+   * from "we read the page and it has no schema" — the former is an
+   * infrastructure issue (residential proxy needed for WAF-protected sites
+   * per ADR-0010), the latter is a real schema gap. Without this flag the
+   * orchestrator would emit `schema:missing_Organization` for sites we
+   * never even reached, and the dashboard would tell the operator to add
+   * markup that's already there.
+   */
+  fetchBlocked: boolean;
+  /** HTTP status when fetch returned non-2xx; null on network failure or success. */
+  httpStatus: number | null;
 }
 
 /**
@@ -133,24 +146,46 @@ export async function scanJsonLd(url: string): Promise<JsonLdFinding> {
   const allTypes: string[] = [];
 
   let html: string;
+  let httpStatus: number | null = null;
   try {
     const res = await fetch(url, {
       headers: {
-        'User-Agent': 'ai-edge-entity-scan/0.1 (schema.org audit)',
+        // Browser-compatible UA in the conventional `(compatible; <bot>; +<url>)`
+        // format Googlebot uses. Improves the success rate against WAFs that
+        // refuse plain `curl/`-style or `app-name/version` UAs while still
+        // identifying us honestly. WAFs that fingerprint by IP (e.g.
+        // adidas.com's Cloudflare config) still 403 — those need the
+        // Playwright + residential-proxy worker per ADR-0010.
+        'User-Agent':
+          'Mozilla/5.0 (compatible; ai-edge-bot/0.1; +https://clixsy.com)',
         Accept: 'text/html,application/xhtml+xml',
       },
       redirect: 'follow',
     });
+    httpStatus = res.status;
     if (!res.ok) {
-      throw new Error(`${url} returned ${res.status}`);
+      // 4xx/5xx with no body access — distinguish in the return value so the
+      // orchestrator can write a `schema:fetch_blocked` flag rather than
+      // claiming the page is missing schema it might actually have.
+      return {
+        url,
+        typesFound: [],
+        blocks: [],
+        errors: [`${url} returned ${res.status}`],
+        fetchBlocked: true,
+        httpStatus,
+      };
     }
     html = await res.text();
   } catch (err) {
+    // Network-level failure (DNS, TCP, TLS, etc.). Also fetch-blocked.
     return {
       url,
       typesFound: [],
       blocks: [],
       errors: [`fetch failed: ${String(err)}`],
+      fetchBlocked: true,
+      httpStatus,
     };
   }
 
@@ -171,7 +206,7 @@ export async function scanJsonLd(url: string): Promise<JsonLdFinding> {
   });
 
   const typesFound = Array.from(new Set(allTypes)).sort();
-  return { url, typesFound, blocks, errors };
+  return { url, typesFound, blocks, errors, fetchBlocked: false, httpStatus };
 }
 
 /**

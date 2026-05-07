@@ -210,7 +210,22 @@ export type EntityHealth = {
   firmType: FirmType;
   siteUrl: string | null;
 
-  // Schema.org breakdown
+  /**
+   * Whether the latest scan could actually fetch the homepage. When
+   * `fetch_blocked`, the schemaPresent / schemaMissingRequired arrays
+   * are empty and meaningless — the UI should show "fetch blocked"
+   * messaging instead of "you're missing Organization markup." Common
+   * causes: WAF rejected our request (Cloudflare/Akamai/etc.),
+   * geo-redirect to an unreachable region-locked site, or a network
+   * failure between Vercel and the origin.
+   */
+  schemaFetchStatus:
+    | { state: 'ok' }
+    | { state: 'fetch_blocked'; httpStatus: string }
+    | { state: 'never_scanned' };
+
+  // Schema.org breakdown — present/missing arrays are populated only when
+  // schemaFetchStatus.state === 'ok'.
   schemaPresent: string[];
   schemaMissingRequired: string[];
   schemaMissingRecommended: string[];
@@ -257,6 +272,7 @@ export async function getEntityHealth(firmSlug: string): Promise<EntityHealth> {
     return {
       firmType: 'other',
       siteUrl: null,
+      schemaFetchStatus: { state: 'never_scanned' },
       schemaPresent: [],
       schemaMissingRequired: [],
       schemaMissingRecommended: [],
@@ -292,19 +308,39 @@ export async function getEntityHealth(firmSlug: string): Promise<EntityHealth> {
   const kgRow = latestBySource.get('google-kg');
 
   // ── Schema.org decode ──────────────────────────────────────
+  // Three terminal states:
+  //   - never_scanned: no `entity_signals[source=website]` row exists yet.
+  //   - fetch_blocked: the latest scan couldn't reach the homepage (WAF
+  //     403, geo-block, network failure). present/missing arrays are
+  //     empty — we never had a chance to look. The UI shows "homepage
+  //     fetch blocked" rather than a fabricated list of missing types.
+  //   - ok: latest scan succeeded; present/missing arrays are accurate.
   const required = EXPECTED_TYPES_BY_FIRM[firmType] ?? EXPECTED_TYPES_BY_FIRM.other;
   const present: string[] = [];
   const missingReq: string[] = [];
   const missingRec: string[] = [];
+  let schemaFetchStatus: EntityHealth['schemaFetchStatus'] = { state: 'never_scanned' };
 
   if (websiteRow) {
     const flags = (websiteRow.divergence_flags ?? []) as string[];
-    for (const f of flags) {
-      if (f.startsWith('schema:present_')) present.push(f.slice('schema:present_'.length));
-      else if (f.startsWith('schema:missing_'))
-        missingReq.push(f.slice('schema:missing_'.length));
-      else if (f.startsWith('schema:recommended_'))
-        missingRec.push(f.slice('schema:recommended_'.length));
+    const blockedFlag = flags.find((f) => f.startsWith('schema:fetch_blocked:'));
+    if (blockedFlag) {
+      schemaFetchStatus = {
+        state: 'fetch_blocked',
+        httpStatus: blockedFlag.slice('schema:fetch_blocked:'.length),
+      };
+      // Keep present/missing arrays empty — anything we wrote here would
+      // be a guess, and the UI specifically renders the fetch-blocked
+      // state instead of the type-by-type breakdown.
+    } else {
+      schemaFetchStatus = { state: 'ok' };
+      for (const f of flags) {
+        if (f.startsWith('schema:present_')) present.push(f.slice('schema:present_'.length));
+        else if (f.startsWith('schema:missing_'))
+          missingReq.push(f.slice('schema:missing_'.length));
+        else if (f.startsWith('schema:recommended_'))
+          missingRec.push(f.slice('schema:recommended_'.length));
+      }
     }
   } else {
     // Never scanned — everything expected is "missing"
@@ -365,6 +401,7 @@ export async function getEntityHealth(firmSlug: string): Promise<EntityHealth> {
   return {
     firmType,
     siteUrl,
+    schemaFetchStatus,
     schemaPresent: present,
     schemaMissingRequired: missingReq,
     schemaMissingRecommended: missingRec,

@@ -42,7 +42,7 @@ export interface CrawlResult {
 async function fetchSitemapXml(url: string): Promise<string> {
   const res = await fetch(url, {
     headers: {
-      'User-Agent': 'ai-edge-suppression/0.1 (brand audit)',
+      'User-Agent': 'Mozilla/5.0 (compatible; ai-edge-bot/0.1; +https://clixsy.com)',
       Accept: 'application/xml,text/xml,*/*',
     },
   });
@@ -146,7 +146,7 @@ async function discoverSitemapFromRobots(origin: string): Promise<string | null>
   try {
     const res = await fetch(`${origin}/robots.txt`, {
       headers: {
-        'User-Agent': 'ai-edge-suppression/0.1 (brand audit)',
+        'User-Agent': 'Mozilla/5.0 (compatible; ai-edge-bot/0.1; +https://clixsy.com)',
         Accept: 'text/plain,*/*',
       },
     });
@@ -205,10 +205,21 @@ async function fetchFirstWorkingSitemap(
       });
     }
   }
+  // If every candidate failed with HTTP 403, the site's WAF / bot-detection
+  // is blocking us regardless of where the sitemap lives — adding a
+  // `Sitemap:` line to robots.txt won't help because we can't read robots.txt
+  // either. Common on major retail / consumer brands (Adidas, Nike Snkrs,
+  // many Cloudflare/Akamai-protected sites). Surface that signal so the
+  // operator doesn't chase a content fix that won't work; the real path
+  // is the Playwright + residential-proxy worker per ADR-0010.
+  const allBlocked = attempted.every((a) => /returned 403/.test(a.status));
+  const blockedHint = allBlocked
+    ? "Every candidate returned 403 — the site's WAF (Cloudflare/Akamai/etc.) is blocking our crawler. This isn't a missing-sitemap problem; the site has one we can't reach. Fix path: deploy the Playwright + residential-proxy worker (ADR-0010) to scan WAF-protected sites."
+    : 'Add a "Sitemap: <url>" line to robots.txt or place sitemap.xml at the site root.';
   throw new Error(
     `Could not find a sitemap. Tried ${attempted.length} location(s): ` +
       attempted.map((a) => `${a.url} (${a.status})`).join(' · ') +
-      `. Add a "Sitemap: <url>" line to robots.txt or place sitemap.xml at the site root.`,
+      `. ${blockedHint}`,
   );
 }
 

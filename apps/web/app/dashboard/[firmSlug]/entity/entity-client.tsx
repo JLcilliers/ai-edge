@@ -145,25 +145,71 @@ export function EntityClient({
 
       {h && (
         <>
+          {/* Fetch-blocked banner — sits above the panels so the operator
+              sees up-front that the schema check below is INCONCLUSIVE
+              for this firm, not a real "missing markup" gap. Common on
+              major brand sites with Cloudflare/Akamai WAFs that 403 our
+              crawler regardless of User-Agent. */}
+          {h.schemaFetchStatus.state === 'fetch_blocked' && (
+            <div className="mt-6 flex items-start gap-3 rounded-xl border border-amber-500/40 bg-amber-500/5 p-4 text-sm">
+              <AlertCircle
+                size={18}
+                strokeWidth={2}
+                className="mt-0.5 shrink-0 text-amber-300"
+              />
+              <div className="flex-1 leading-relaxed">
+                <p className="font-semibold text-amber-200">
+                  Homepage fetch blocked (HTTP {h.schemaFetchStatus.httpStatus})
+                </p>
+                <p className="mt-1 text-amber-100/80">
+                  Our scanner couldn&apos;t reach{' '}
+                  <code className="text-amber-100">{h.siteUrl}</code> —
+                  likely a WAF / bot-detection rule (Cloudflare, Akamai, or
+                  similar) that 403s non-residential IPs. The schema panel
+                  below shows {' '}
+                  <em>&quot;not detected&quot;</em> only because we never
+                  saw the page; the page may well have correct
+                  Organization / PostalAddress markup that a real browser
+                  would see. <strong>Don&apos;t treat this as a missing-
+                  schema gap</strong> — no remediation ticket has been
+                  opened.
+                </p>
+                <p className="mt-1 text-amber-100/80">
+                  Fix path: deploy the Playwright + residential-proxy
+                  worker per ADR-0010 to scan WAF-protected sites. Until
+                  then, the Wikidata / Knowledge-Graph panels still work
+                  normally — those probe the open knowledge graph APIs,
+                  not the firm&apos;s site.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Three big health panels */}
           <div className="mt-6 grid gap-4 md:grid-cols-3">
             <HealthPanel
               icon={Globe}
               title="Home page schema.org"
               state={
-                h.schemaMissingRequired.length === 0 && h.schemaPresent.length > 0
+                h.schemaFetchStatus.state === 'fetch_blocked'
+                  ? 'idle'
+                  : h.schemaMissingRequired.length === 0 && h.schemaPresent.length > 0
                   ? 'ok'
                   : h.schemaPresent.length > 0
                   ? 'warn'
                   : 'bad'
               }
               primary={
-                h.schemaPresent.length > 0
+                h.schemaFetchStatus.state === 'fetch_blocked'
+                  ? `Homepage fetch blocked (HTTP ${h.schemaFetchStatus.httpStatus})`
+                  : h.schemaPresent.length > 0
                   ? `${h.schemaPresent.length} / ${h.schemaPresent.length + h.schemaMissingRequired.length} required types present`
                   : 'No schema detected'
               }
               detail={
-                h.schemaMissingRequired.length > 0
+                h.schemaFetchStatus.state === 'fetch_blocked'
+                  ? "We couldn't reach the homepage — schema check is inconclusive, not a real gap."
+                  : h.schemaMissingRequired.length > 0
                   ? `Missing: ${h.schemaMissingRequired.join(', ')}`
                   : h.schemaMissingRecommended.length > 0
                   ? `Recommended: ${h.schemaMissingRecommended.slice(0, 3).join(', ')}`
