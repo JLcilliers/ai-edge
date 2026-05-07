@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { AlertTriangle } from 'lucide-react';
 import {
   getRedditMentions,
   getRedditTriageCounts,
@@ -63,6 +64,7 @@ export default async function RedditPage({
           Reddit is a high-weight LLM citation source.
         </p>
       </div>
+      <RedditQuotaNotice />
       <RedditListClient
         firmSlug={firmSlug}
         initialMentions={mentions}
@@ -70,6 +72,56 @@ export default async function RedditPage({
         counts={counts}
         activeFilter={activeFilter}
       />
+    </div>
+  );
+}
+
+/**
+ * Operator-facing notice that the Reddit data source is currently quota-
+ * blocked. Surfaced above the feed so a stale "0 new mentions" state
+ * doesn't get misread as "Reddit is quiet about this firm" — it's
+ * actually "we've stopped fetching Reddit until the plan is upgraded."
+ *
+ * Why this is a static banner rather than a dynamic check on the latest
+ * `audit_run.error`: the failure mode is the same for every firm in this
+ * workspace right now (shared RapidAPI key, BASIC plan monthly quota).
+ * A static banner is the cheapest accurate signal. Once the plan is
+ * upgraded (or migrated to a different provider) this component is
+ * deleted in one PR.
+ */
+function RedditQuotaNotice() {
+  return (
+    <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-500/40 bg-amber-500/5 p-4">
+      <AlertTriangle
+        size={18}
+        strokeWidth={2}
+        className="mt-0.5 shrink-0 text-amber-300"
+      />
+      <div className="flex-1 text-sm leading-relaxed">
+        <p className="font-semibold text-amber-200">
+          Reddit polling paused — RapidAPI plan needs upgrade
+        </p>
+        <p className="mt-1 text-amber-100/80">
+          Our shared RapidAPI Reddit3 key has hit the BASIC tier&apos;s monthly
+          request quota. The daily reddit-poll cron is currently failing for
+          every firm with a 429 error, and any new mentions are not being
+          ingested. Existing mentions remain visible below — but they reflect
+          the last successful scan, not today&apos;s Reddit chatter.
+        </p>
+        <p className="mt-1 text-amber-100/80">
+          Fix: upgrade the plan at{' '}
+          <a
+            href="https://rapidapi.com/sparior/api/reddit3"
+            target="_blank"
+            rel="noreferrer"
+            className="underline underline-offset-2 hover:no-underline"
+          >
+            rapidapi.com/sparior/api/reddit3
+          </a>{' '}
+          (PRO tier covers our current ~750 calls/month volume). Quota also
+          resets on the next billing cycle if you&apos;d rather wait.
+        </p>
+      </div>
     </div>
   );
 }
