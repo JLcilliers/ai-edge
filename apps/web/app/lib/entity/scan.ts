@@ -81,6 +81,8 @@ export async function runEntityScan(firmId: string): Promise<string> {
         : Promise.resolve({
             url: '',
             typesFound: [] as string[],
+            fetchBlocked: false,
+            httpStatus: null,
             blocks: [] as Array<{ type: string; raw: unknown }>,
             errors: ['no primary_url on Brand Truth — skipped home-page scan'],
           }),
@@ -89,13 +91,30 @@ export async function runEntityScan(firmId: string): Promise<string> {
     ]);
 
     // ── Persist website (schema.org) signal ──────────────────
-    const typeDiff = diffExpectedTypes(firmType, schemaResult.typesFound);
-    const websiteFlags: string[] = [
-      ...typeDiff.missingRequired.map((t) => `schema:missing_${t}`),
-      ...typeDiff.missingRecommended.map((t) => `schema:recommended_${t}`),
-      ...typeDiff.presentRequired.map((t) => `schema:present_${t}`),
-      ...schemaResult.errors.map((e) => `error:${e.slice(0, 80)}`),
-    ];
+    // When the page fetch was blocked (WAF / 4xx / network failure) we
+    // genuinely don't know what schema is on the page. Don't write
+    // `schema:missing_X` flags for types we never had a chance to look for —
+    // that would tell the operator to add Organization markup to a homepage
+    // where it already exists, and would open a remediation ticket the
+    // operator can't actually resolve. Instead emit a single
+    // `schema:fetch_blocked:<httpStatus>` flag so the dashboard can render
+    // an "inconclusive — homepage couldn't be reached" state. The proper
+    // fix for these sites is the Playwright + residential-proxy worker
+    // path per ADR-0010, not a content change.
+    const websiteFlags: string[] = [];
+    if (schemaResult.fetchBlocked) {
+      const status = schemaResult.httpStatus ?? 'network-error';
+      websiteFlags.push(`schema:fetch_blocked:${status}`);
+      websiteFlags.push(...schemaResult.errors.map((e) => `error:${e.slice(0, 80)}`));
+    } else {
+      const typeDiff = diffExpectedTypes(firmType, schemaResult.typesFound);
+      websiteFlags.push(
+        ...typeDiff.missingRequired.map((t) => `schema:missing_${t}`),
+        ...typeDiff.missingRecommended.map((t) => `schema:recommended_${t}`),
+        ...typeDiff.presentRequired.map((t) => `schema:present_${t}`),
+        ...schemaResult.errors.map((e) => `error:${e.slice(0, 80)}`),
+      );
+    }
 
     await db.insert(entitySignals).values({
       firm_id: firmId,
@@ -165,12 +184,22 @@ export async function runEntityScan(firmId: string): Promise<string> {
       source_id: string; // we reuse the auditRun id for MVP since entitySignals can have many rows per run
     }> = [];
 
-    if (typeDiff.missingRequired.length > 0) {
-      tickets.push({
-        playbook_step: `entity:schema:${typeDiff.missingRequired.join(',')}`,
-        due_days: 14,
-        source_id: runId,
-      });
+    // Skip the missing-schema ticket when the homepage fetch was blocked —
+    // we don't actually know what schema is on the page, and the operator
+    // can't fix a "missing schema" ticket whose root cause is "WAF blocked
+    // our crawler". The fetch-blocked state is already surfaced via
+    // `schema:fetch_blocked:<status>` in entity_signals; ops can act on it
+    // by reaching for the residential-proxy path (ADR-0010) rather than
+    // editing site markup.
+    if (!schemaResult.fetchBlocked) {
+      const typeDiff = diffExpectedTypes(firmType, schemaResult.typesFound);
+      if (typeDiff.missingRequired.length > 0) {
+        tickets.push({
+          playbook_step: `entity:schema:${typeDiff.missingRequired.join(',')}`,
+          due_days: 14,
+          source_id: runId,
+        });
+      }
     }
 
     if (wikidataResult.hits.length === 0) {
