@@ -8,10 +8,13 @@
  * always retry generation from the step detail page.
  */
 
-import { getDb, sopRuns } from '@ai-edge/db';
+import { getDb, sopRuns, sopDeliverables, firms } from '@ai-edge/db';
 import { eq } from 'drizzle-orm';
 import type { SopDefinition, SopKey } from './types';
 import { generatePriorityActions } from './ticket-factories/priority-actions';
+import { generateSuppressionTickets } from './ticket-factories/suppression-decisions';
+import { buildComparisonMatrixXlsx } from './deliverables/comparison-matrix-xlsx';
+import { buildSuppressionArtifacts } from './deliverables/suppression-artifacts';
 
 interface DispatchInput {
   firmSlug: string;
@@ -64,20 +67,127 @@ export async function dispatchStepGenerators(input: DispatchInput): Promise<Disp
     }
   }
 
-  // Other factories — suppression, third_party, schema, etc. — stub for
-  // Day 2 continuation.
-  if (
-    gen.ticketsFromFactory &&
-    gen.ticketsFromFactory !== 'priority_actions_from_visibility_audit'
-  ) {
-    out.warnings.push(`Factory '${gen.ticketsFromFactory}' wired on Day 2D/E (after priority_actions lands).`);
+  if (gen.ticketsFromFactory === 'suppression_decisions_to_tickets') {
+    try {
+      const [firmRow] = await db
+        .select({ name: firms.name })
+        .from(firms)
+        .where(eq(firms.id, input.firmId))
+        .limit(1);
+      const primaryUrl = typeof (anchors.primary_url) === 'string' ? (anchors.primary_url as string) : null;
+      const r = await generateSuppressionTickets({
+        firmSlug: input.firmSlug,
+        firmId: input.firmId,
+        firmName: firmRow?.name ?? 'Firm',
+        primaryUrl,
+        sopKey: 'legacy_content_suppression',
+        runId: input.runId,
+        stepNumber: input.stepNumber,
+      });
+      out.ticketsCreated += r.created.length;
+    } catch (e) {
+      out.warnings.push(`suppression_decisions failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
   }
 
-  // Deliverable builders — wired Day 2 next pass.
+  // Other factories — third_party_listing_updates, schema_patches_per_page,
+  // etc. — land in Day 2E.
+  if (
+    gen.ticketsFromFactory &&
+    gen.ticketsFromFactory !== 'priority_actions_from_visibility_audit' &&
+    gen.ticketsFromFactory !== 'suppression_decisions_to_tickets'
+  ) {
+    out.warnings.push(`Factory '${gen.ticketsFromFactory}' wired on Day 2E.`);
+  }
+
+  // Deliverable builders.
   if (gen.deliverableKinds?.length) {
-    out.warnings.push(
-      `Deliverables [${gen.deliverableKinds.join(', ')}] queued — builders land in the next Day 2 commit.`,
-    );
+    for (const kind of gen.deliverableKinds) {
+      if (kind === 'comparison_matrix_xlsx') {
+        const auditRunId = typeof anchors.auditRunId === 'string' ? anchors.auditRunId : undefined;
+        if (!auditRunId) {
+          out.warnings.push(`${kind}: no auditRunId in run.meta.anchors — skipping`);
+          continue;
+        }
+        try {
+          const [firmRow] = await db.select({ name: firms.name }).from(firms).where(eq(firms.id, input.firmId)).limit(1);
+          const result = await buildComparisonMatrixXlsx({
+            firmName: firmRow?.name ?? 'Firm',
+            auditRunId,
+            generatedAt: new Date(),
+          });
+          await db.insert(sopDeliverables).values({
+            sop_run_id: input.runId,
+            kind,
+            name: result.filename,
+            payload: {
+              filename: result.filename,
+              bytes: result.bytes,
+              rowCount: result.rowCount,
+              auditRunId,
+            },
+            blob_url: result.blobUrl,
+          });
+          out.deliverablesCreated += 1;
+        } catch (e) {
+          out.warnings.push(`${kind} builder failed: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      } else if (
+        kind === 'decision_matrix_csv' ||
+        kind === 'redirect_map_csv' ||
+        kind === 'phased_implementation_plan_md'
+      ) {
+        // Build once for the run and emit all three artifacts together —
+        // they all come from the same decision pass. Avoid rebuilding when
+        // multiple kinds are listed on the same step.
+        try {
+          const [firmRow] = await db
+            .select({ name: firms.name })
+            .from(firms)
+            .where(eq(firms.id, input.firmId))
+            .limit(1);
+          const primaryUrl = typeof anchors.primary_url === 'string' ? (anchors.primary_url as string) : null;
+          const artifacts = await buildSuppressionArtifacts({
+            firmId: input.firmId,
+            firmName: firmRow?.name ?? 'Firm',
+            primaryUrl,
+            generatedAt: new Date(),
+          });
+          const persist = async (k: string, name: string, blobUrl: string | null, payload: Record<string, unknown>) => {
+            await db.insert(sopDeliverables).values({
+              sop_run_id: input.runId,
+              kind: k,
+              name,
+              payload,
+              blob_url: blobUrl,
+            });
+            out.deliverablesCreated += 1;
+          };
+          if (kind === 'decision_matrix_csv') {
+            await persist('decision_matrix_csv', artifacts.decisionMatrix.filename, artifacts.decisionMatrix.blobUrl, {
+              filename: artifacts.decisionMatrix.filename,
+              rowCount: artifacts.decisionMatrix.rowCount,
+            });
+          } else if (kind === 'redirect_map_csv') {
+            await persist('redirect_map_csv', artifacts.redirectMap.filename, artifacts.redirectMap.blobUrl, {
+              filename: artifacts.redirectMap.filename,
+              rowCount: artifacts.redirectMap.rowCount,
+            });
+          } else {
+            await persist('phased_implementation_plan_md', artifacts.phasedPlan.filename, artifacts.phasedPlan.blobUrl, {
+              filename: artifacts.phasedPlan.filename,
+              bytes: artifacts.phasedPlan.bytes,
+            });
+          }
+        } catch (e) {
+          out.warnings.push(`${kind} builder failed: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      } else {
+        // Other deliverable kinds (messaging_framework_md, schema_bundle_jsonld,
+        // messaging_guide_md, monitoring_log_md, etc.) — land in Day 2E.
+        out.warnings.push(`Deliverable '${kind}' builder lands in Day 2E.`);
+      }
+    }
   }
 
   return out;
