@@ -233,11 +233,29 @@ export interface SopDefinition {
 }
 
 // ───────────────────────────────────────────────────────────────
-// Convenience: SOPs grouped by phase, for the /sops page grid.
+// Phases — the operator-facing program structure. Each phase has
+// its own top-level sidebar tab; the URL slug is the kebab-cased
+// phase name (no "phase-1" prefix — the label IS the routing
+// surface).
 // ───────────────────────────────────────────────────────────────
+export type PhaseKey =
+  | 'brand-audit-analysis'
+  | 'measurement-monitoring'
+  | 'content-optimization'
+  | 'third-party-optimization'
+  | 'technical-implementation'
+  | 'content-generation'
+  | 'client-services';
+
 export interface PhaseDefinition {
+  /** Stable internal ordinal (1-7). NOT shown in UI labels. */
   phase: SopPhase;
-  name: string;          // "Brand Audit & Analysis", etc.
-  description: string;   // one-sentence phase summary
-  sopKeys: SopKey[];     // in display order
+  /** URL slug — used in /dashboard/[firmSlug]/[phaseKey]/... routes. */
+  phaseKey: PhaseKey;
+  /** The operator-facing name. The sidebar shows this verbatim. */
+  name: string;
+  /** One-sentence phase summary for the page header. */
+  description: string;
+  /** Member workflows in display order. */
+  sopKeys: SopKey[];
 }

@@ -1772,47 +1772,59 @@ const COMPETITIVE_LLM_MONITORING: SopDefinition = {
 export const PHASES: PhaseDefinition[] = [
   {
     phase: 1,
+    phaseKey: 'brand-audit-analysis',
     name: 'Brand Audit & Analysis',
     description: 'Establish baseline: how do LLMs describe the firm today, what legacy content confuses them, and what is the canonical messaging?',
     sopKeys: ['brand_visibility_audit', 'legacy_content_suppression', 'brand_messaging_standardization'],
   },
   {
     phase: 2,
+    phaseKey: 'measurement-monitoring',
     name: 'Measurement & Monitoring',
     description: 'Track AEO impact in analytics, server logs, and recurring LLM probes.',
     sopKeys: ['ga4_llm_traffic_setup', 'ai_bot_log_file_analysis', 'bi_weekly_llm_monitoring'],
   },
   {
     phase: 3,
+    phaseKey: 'content-optimization',
     name: 'Content Optimization',
     description: 'Refresh and re-author content so it actually wins LLM citations.',
     sopKeys: ['deep_research_content_audit', 'comparison_page_creation', 'content_repositioning', 'llm_friendly_content_checklist', 'content_freshness_audit'],
   },
   {
     phase: 4,
+    phaseKey: 'third-party-optimization',
     name: 'Third-Party Optimization',
     description: 'The third-party signals LLMs trust most: golden links, Wikidata/KG, Reddit.',
     sopKeys: ['golden_links_opportunity_analysis', 'entity_optimization', 'reddit_brand_sentiment_monitoring'],
   },
   {
     phase: 5,
+    phaseKey: 'technical-implementation',
     name: 'Technical Implementation',
     description: 'On-site infrastructure: dedicated AI info page, schema, semantic HTML.',
     sopKeys: ['ai_info_page_creation', 'schema_markup_deployment', 'semantic_html_optimization'],
   },
   {
     phase: 6,
+    phaseKey: 'content-generation',
     name: 'Content Generation',
     description: 'Net-new content from SMEs, validated against trust consensus.',
     sopKeys: ['sme_content_generation', 'trust_alignment_audit'],
   },
   {
     phase: 7,
+    phaseKey: 'client-services',
     name: 'Client Services',
     description: 'Selling, delivering, and reporting AEO engagements.',
     sopKeys: ['weekly_aeo_reporting', 'aeo_discovery_call', 'aeo_audit_delivery', 'competitive_llm_monitoring'],
   },
 ];
+
+/** Look up a phase by its URL slug. Returns undefined for unknown slugs. */
+export function getPhaseByKey(phaseKey: string): PhaseDefinition | undefined {
+  return PHASES.find((p) => p.phaseKey === phaseKey);
+}
 
 const ALL_SOPS_LIST: SopDefinition[] = [
   // Phase 1 (fully specified)

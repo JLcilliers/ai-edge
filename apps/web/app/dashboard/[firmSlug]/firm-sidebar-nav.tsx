@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, FileText, ClipboardCheck, MessageSquare, Users, FileX, Database, ShieldCheck, FileBarChart, Eye, Settings, Inbox, FlaskConical, Workflow } from 'lucide-react';
+import { LayoutDashboard, FileText, ClipboardCheck, MessageSquare, Users, FileX, Database, ShieldCheck, FileBarChart, Eye, Settings, Inbox, FlaskConical, ScanSearch, Activity, PenSquare, Globe2, Wrench, Sparkles, Briefcase } from 'lucide-react';
 
 type NavItem = {
   label: string;
@@ -22,12 +22,56 @@ const ITEMS: NavItem[] = [
     icon: LayoutDashboard,
     match: 'exact',
   },
+
+  // ── The Steve Toth playbook, surfaced as 7 ordered phase tabs ──
+  // Each tab is one phase of the AEO program. The label IS the phase
+  // name — no "Phase 1" / "Phase 2" prefixes, no umbrella "SOPs" tab.
+  // Order matters: top → bottom mirrors the program sequence the
+  // operator runs through.
   {
-    label: 'SOPs',
-    href: (slug) => `/dashboard/${slug}/sops`,
-    icon: Workflow,
+    label: 'Brand Audit & Analysis',
+    href: (slug) => `/dashboard/${slug}/brand-audit-analysis`,
+    icon: ScanSearch,
     match: 'prefix',
   },
+  {
+    label: 'Measurement & Monitoring',
+    href: (slug) => `/dashboard/${slug}/measurement-monitoring`,
+    icon: Activity,
+    match: 'prefix',
+  },
+  {
+    label: 'Content Optimization',
+    href: (slug) => `/dashboard/${slug}/content-optimization`,
+    icon: PenSquare,
+    match: 'prefix',
+  },
+  {
+    label: 'Third-Party Optimization',
+    href: (slug) => `/dashboard/${slug}/third-party-optimization`,
+    icon: Globe2,
+    match: 'prefix',
+  },
+  {
+    label: 'Technical Implementation',
+    href: (slug) => `/dashboard/${slug}/technical-implementation`,
+    icon: Wrench,
+    match: 'prefix',
+  },
+  {
+    label: 'Content Generation',
+    href: (slug) => `/dashboard/${slug}/content-generation`,
+    icon: Sparkles,
+    match: 'prefix',
+  },
+  {
+    label: 'Client Services',
+    href: (slug) => `/dashboard/${slug}/client-services`,
+    icon: Briefcase,
+    match: 'prefix',
+  },
+
+  // ── Operator surfaces (separate from the playbook phases) ──
   {
     label: 'Action Items',
     href: (slug) => `/dashboard/${slug}/tickets`,
@@ -41,6 +85,9 @@ const ITEMS: NavItem[] = [
     icon: FileText,
     match: 'prefix',
   },
+
+  // ── Legacy data views — will fold into their parent phase pages
+  // as we wire each phase's workflows. Kept top-level for continuity. ──
   {
     label: 'Audits',
     href: (slug) => `/dashboard/${slug}/audits`,
