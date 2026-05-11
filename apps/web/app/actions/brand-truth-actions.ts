@@ -5,6 +5,9 @@ import { brandTruthSchema, type BrandTruth, type FirmType, validateClaims } from
 import { eq, desc, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { bootstrapBrandTruthFromUrl } from '../lib/brand-truth/bootstrap';
+import { runSuppressionScan } from '../lib/suppression/scan';
+import { runEntityScan } from '../lib/entity/scan';
+import { captureAioForFirm } from '../lib/aio/capture';
 
 /** Resolve firm id from URL slug. Throws if the slug doesn't match a firm. */
 async function resolveFirmId(slug: string): Promise<string> {
@@ -175,11 +178,40 @@ export async function saveBrandTruth(
  * Auth (future hardening): operator-only action. For now we trust the
  * caller because the broader dashboard has no auth wrapper yet.
  */
+/**
+ * Summary of post-bootstrap enrichment scan outcomes. Each scan can succeed,
+ * fail, or skip — we report all three so the caller can render a banner
+ * showing what's already populated when the operator lands in the editor.
+ *
+ * None of these blocking the redirect — partial enrichment is fine. If
+ * suppression times out on a WAF or the AIO provider isn't configured,
+ * the bootstrap still succeeds and the operator gets a populated Brand Truth.
+ */
+export interface PostBootstrapEnrichment {
+  suppression:
+    | { status: 'completed'; findingsCount: number; pagesEmbedded: number; runId: string }
+    | { status: 'failed'; reason: string }
+    | { status: 'skipped'; reason: string };
+  entity:
+    | { status: 'completed'; sourcesCount: number; runId: string }
+    | { status: 'failed'; reason: string };
+  aio:
+    | { status: 'completed'; attempted: number; hasAio: number; firmCited: number }
+    | { status: 'skipped'; reason: string };
+}
+
 export async function bootstrapBrandTruthForFirm(
   firmSlug: string,
   primaryUrl: string,
 ): Promise<
-  | { ok: true; version: number; costUsd: number; latencyMs: number; pagesUsed: string[] }
+  | {
+      ok: true;
+      version: number;
+      costUsd: number;
+      latencyMs: number;
+      pagesUsed: string[];
+      enrichment: PostBootstrapEnrichment;
+    }
   | { ok: false; error: string; reason?: string }
 > {
   const db = getDb();
@@ -244,6 +276,35 @@ export async function bootstrapBrandTruthForFirm(
     },
   });
 
+  // ── Post-bootstrap enrichment scans ──────────────────────────────────
+  // Now that the Brand Truth is persisted, kick off the three scans that
+  // depend on it. Running them here (vs leaving them as on-demand buttons)
+  // means a freshly-bootstrapped firm lands in the editor with real data
+  // on EVERY module — Suppression, Entity, AIO captures, monthly report —
+  // instead of empty "no scans yet" placeholders.
+  //
+  // What's chained:
+  //   • Suppression scan — crawls site, embeds pages, flags drift findings.
+  //     Cost: <$0.01 (embeddings only). Wall-clock: 30-90s depending on
+  //     sitemap size. Capped at 15 URLs.
+  //   • Entity scan — JSON-LD fetch + Wikidata + Google KG probes.
+  //     Cost: $0. Wall-clock: ~5s.
+  //   • AIO capture — 3 queries through DataForSEO (or NullAioProvider if
+  //     unconfigured). Cost: ~$0.015 with provider, $0 without.
+  //
+  // What's NOT chained: the Trust Alignment Audit. It's $0.05-0.10 per run
+  // and benefits from operator review of the Brand Truth first — so we
+  // leave it as a manual "Run audit" click on the audits page.
+  //
+  // All three run in parallel via Promise.allSettled — independent modules,
+  // each writes to its own tables, no shared in-memory state. Failures are
+  // captured per-module so the operator sees what populated vs what didn't.
+  //
+  // Total wall-clock for the chain: max(suppression, entity, AIO) ~= 90s.
+  // Together with the bootstrap call (~20-30s), the full new-client flow
+  // takes ~2 minutes and fits comfortably under the page's maxDuration=300s.
+  const enrichment = await runPostBootstrapEnrichment(firm.id);
+
   // revalidatePath only works inside the Next.js request context — guard
   // so this action can also be invoked from Node scripts (integration
   // tests, manual cron triggers) without crashing the otherwise-successful
@@ -251,6 +312,9 @@ export async function bootstrapBrandTruthForFirm(
   try {
     revalidatePath(`/dashboard/${firmSlug}/brand-truth`);
     revalidatePath(`/dashboard/${firmSlug}`);
+    revalidatePath(`/dashboard/${firmSlug}/suppression`);
+    revalidatePath(`/dashboard/${firmSlug}/entity`);
+    revalidatePath(`/dashboard/${firmSlug}/visibility`);
   } catch {
     // Outside Next.js runtime — no-op, the page will re-fetch on next render.
   }
@@ -261,5 +325,106 @@ export async function bootstrapBrandTruthForFirm(
     costUsd: result.costUsd,
     latencyMs: result.latencyMs,
     pagesUsed: result.provenance.pagesUsed,
+    enrichment,
   };
+}
+
+/**
+ * Fire the three enrichment scans in parallel and structure their outcomes
+ * so the caller can render a "what's already populated" banner.
+ *
+ * Why Promise.allSettled (not Promise.all): if one scan throws — say the
+ * site is WAF-blocked and suppression can't crawl it — we still want the
+ * other two scans to write their rows. Promise.all would abort the whole
+ * batch on first throw; allSettled lets each module fail independently.
+ */
+async function runPostBootstrapEnrichment(
+  firmId: string,
+): Promise<PostBootstrapEnrichment> {
+  const [supResult, entResult, aioResult] = await Promise.allSettled([
+    runSuppressionScan(firmId, { maxUrls: 15 }),
+    runEntityScan(firmId),
+    captureAioForFirm(firmId, { maxQueries: 3 }),
+  ]);
+
+  // Suppression — translate raw runId into rich status by reading back the
+  // audit_runs row + counting findings. Same pattern the demo script uses.
+  const db = getDb();
+  let suppression: PostBootstrapEnrichment['suppression'];
+  if (supResult.status === 'fulfilled') {
+    const { auditRuns, legacyFindings, pages: pagesTable } = await import('@ai-edge/db');
+    const [run] = await db
+      .select({ status: auditRuns.status, error: auditRuns.error })
+      .from(auditRuns)
+      .where(eq(auditRuns.id, supResult.value))
+      .limit(1);
+    if (run?.status === 'completed') {
+      const [pageCount] = await db
+        .select({ c: sql<number>`count(*)::int` })
+        .from(pagesTable)
+        .where(eq(pagesTable.firm_id, firmId));
+      const [findingCount] = await db
+        .select({ c: sql<number>`count(*)::int` })
+        .from(legacyFindings)
+        .innerJoin(pagesTable, eq(pagesTable.id, legacyFindings.page_id))
+        .where(eq(pagesTable.firm_id, firmId));
+      suppression = {
+        status: 'completed',
+        findingsCount: findingCount?.c ?? 0,
+        pagesEmbedded: pageCount?.c ?? 0,
+        runId: supResult.value,
+      };
+    } else {
+      suppression = { status: 'failed', reason: run?.error?.slice(0, 200) ?? 'unknown' };
+    }
+  } else {
+    suppression = {
+      status: 'failed',
+      reason: supResult.reason instanceof Error
+        ? supResult.reason.message
+        : String(supResult.reason),
+    };
+  }
+
+  // Entity — count entity_signals rows from this scan.
+  let entity: PostBootstrapEnrichment['entity'];
+  if (entResult.status === 'fulfilled') {
+    const { entitySignals } = await import('@ai-edge/db');
+    const [sigCount] = await db
+      .select({ c: sql<number>`count(*)::int` })
+      .from(entitySignals)
+      .where(eq(entitySignals.firm_id, firmId));
+    entity = { status: 'completed', sourcesCount: sigCount?.c ?? 0, runId: entResult.value };
+  } else {
+    entity = {
+      status: 'failed',
+      reason: entResult.reason instanceof Error
+        ? entResult.reason.message
+        : String(entResult.reason),
+    };
+  }
+
+  // AIO — translate the bulk outcome into a single completed/skipped row.
+  // When no provider is configured, captureAioForFirm writes provider:'none'
+  // rows that show "tried, no provider" in the dashboard — meaningful, but
+  // we report it as `skipped` in the enrichment summary so the banner says
+  // "AIO skipped — DataForSEO not configured" rather than "AIO 5/5 captured".
+  let aio: PostBootstrapEnrichment['aio'];
+  if (aioResult.status === 'fulfilled') {
+    const v = aioResult.value;
+    if (v.hasAio === 0 && v.errors === v.attempted && v.attempted > 0) {
+      aio = { status: 'skipped', reason: 'AIO provider not configured (DATAFORSEO_LOGIN missing)' };
+    } else {
+      aio = { status: 'completed', attempted: v.attempted, hasAio: v.hasAio, firmCited: v.firmCited };
+    }
+  } else {
+    aio = {
+      status: 'skipped',
+      reason: aioResult.reason instanceof Error
+        ? aioResult.reason.message
+        : String(aioResult.reason),
+    };
+  }
+
+  return { suppression, entity, aio };
 }
