@@ -19,10 +19,12 @@ export const config: VercelConfig = {
     // Stale audit-run sweeper — hourly at :15, marks any audit_run stuck
     // in 'running' for >60 min as failed (process crash / deploy cycle).
     { path: '/api/cron/audit-sweep', schedule: '15 * * * *' },
-    // Live SERP capture via Bing Web Search v7 (Phase B #3) — weekly,
-    // Monday 09:00 UTC. Caps at 5 queries/firm/run to stay inside Bing
-    // free tier (1,000 queries/month). No-ops when BING_SEARCH_API_KEY
-    // isn't set so a deploy without procurement still runs cleanly.
+    // Live SERP capture via DataForSEO Google Organic SERP (Phase B #3) —
+    // weekly, Monday 09:00 UTC. Caps at 5 queries/firm/run to keep the
+    // DataForSEO bill bounded (~$0.0006/query). Originally Bing Web Search
+    // v7 — Microsoft retired that API in August 2025; we now reuse the
+    // DataForSEO credentials already provisioned for AIO capture. No-ops
+    // when DATAFORSEO_LOGIN/PASSWORD aren't set.
     { path: '/api/cron/serp-capture', schedule: '0 9 * * 1' },
     // Daily Search Console sync (Phase B #6) — pulls last 30 days of
     // clicks/impressions/ctr/position per connected firm at 06:30 UTC.

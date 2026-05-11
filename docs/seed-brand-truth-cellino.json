@@ -1,0 +1,112 @@
+{
+  "firm_slug": "cellino-law",
+  "firm_name_legal": "Cellino Law LLP",
+  "brand_truth_version": 1,
+  "payload": {
+    "firm_type": "law_firm",
+    "firm_name": "Cellino Law",
+    "primary_url": "https://www.cellinolaw.com",
+    "name_variants": ["Cellino & Cellino", "Cellino Law LLP", "Cellino"],
+    "common_misspellings": ["Celino Law", "Cellio Law", "Cellino & Barnes"],
+    "legal_entity": "Cellino Law LLP",
+    "headquarters": {
+      "street": "350 Main Street, 25th Floor",
+      "city": "Buffalo",
+      "region": "NY",
+      "postal_code": "14202",
+      "country": "US",
+      "phone": "1-888-888-8888"
+    },
+    "practice_areas": [
+      "personal injury",
+      "car accidents",
+      "truck accidents",
+      "motorcycle accidents",
+      "construction accidents",
+      "medical malpractice",
+      "slip and fall",
+      "wrongful death",
+      "premises liability",
+      "product liability"
+    ],
+    "geographies_served": [
+      { "city": "Buffalo", "state": "NY", "country": "US", "radius_mi": 75 },
+      { "city": "Rochester", "state": "NY", "country": "US", "radius_mi": 50 },
+      { "city": "New York", "state": "NY", "country": "US", "radius_mi": 50 },
+      { "city": "Long Island", "state": "NY", "country": "US", "radius_mi": 50 },
+      { "city": "Manhattan", "state": "NY", "country": "US", "radius_mi": 25 }
+    ],
+    "unique_differentiators": [
+      "No fee unless we win your case",
+      "Billions recovered for injury victims",
+      "Free 24/7 consultations across New York State",
+      "Statewide trial-tested personal injury practice"
+    ],
+    "required_positioning_phrases": [
+      "New York personal injury attorneys",
+      "Cellino Law represents accident victims across New York State"
+    ],
+    "banned_claims": [
+      { "claim": "best personal injury lawyer", "reason": "NY RPC 7.1 prohibits unverifiable comparative claims", "source_rule": "NY 22 NYCRR 1200.0 R7.1" },
+      { "claim": "guaranteed settlement", "reason": "NY RPC 7.1 prohibits outcome guarantees", "source_rule": "NY 22 NYCRR 1200.0 R7.1" },
+      { "claim": "always win", "reason": "NY RPC 7.1 prohibits absolute superiority claims", "source_rule": "NY 22 NYCRR 1200.0 R7.1" }
+    ],
+    "compliance_jurisdictions": ["US-FTC-AGENCY"],
+    "tone_guidelines": {
+      "voice": "confident, plainspoken, results-focused",
+      "register": "professional but approachable",
+      "avoid": ["legalese", "passive voice", "hedging language"]
+    },
+    "target_audience": {
+      "primary_verticals": ["accident victims", "injured workers", "families of wrongful-death victims"],
+      "firmographic": "Adults 25-65 across NY State who have suffered personal injury",
+      "persona": "Worried, recently injured, looking for a confident lawyer who will fight insurers"
+    },
+    "brand_values": ["accountability", "client advocacy", "trial readiness", "Western NY roots"],
+    "seed_query_intents": [
+      "best personal injury lawyer in Buffalo NY",
+      "Cellino Law reviews",
+      "should I hire Cellino Law",
+      "top car accident attorney Buffalo NY",
+      "Cellino Law settlement results",
+      "how much does Cellino Law charge",
+      "personal injury lawyer near me Buffalo",
+      "truck accident lawyer New York",
+      "medical malpractice attorney Buffalo",
+      "construction accident lawyer Rochester NY",
+      "wrongful death attorney New York City",
+      "is Cellino Law legitimate",
+      "Cellino Law fees and costs",
+      "Cellino and Barnes vs Cellino Law",
+      "best Buffalo car accident lawyer",
+      "slip and fall lawyer NY",
+      "motorcycle accident attorney Buffalo",
+      "personal injury attorney Long Island",
+      "Cellino Law office locations",
+      "what to do after a car accident in New York"
+    ],
+    "competitors_for_llm_monitoring": [
+      "William Mattar",
+      "Jed Dietrich Law",
+      "The Barnes Firm",
+      "Andrews Bernstein Maranto & Nicotra",
+      "Lipsitz & Ponterio"
+    ],
+    "attorney_bios": [
+      {
+        "name": "Ross M. Cellino Jr.",
+        "role": "Founding Partner",
+        "credentials": ["JD, SUNY Buffalo School of Law"],
+        "bio": "Co-founder of Cellino Law, focused on serious-injury trial practice across New York State."
+      }
+    ],
+    "notable_cases": [],
+    "awards": [],
+    "known_press_and_media": [],
+    "third_party_listings": [
+      { "source": "avvo", "url": "https://www.avvo.com/attorneys/14202-ny-ross-cellino-1545672.html" },
+      { "source": "justia", "url": "https://www.justia.com/lawyers/new-york/buffalo/cellino-law-llp" },
+      { "source": "superlawyers", "url": "https://profiles.superlawyers.com/new-york/buffalo/lawfirm/cellino-law/" }
+    ]
+  }
+}

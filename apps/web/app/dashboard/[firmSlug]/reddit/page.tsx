@@ -13,6 +13,10 @@ import { getFirmBySlug } from '../../../actions/firm-actions';
 import { RedditListClient } from './reddit-list-client';
 
 export const dynamic = 'force-dynamic';
+// `runRedditScan` searches N terms × RapidAPI Reddit + classifies sentiment
+// per accepted post via OpenRouter Gemini Flash. A firm with ~5 search terms
+// + ~20 accepted posts runs 20-40s; bigger rosters push past the 60s default.
+export const maxDuration = 300;
 
 /**
  * Reddit sentiment page with a triage-aware feed.

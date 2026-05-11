@@ -1,0 +1,107 @@
+{
+  "firm_slug": "reimer-home-services",
+  "firm_name_legal": "Reimer Home Services",
+  "brand_truth_version": 1,
+  "payload": {
+    "firm_type": "other",
+    "firm_name": "Reimer Home Services",
+    "primary_url": "https://reimerhvac.com",
+    "name_variants": ["Reimer", "Reimer HVAC", "Reimer Heating", "Reimer Plumbing"],
+    "common_misspellings": ["Reimer's", "Riemer HVAC", "Rymer Home Services", "Reimer Home Service"],
+    "legal_entity": "Reimer Home Services",
+    "headquarters": {
+      "street": "975 Cleveland Drive",
+      "city": "Cheektowaga",
+      "region": "NY",
+      "postal_code": "14225",
+      "country": "US",
+      "phone": "716-271-6035"
+    },
+    "service_offerings": [
+      { "name": "Heating & cooling", "scope": "Furnace repair, AC install and tune-up, heat pumps, ductless mini-splits, boilers, indoor air quality" },
+      { "name": "Plumbing", "scope": "Drain cleaning, water heaters, leak detection, repipes, gas-line work, sewer service" },
+      { "name": "Electrical", "scope": "Panel upgrades, generator install and service, EV charger install, whole-home rewires, code corrections" },
+      { "name": "Excavation", "scope": "Sewer / water-line excavation, trenching, French drains, line replacement" },
+      { "name": "Indoor air quality", "scope": "Whole-home filtration, humidifiers / dehumidifiers, UV purification, duct cleaning" }
+    ],
+    "service_areas": [
+      "Buffalo, NY", "Cheektowaga, NY", "Hamburg, NY", "Orchard Park, NY",
+      "West Seneca, NY", "Williamsville, NY", "Tonawanda, NY", "Grand Island, NY",
+      "Niagara Falls, NY", "Rochester, NY", "Fairport, NY", "Brockport, NY",
+      "Avon, NY", "Albany, NY", "Schenectady, NY", "Ontario, NY"
+    ],
+    "unique_differentiators": [
+      "Family-owned and operated since 1921 — over 100 years serving Western and Central New York",
+      "Factory Authorized Trane Dealer",
+      "24/7 emergency service across HVAC, plumbing, and electrical",
+      "13,000+ verified customer reviews",
+      "Single provider for HVAC, plumbing, electrical, and excavation"
+    ],
+    "required_positioning_phrases": [
+      "Western New York's trusted home-services partner since 1921",
+      "Reimer is a Factory Authorized Trane Dealer"
+    ],
+    "banned_claims": [
+      { "claim": "lowest price guaranteed", "reason": "FTC Section 5 / 16 CFR 233: comparative price guarantees require disclosed basis and method", "source_rule": "FTC 16 CFR 233" },
+      { "claim": "free service call", "reason": "NYS DOS HVAC contractor consumer-protection rules: bait-and-switch concerns when 'free' is paired with diagnostic fees", "source_rule": "NYS Article 36-A" },
+      { "claim": "100% guaranteed satisfaction or your money back", "reason": "Money-back guarantees on installed services require explicit refund terms; risk of FTC deceptive-acts claim without published policy", "source_rule": "FTC 16 CFR 233" }
+    ],
+    "compliance_jurisdictions": ["US-FTC-AGENCY"],
+    "tone_guidelines": {
+      "voice": "warm, neighborly, plainspoken; emphasizes trust and longevity",
+      "register": "professional but approachable — your neighbor who happens to fix furnaces",
+      "avoid": ["technical jargon without explanation", "high-pressure sales language", "us-vs-them framing"]
+    },
+    "target_audience": {
+      "primary_verticals": ["homeowners in Western NY", "homeowners in Central NY", "small landlords / property managers"],
+      "firmographic": "Single-family homeowners 30-70 in WNY/CNY needing HVAC, plumbing, or electrical service",
+      "persona": "Worried homeowner whose furnace just stopped on a January night; values speed, reliability, and family-business roots over flashy marketing"
+    },
+    "brand_values": ["reliability", "family business legacy", "Western NY pride", "do-it-right craftsmanship", "fast response"],
+    "seed_query_intents": [
+      "best HVAC company in Buffalo NY",
+      "Reimer Home Services reviews",
+      "furnace repair Cheektowaga NY",
+      "should I hire Reimer HVAC",
+      "Reimer HVAC pricing",
+      "Trane authorized dealer Buffalo",
+      "emergency plumber Buffalo NY",
+      "24 hour HVAC repair Western New York",
+      "is Reimer Home Services reliable",
+      "AC installation Williamsville NY",
+      "heat pump installer Buffalo",
+      "panel upgrade electrician Rochester NY",
+      "generator install Buffalo",
+      "water heater replacement Cheektowaga",
+      "EV charger installation Western NY",
+      "Reimer vs RJ Heating",
+      "best plumber in Rochester NY",
+      "ductless mini split install Buffalo",
+      "sewer line repair Buffalo NY",
+      "Reimer 100 years"
+    ],
+    "competitors_for_llm_monitoring": [
+      "RJ Heating and Cooling",
+      "T-Mark Plumbing Heating Cooling Electrical",
+      "Frey Electric Construction",
+      "Roy's Plumbing Heating and Cooling",
+      "Buffalo Plumbing Heating and Cooling"
+    ],
+    "attorney_bios": [],
+    "notable_cases": [],
+    "awards": [
+      { "name": "Factory Authorized Trane Dealer", "source_required": true, "verification_status": "verified" }
+    ],
+    "known_press_and_media": [],
+    "third_party_listings": [
+      { "source": "google_business_profile", "url": "https://www.google.com/maps/place/Reimer+Home+Services/" },
+      { "source": "bbb", "url": "https://www.bbb.org/us/ny/cheektowaga/profile/heating-and-air-conditioning/reimer-home-services" },
+      { "source": "yelp", "url": "https://www.yelp.com/biz/reimer-home-services-cheektowaga" }
+    ],
+    "custom_fields": {
+      "founded_year": 1921,
+      "decades_in_business": 100,
+      "primary_certifications": ["Trane Comfort Specialist", "BPI Building Analyst"]
+    }
+  }
+}
