@@ -149,14 +149,20 @@ export const legacyFindings = pgTable('legacy_finding', {
   detected_at: timestamp('detected_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
-// ── Remediation queue ───────────────────────────────────────
+// ── Remediation queue (Action Items) ────────────────────────
+// Per the SOP engine (migration 0013), tickets carry SOP provenance +
+// the prescription layer (title, description, priority_rank,
+// remediation_copy, validation_steps, evidence_links) so the operator
+// gets a concrete assignable task, not just a flag. Legacy auto-
+// generated tickets predate these columns and leave them NULL until the
+// data migration backfills them.
 export const remediationTickets = pgTable('remediation_ticket', {
   id: uuid('id').primaryKey().defaultRandom(),
   firm_id: uuid('firm_id').notNull().references(() => firms.id, { onDelete: 'cascade' }),
-  // 'audit' | 'legacy' | 'entity' | 'reddit' — matches what each scanner
-  // actually writes. `run-audit.ts` uses 'audit' (source_id = alignment_score
-  // id) for Red consensus rows; the earlier spec said 'alignment' but that
-  // label was never emitted. The tickets UI resolves context off this tag.
+  // 'audit' | 'legacy' | 'entity' | 'reddit' | 'sop' — matches what each
+  // scanner actually writes. `run-audit.ts` uses 'audit' (source_id =
+  // alignment_score id) for Red consensus rows; SOP step factories use
+  // 'sop' (source_id = sop_step_state id).
   source_type: text('source_type').notNull(),
   source_id: uuid('source_id').notNull(),
   status: text('status').notNull().default('open'),
@@ -164,6 +170,36 @@ export const remediationTickets = pgTable('remediation_ticket', {
   playbook_step: text('playbook_step'),
   due_at: timestamp('due_at', { withTimezone: true }),
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  // ── SOP provenance + prescription layer (0013) ────────────
+  // sop_run_id is nullable: legacy tickets predate the SOP engine.
+  sop_run_id: uuid('sop_run_id').references((): any => sopRuns.id, { onDelete: 'set null' }),
+  sop_step_number: integer('sop_step_number'),
+  // Human-readable. New tickets always populate `title`; the action-
+  // items UI falls back to a derived title from `source_type` for legacy
+  // rows.
+  title: text('title'),
+  description: text('description'),
+  // 1 = highest priority. Per Brand Visibility Audit SOP Step 7 formula:
+  // priority_rank = f(LLMs_affected, ease_of_implementation, impact).
+  priority_rank: integer('priority_rank'),
+  // Exact text the operator pastes / replaces. For "Update G2 category"
+  // tickets, this is the new category string. For schema patches, the
+  // JSON-LD block.
+  remediation_copy: text('remediation_copy'),
+  // [{ description: string, completed_at?: string }] — must-verify
+  // checklist before the ticket can be closed.
+  validation_steps: jsonb('validation_steps').$type<Array<{
+    description: string;
+    completed_at?: string;
+  }>>(),
+  // [{ kind, url, description }] — which LLM said what, which URL was
+  // cited, which page has the drift. Renders as "evidence" pills in the
+  // ticket detail.
+  evidence_links: jsonb('evidence_links').$type<Array<{
+    kind: 'llm_citation' | 'page_url' | 'third_party_listing' | 'aio_source' | 'reddit_thread';
+    url: string;
+    description?: string;
+  }>>(),
 });
 
 // ── Reddit ──────────────────────────────────────────────────
@@ -590,6 +626,110 @@ export const gscDailyMetrics = pgTable('gsc_daily_metric', {
 //   'playwright' — fallback for AIO pages no provider covers
 //                  (requires Bright Data residential proxies per
 //                  ADR-0010)
+// ── SOP execution engine (0013) ──────────────────────────────
+// See docs/design-sop-engine.md for the full architecture.
+//
+// `sop_run` is one row per (firm × SOP instance). The status machine
+// runs: not_started → in_progress → (awaiting_input ↔ in_progress)+ →
+// completed | paused | cancelled. `current_step` is the step the
+// operator is currently working on; sop_step_state holds the per-step
+// detail.
+export const sopRuns = pgTable('sop_run', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  firm_id: uuid('firm_id').notNull().references(() => firms.id, { onDelete: 'cascade' }),
+  // Stable key from apps/web/app/lib/sop/registry.ts — never change the
+  // value of an existing key without writing a migration to rename
+  // historical rows, because the registry uses this to look up the
+  // step definitions.
+  sop_key: text('sop_key').notNull(),
+  // Denormalized from the registry so the Phase grid can group without
+  // a JOIN through TypeScript. 1..7.
+  phase: integer('phase').notNull(),
+  // 'not_started' | 'in_progress' | 'awaiting_input' | 'completed' | 'paused' | 'cancelled'
+  status: text('status').notNull().default('not_started'),
+  current_step: integer('current_step').notNull().default(1),
+  started_at: timestamp('started_at', { withTimezone: true }),
+  completed_at: timestamp('completed_at', { withTimezone: true }),
+  paused_at: timestamp('paused_at', { withTimezone: true }),
+  // For recurring SOPs (Brand Visibility Audit every 4-6 weeks, etc.),
+  // set when the run completes. The sop-followup-scheduler cron
+  // creates a successor run when this passes.
+  next_review_at: timestamp('next_review_at', { withTimezone: true }),
+  // Soft-enforced sequence: Suppression depends on Brand Visibility
+  // Audit being past Step 7; Messaging Standardization on both. The
+  // operator can override with a logged reason.
+  depends_on_sop_run_id: uuid('depends_on_sop_run_id'),
+  // SOP-specific anchors. For Brand Visibility Audit:
+  //   { audit_run_id, brand_truth_version_id }
+  // For Legacy Content Suppression:
+  //   { audit_run_id, legacy_findings_count, gsc_export_at }
+  // Keep this typed loosely so the registry can evolve without a
+  // migration each time we add a new anchor.
+  meta: jsonb('meta').notNull().default({}),
+  created_by: text('created_by').notNull().default('system'),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  firmPhaseIdx: index('sop_run_firm_phase_idx').on(t.firm_id, t.phase, t.status),
+  firmSopIdx: index('sop_run_firm_sop_idx').on(t.firm_id, t.sop_key, t.created_at),
+}));
+
+// `sop_step_state` is one row per (sop_run × step). Step status drives
+// the workflow UI's left-rail rendering and the gate enforcement on
+// advance.
+export const sopStepStates = pgTable('sop_step_state', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  sop_run_id: uuid('sop_run_id').notNull().references(() => sopRuns.id, { onDelete: 'cascade' }),
+  step_number: integer('step_number').notNull(),
+  step_key: text('step_key').notNull(),
+  // 'not_started' | 'in_progress' | 'awaiting_input' | 'completed' | 'skipped'
+  status: text('status').notNull().default('not_started'),
+  started_at: timestamp('started_at', { withTimezone: true }),
+  completed_at: timestamp('completed_at', { withTimezone: true }),
+  // Gate evidence: which operator confirmations were checked off before
+  // this step advanced. Renders as the audit trail on the SOP detail
+  // page so the operator can show their work to a reviewer.
+  operator_confirmations: jsonb('operator_confirmations').$type<Array<{
+    key: string;
+    label: string;
+    confirmed_at: string;
+    confirmed_by: string;
+    value?: string;  // for free_text gates
+  }>>().notNull().default([]),
+  // Structured summary the step produced. For Step 4 of Brand
+  // Visibility ("Analyze and Score Alignment"), this is
+  //   { red: 2, yellow: 1, green: 2, examples: [{ llm, alignment, finding }] }
+  output_summary: jsonb('output_summary').notNull().default({}),
+  notes: text('notes'),
+}, (t) => ({
+  runStepUniq: uniqueIndex('sop_step_state_run_step_uniq').on(t.sop_run_id, t.step_number),
+}));
+
+// `sop_deliverable` is what makes the engine an execution tool rather
+// than a reporting tool. Each SOP terminus emits at least one
+// deliverable — a downloadable artifact the operator can hand off, ship
+// to a client, or paste into a CMS. Examples per SOP in
+// docs/design-sop-engine.md.
+export const sopDeliverables = pgTable('sop_deliverable', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  sop_run_id: uuid('sop_run_id').notNull().references(() => sopRuns.id, { onDelete: 'cascade' }),
+  // 'comparison_matrix_xlsx' | 'redirect_map_csv' | 'messaging_guide_md' |
+  // 'schema_bundle_jsonld' | 'priority_actions_list' |
+  // 'phased_implementation_plan_md' | 'decision_matrix_csv' |
+  // 'messaging_framework_md'
+  kind: text('kind').notNull(),
+  name: text('name').notNull(),
+  // The structured representation. UI renders this server-side into
+  // markdown / xlsx / csv. We keep payload + blob_url separate so we
+  // can re-render without re-uploading.
+  payload: jsonb('payload').notNull().default({}),
+  // Optional Vercel Blob URL for binary downloads (xlsx, csv).
+  // Markdown deliverables render inline and skip blob storage.
+  blob_url: text('blob_url'),
+  generated_at: timestamp('generated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  runIdx: index('sop_deliverable_run_idx').on(t.sop_run_id, t.generated_at),
+}));
+
 export const aioCaptures = pgTable('aio_capture', {
   id: uuid('id').primaryKey().defaultRandom(),
   firm_id: uuid('firm_id').notNull().references(() => firms.id, { onDelete: 'cascade' }),
