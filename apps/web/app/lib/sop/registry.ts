@@ -1207,21 +1207,217 @@ const SCHEMA_MARKUP_DEPLOYMENT: SopDefinition = {
   phase: 5,
   name: 'Schema Markup Deployment',
   purpose:
-    'Deploy structured data across the firm\'s website to give LLMs and search engines machine-readable signals about entities, products, and content.',
-  timeRequired: '2-4 hours initial + ongoing per-page additions',
-  scope: ['After Brand Messaging Standardization', 'For every published page going forward'],
-  prerequisites: { tools: ['GTM or CMS', 'Schema validator'], access: ['Developer/CMS admin'], data: ['Brand Truth', 'Schema patches from entity scanner'] },
-  dependsOnSops: ['entity_optimization'],
-  cadence: 'one-time',
-  steps: [
-    stub(1, 'inventory_required_schemas', 'Inventory Required Schemas by Page Type'),
-    stub(2, 'generate_schemas', 'Generate Schemas from Brand Truth'),
-    stub(3, 'deploy_via_gtm_or_cms', 'Deploy via GTM or CMS'),
-    stub(4, 'validate_each_page', 'Validate Each Page'),
-    stub(5, 'monitor_pickup', 'Monitor Schema Pickup in GSC'),
+    'Make content machine-readable through structured data (schema markup), improving LLM comprehension of key information and increasing chances of being cited in structured answers. Audit every page for schema opportunities, deploy FAQPage / Organization / SoftwareApplication / Article / HowTo schemas, validate with Google Rich Results Test, monitor pickup quarterly.',
+  timeRequired: '3-5 hours initial deployment + 1 hour per new page',
+  scope: [
+    'After completing /ai-info Page Creation (Organization schema)',
+    'When adding FAQ sections to pages',
+    'For product pages requiring SoftwareApplication schema',
+    'After content updates that change structured information',
+    'When LLMs misinterpret your content structure',
+    'As part of comprehensive AEO implementation',
+    'Quarterly schema audits to ensure accuracy',
   ],
-  troubleshooting: [],
-  relatedSops: ['ai_info_page_creation', 'entity_optimization'],
+  prerequisites: {
+    tools: [
+      'Google Rich Results Test (https://search.google.com/test/rich-results)',
+      'Schema.org documentation',
+      'JSON-LD validator',
+      'CMS access or HTML editing capability',
+      'Google Search Console',
+    ],
+    access: [
+      'Website CMS admin access or FTP access',
+      'Ability to edit HTML in <head> or <body>',
+      'Google Search Console verification',
+    ],
+    data: ['Basic understanding of JSON format', 'Ability to identify structured content on pages', 'Understanding of your content types'],
+  },
+  dependsOnSops: ['ai_info_page_creation'],
+  cadence: { intervalDays: 90, reason: 'Quarterly schema audit to catch drift after page updates' },
+  steps: [
+    {
+      number: 1,
+      key: 'audit_current_schema',
+      title: 'Audit Current Schema Implementation',
+      process: [
+        'Create spreadsheet "Schema Deployment Audit - [Date]" with columns: URL · Content Type · Current Schema? · Schema Type · Validation Status · Priority · Status',
+        'For each page, test in Google Rich Results Test — review valid items, errors, warnings, schema types found',
+        'Identify schema opportunities: Homepage → Organization, FAQ pages → FAQPage, Product pages → SoftwareApplication, About → Organization+Person, Blogs → Article/BlogPosting, How-to guides → HowTo',
+        'Score priority (0-100): LLM Citation Potential (0-40) + Traffic Volume (0-30) + Content Clarity (0-20) + Business Impact (0-10)',
+        'Focus on Priority Score > 70 first',
+      ],
+      dataInputs: [
+        { kind: 'pages', label: 'Crawled page corpus — every URL needs a row in the audit spreadsheet', required: true },
+        { kind: 'entity_signals', label: 'Entity scanner output — pre-detected schema types per page', required: false },
+      ],
+      operatorActions: [
+        'Run a Rich Results Test on the top 10 highest-traffic pages',
+        'Categorize each page by content type (FAQ / Product / How-To / Article / Organization)',
+      ],
+      gates: [
+        { key: 'audit_spreadsheet_ready', label: 'Audit spreadsheet created with priority scores for all flagged pages', kind: 'checkbox', required: true },
+      ],
+      output: 'Complete schema audit with prioritized implementation list',
+    },
+    {
+      number: 2,
+      key: 'implement_faqpage_schema',
+      title: 'Implement FAQPage Schema',
+      process: [
+        'FAQPage schema is critical for LLMs — it explicitly marks Q&A content for easy extraction',
+        'Apply to pages with 3+ question-answer pairs, FAQ sections, support docs, "Common Questions" sections',
+        'For each Q&A pair: extract question text + answer text (full, multi-paragraph OK)',
+        'Build FAQPage JSON-LD: @type Question + acceptedAnswer.@type Answer with text matching visible page content exactly',
+        'Validate in Rich Results Test',
+      ],
+      dataInputs: [
+        { kind: 'pages', label: 'Pages with FAQ sections — candidates for FAQPage schema', required: true },
+      ],
+      operatorActions: [
+        'For each FAQ page, paste the JSON-LD block into <head>',
+        'Verify question/answer text matches the visible H2/H3 + body content exactly',
+      ],
+      gates: [
+        { key: 'faq_schema_validated', label: 'All FAQPage schema blocks pass Google Rich Results Test', kind: 'attestation', required: true },
+      ],
+      output: 'Validated FAQPage schema on all FAQ content',
+      generates: { ticketsFromFactory: 'schema_patches_per_page' },
+    },
+    {
+      number: 3,
+      key: 'deploy_organization_schema',
+      title: 'Deploy Organization Schema',
+      process: [
+        'Organization schema establishes your entity for LLMs to understand your brand',
+        'Required on: Homepage · /ai-info page · About page · Contact page',
+        'Pull canonical data from Brand Truth: name, url, logo, description, sameAs (third-party listings), foundingDate, address',
+        'Include sameAs array linking to LinkedIn, Wikipedia, Wikidata, Crunchbase, G2',
+      ],
+      dataInputs: [
+        { kind: 'brand_truth', label: 'Brand Truth — source for canonical org metadata', required: true },
+        { kind: 'third_party_listings', label: 'Third-party listings — populates the sameAs array', required: true },
+      ],
+      operatorActions: [
+        'Ship the Organization JSON-LD block to homepage + /ai-info + About',
+        'Validate each in Rich Results Test',
+      ],
+      gates: [
+        { key: 'org_schema_live', label: 'Organization schema live on homepage and /ai-info, validated', kind: 'attestation', required: true },
+      ],
+      output: 'Organization schema deployed and validated across required pages',
+      generates: { deliverableKinds: ['schema_bundle_jsonld'] },
+    },
+    {
+      number: 4,
+      key: 'implement_softwareapplication_schema',
+      title: 'Implement SoftwareApplication Schema',
+      process: [
+        'For SaaS / app products: SoftwareApplication schema on each product page',
+        'Include name, description, applicationCategory, operatingSystem, offers (price + currency), aggregateRating if applicable',
+        'For law firms / dental practices: use LegalService / Dentist / LocalBusiness instead (vertical-specific Schema.org types)',
+      ],
+      dataInputs: [
+        { kind: 'brand_truth', label: 'Firm type drives the right Schema.org vertical type', required: true },
+        { kind: 'pages', label: 'Product / service pages to mark up', required: true },
+      ],
+      operatorActions: [
+        'Apply the right vertical schema on each product/service page',
+        'Verify required properties (name + description at minimum)',
+      ],
+      gates: [
+        { key: 'vertical_schema_live', label: 'Vertical schema deployed on product/service pages and validated', kind: 'attestation', required: false },
+      ],
+      output: 'Vertical-appropriate schema deployed across product/service pages',
+    },
+    {
+      number: 5,
+      key: 'add_article_schema',
+      title: 'Add Article / BlogPosting Schema',
+      process: [
+        'For each blog post: Article or BlogPosting schema with headline, author, datePublished, dateModified, image',
+        'Author field uses Person schema with sameAs linking to author profiles',
+        'Include publisher (Organization) with logo',
+      ],
+      dataInputs: [
+        { kind: 'pages', label: 'Blog posts that need Article schema', required: true },
+      ],
+      operatorActions: [
+        'Roll out via CMS template (one-time) rather than per-post manual edit',
+        'Validate a representative sample in Rich Results Test',
+      ],
+      gates: [
+        { key: 'article_template_live', label: 'Blog template emits Article schema; sample validated', kind: 'attestation', required: false },
+      ],
+      output: 'Article schema deployed via CMS template across the blog',
+    },
+    {
+      number: 6,
+      key: 'implement_howto_schema',
+      title: 'Implement HowTo Schema',
+      process: [
+        'For step-by-step guides: HowTo schema with step list (name + text per step)',
+        'Optional: totalTime, supply, tool, estimatedCost',
+        'Step text matches visible content exactly',
+      ],
+      dataInputs: [
+        { kind: 'pages', label: 'How-to / guide pages — candidates for HowTo schema', required: false },
+      ],
+      operatorActions: [
+        'Identify pages that follow a "Step 1, Step 2..." pattern',
+        'Add HowTo JSON-LD per page',
+      ],
+      gates: [],
+      output: 'HowTo schema deployed on step-by-step content',
+    },
+    {
+      number: 7,
+      key: 'validate_all_schema',
+      title: 'Validate and Test All Schema',
+      process: [
+        'Run every page through Google Rich Results Test',
+        'Fix all errors (missing required properties, malformed JSON)',
+        'Address warnings where possible',
+        'Cross-check with schema.org documentation',
+      ],
+      dataInputs: [
+        { kind: 'previous_sop_output', label: 'Pages from Steps 2-6 — all need validation', required: true, anchor: { sopKey: 'schema_markup_deployment', stepNumber: 6 } },
+      ],
+      operatorActions: [
+        'Spot-check 10 random pages in Rich Results Test',
+        'Fix any errors found',
+      ],
+      gates: [
+        { key: 'all_schemas_pass', label: 'No schema errors remain on any page under management', kind: 'attestation', required: true },
+      ],
+      output: 'Validated schema deployment across the entire site',
+    },
+    {
+      number: 8,
+      key: 'monitor_and_maintain',
+      title: 'Monitor and Maintain Schema',
+      process: [
+        'Set quarterly re-audit reminder',
+        'Watch GSC Enhancements report for schema errors that appear post-deploy',
+        'Re-validate after every major content update',
+        'Track LLM citation rate to confirm schema is helping (via Brand Visibility Audit re-runs)',
+      ],
+      dataInputs: [],
+      operatorActions: [
+        'Confirm the 90-day follow-up SOP cadence is scheduled',
+      ],
+      gates: [
+        { key: 'monitoring_scheduled', label: 'Quarterly schema audit scheduled on the team calendar', kind: 'checkbox', required: true },
+      ],
+      output: 'Ongoing schema health monitoring established',
+    },
+  ],
+  troubleshooting: [
+    { issue: 'Rich Results Test shows "no items detected"', cause: 'Schema not in <head>, or syntax error breaks parsing', solution: 'Check page source for <script type="application/ld+json"> block; validate JSON with jsonlint; confirm @context is exactly https://schema.org' },
+    { issue: 'CMS strips JSON-LD on save', cause: 'Some WYSIWYG editors clean unknown tags', solution: 'Use HTML mode, custom HTML block, or theme template injection rather than the visual editor' },
+    { issue: 'Schema validates but GSC shows errors', cause: 'GSC checks stricter than Rich Results Test (canonicals, structured data conflicts)', solution: 'Check GSC Enhancements report for specific error messages; usually a missing recommended property' },
+  ],
+  relatedSops: ['ai_info_page_creation', 'entity_optimization', 'semantic_html_optimization'],
 };
 
 const SEMANTIC_HTML_OPTIMIZATION: SopDefinition = {
@@ -1229,20 +1425,211 @@ const SEMANTIC_HTML_OPTIMIZATION: SopDefinition = {
   phase: 5,
   name: 'Semantic HTML Optimization',
   purpose:
-    'Ensure the firm\'s HTML uses semantic elements (article, section, nav, main, aside) that signal content hierarchy to LLM crawlers.',
-  timeRequired: '1-2 hours per template',
-  scope: ['When LLM crawls show poor content extraction', 'Site migration or major redesign'],
-  prerequisites: { tools: ['HTML inspector', 'Lighthouse'], access: ['Theme/template editor'], data: ['Current template HTML'] },
+    'Improve how LLMs parse and understand content by using proper semantic HTML tags. Structure content with <main>/<article>/<section>/<aside>, replace presentational tags (<b>/<i>) with semantic ones (<strong>/<em>), implement definition lists (<dl>) for entity extraction, fix heading hierarchy, and use semantic table + figure markup. Each page gets a 0-100 score against a 7-criterion rubric.',
+  timeRequired: '1-2 hours per page (auditing + implementation)',
+  scope: [
+    'New content creation (apply from the start)',
+    'Content refresh or repositioning projects',
+    'Pages with low LLM citation despite good content',
+    'Technical documentation requiring precise markup',
+    'Glossaries, FAQs, or definition-heavy content',
+    'After implementing schema markup (complementary optimization)',
+    'When LLMs misinterpret content structure or relationships',
+  ],
+  prerequisites: {
+    tools: ['HTML editing capability in CMS', 'Browser developer tools (Inspect Element)', 'HTML validator (https://validator.w3.org)', 'Access to page templates or components'],
+    access: ['CMS admin access or template editing permissions', 'Developer access if modifying theme files', 'Ability to edit HTML directly'],
+    data: ['Basic HTML understanding', 'Familiarity with semantic HTML5 elements', 'Understanding of content hierarchy', 'Ability to identify entities and key terms'],
+  },
   dependsOnSops: [],
   cadence: 'one-time',
   steps: [
-    stub(1, 'audit_current_html', 'Audit Current HTML Semantics'),
-    stub(2, 'identify_improvements', 'Identify Improvements'),
-    stub(3, 'update_templates', 'Update Templates'),
-    stub(4, 'verify_pickup', 'Verify Pickup via Crawl Test'),
+    {
+      number: 1,
+      key: 'audit_current_html',
+      title: 'Audit Current HTML Structure',
+      process: [
+        'Identify priority pages — high-traffic content, glossaries, FAQs',
+        'For each page: View Source / Inspect Element, check for semantic vs non-semantic markup',
+        'Score against the 7-criterion rubric (100 points total): document structure (<main>, <section>, <article>) = 25 · definition lists (<dl>) = 20 · semantic text (<strong>, <em>) = 15 · heading hierarchy = 15 · figures (<figure>, <figcaption>) = 10 · sectioning (<header>, <footer>, <aside>) = 10 · semantic tables (<thead>, <tbody>, <th>) = 5',
+        'Priority bands: <40 = High (major restructuring) · 40-70 = Medium (targeted improvements) · >70 = Low (maintenance only)',
+        'Fast path: paste page HTML into the Claude prompt template (see SOP doc) for automated scoring',
+      ],
+      dataInputs: [
+        { kind: 'pages', label: 'Crawled page corpus — every page gets a semantic score', required: true },
+      ],
+      operatorActions: [
+        'Score the top 10 highest-traffic pages',
+        'Build the audit spreadsheet with URL · Score · Issues · Priority · Status',
+      ],
+      gates: [
+        { key: 'audit_complete', label: 'At least 10 priority pages scored against the 7-criterion rubric', kind: 'checkbox', required: true },
+      ],
+      output: 'Complete semantic HTML audit with scores',
+    },
+    {
+      number: 2,
+      key: 'implement_document_structure',
+      title: 'Implement Proper Document Structure',
+      process: [
+        'Each page should have exactly ONE <main> wrapping primary content',
+        'Use <article> for self-contained content (blog posts, news, product descriptions)',
+        'Use <section> for thematic groupings within an article (one H2 per section)',
+        'Use <aside> for sidebars and tangential content',
+        'Use <header> and <footer> as sectioning elements (not just at top/bottom of page)',
+      ],
+      dataInputs: [
+        { kind: 'previous_sop_output', label: 'Audit findings from Step 1 — priority pages to restructure', required: true, anchor: { sopKey: 'semantic_html_optimization', stepNumber: 1 } },
+      ],
+      operatorActions: [
+        'Update the theme/template at the CMS level (not per-page) when 10+ pages share a layout',
+        'Replace <div class="content"> with <main>, <div class="sidebar"> with <aside>, etc.',
+      ],
+      gates: [
+        { key: 'main_element_present', label: '<main> element wraps primary content on every priority page', kind: 'attestation', required: true },
+      ],
+      output: 'Proper document structure with <main>, <article>, <section>, <aside>',
+    },
+    {
+      number: 3,
+      key: 'implement_definition_lists',
+      title: 'Implement Definition Lists for Key Terms',
+      process: [
+        'Definition lists (<dl> + <dt> + <dd>) are #1 priority — biggest LLM-extraction impact',
+        'Identify terms requiring definition: industry terminology, product features, technical concepts, acronyms, company-specific terms, entities',
+        'Convert <p><strong>Term</strong> - Definition</p> patterns to <dl><dt>Term</dt><dd>Definition</dd></dl>',
+        'Keep definitions concise (1-3 sentences), one <dt> per term, group related terms',
+        'Apply on: glossaries, vocabulary lists, product features, key concepts, specifications, FAQ alternatives',
+      ],
+      dataInputs: [
+        { kind: 'pages', label: 'Pages with definitions or term-explanation patterns', required: true },
+      ],
+      operatorActions: [
+        'Find pages with industry terminology and convert to <dl>',
+        'Style <dl> in CSS so the visual hierarchy survives the markup swap',
+      ],
+      gates: [
+        { key: 'dl_implemented', label: 'Definition lists implemented on at least one priority page', kind: 'attestation', required: true },
+      ],
+      output: 'Definition lists implemented for all key terms',
+    },
+    {
+      number: 4,
+      key: 'semantic_text_formatting',
+      title: 'Use Semantic Text Formatting',
+      process: [
+        'Replace <b> with <strong> (importance, not just bold)',
+        'Replace <i> with <em> (emphasis, not just italic)',
+        'Use <mark> for highlighted/referenced text',
+        'Use <code> for technical terms',
+        'Use <kbd> for keyboard commands',
+        'Use <abbr title="..."> for abbreviations (provides full form on hover, helps LLMs disambiguate)',
+      ],
+      dataInputs: [
+        { kind: 'pages', label: 'Pages with presentational <b>/<i> usage', required: false },
+      ],
+      operatorActions: [
+        'Run a find-and-replace across templates: <b> → <strong>, <i> → <em>',
+        'Audit author bios + glossaries for abbreviations that should use <abbr>',
+      ],
+      gates: [],
+      output: 'All presentational tags replaced with semantic equivalents',
+    },
+    {
+      number: 5,
+      key: 'optimize_heading_hierarchy',
+      title: 'Optimize Heading Hierarchy',
+      process: [
+        'One H1 per page (the main title)',
+        'No skipped levels — never H1 → H3',
+        'Descriptive text, not generic ("Introduction" → "What is AEO?")',
+        'Logical nesting (subsections under sections)',
+        'Use question format for FAQ-like H2s',
+        'Bookmarklet for audit: javascript:(function(){var h=document.querySelectorAll("h1,h2,h3,h4,h5,h6");h.forEach(function(e){console.log(e.tagName+": "+e.textContent);});})()',
+      ],
+      dataInputs: [
+        { kind: 'pages', label: 'Pages where the heading audit found issues (multiple H1s, skipped levels)', required: false },
+      ],
+      operatorActions: [
+        'Fix multiple H1s (change secondary H1s to H2)',
+        'Fix skipped levels (change H4 to H3 if H3 was skipped)',
+        'Rewrite generic headings to be specific and topic-anchored',
+      ],
+      gates: [
+        { key: 'one_h1_per_page', label: 'Every priority page has exactly one H1 and no skipped levels', kind: 'attestation', required: true },
+      ],
+      output: 'Proper heading hierarchy across all pages',
+    },
+    {
+      number: 6,
+      key: 'semantic_table_markup',
+      title: 'Use Semantic Table Markup',
+      process: [
+        'Use <thead> for header rows, <tbody> for data rows, <tfoot> for summary',
+        'Use <th scope="col"> for column headers and <th scope="row"> for row headers',
+        'Replace <td><b>Header</b></td> patterns with proper <th>',
+        'Add <caption> to describe the table',
+        'Critical for comparison tables — they are major LLM citation sources',
+      ],
+      dataInputs: [
+        { kind: 'pages', label: 'Pages with tables (pricing, comparisons, specifications)', required: false },
+      ],
+      operatorActions: [
+        'Restructure pricing comparison tables first — highest LLM citation value',
+      ],
+      gates: [],
+      output: 'All tables restructured with proper semantic elements',
+    },
+    {
+      number: 7,
+      key: 'semantic_figure_elements',
+      title: 'Implement Semantic Figure Elements',
+      process: [
+        'Wrap images in <figure> with <figcaption> for context',
+        '<figcaption> should provide context, not just repeat alt text',
+        'Apply to images, diagrams, charts, code snippets, pull-quotes',
+        'For code blocks: <figure><pre><code>...</code></pre><figcaption>...</figcaption></figure>',
+      ],
+      dataInputs: [
+        { kind: 'pages', label: 'Pages with content images and diagrams', required: false },
+      ],
+      operatorActions: [],
+      gates: [],
+      output: 'Images and media wrapped in semantic figure elements',
+    },
+    {
+      number: 8,
+      key: 'validate_and_test',
+      title: 'Validate and Test Semantic HTML',
+      process: [
+        'Validate every priority page at https://validator.w3.org (no errors, minimal warnings)',
+        'Run the 10-item Semantic HTML Checklist per page (see SOP doc)',
+        'Test with a screen reader for accessibility',
+        'Re-score against the rubric — target: 80+ on all priority pages',
+        'Document score improvements',
+      ],
+      dataInputs: [
+        { kind: 'previous_sop_output', label: 'Audit scores from Step 1 — to compare against post-implementation scores', required: true, anchor: { sopKey: 'semantic_html_optimization', stepNumber: 1 } },
+      ],
+      operatorActions: [
+        'Re-score the top 10 pages and confirm the score moved from <40 or 40-70 to >80',
+      ],
+      gates: [
+        { key: 'rescore_passes', label: 'Re-scored priority pages now hit 80+ on the 7-criterion rubric', kind: 'attestation', required: true },
+        { key: 'html_validates', label: 'W3C validator returns no errors on priority pages', kind: 'attestation', required: true },
+      ],
+      output: 'Validated semantic HTML on all priority pages',
+    },
   ],
-  troubleshooting: [],
-  relatedSops: ['schema_markup_deployment'],
+  troubleshooting: [
+    { issue: 'CMS strips semantic HTML', cause: 'WYSIWYG editor removing tags', solution: 'Switch to HTML mode; modify editor settings; use custom HTML blocks; contact developer to allowlist tags' },
+    { issue: 'Theme uses <div>s everywhere', cause: 'Old or poorly-coded theme', solution: 'Override in child theme; use custom CSS classes; consider theme migration' },
+    { issue: 'Multiple H1s from template', cause: 'Logo and title both H1', solution: 'Change logo to <p> or <div>; ensure only title is H1' },
+    { issue: 'Tables not displaying correctly after semantic markup', cause: 'CSS expecting old markup structure', solution: 'Update CSS selectors; add classes if needed' },
+    { issue: 'Definition lists look unstyled', cause: 'No CSS for <dl>, <dt>, <dd>', solution: 'Add CSS styling to maintain visual hierarchy' },
+    { issue: "Can't access HTML editor", cause: 'CMS permissions or page builder restrictions', solution: 'Request developer access; work with dev team; use custom HTML blocks where available' },
+  ],
+  relatedSops: ['schema_markup_deployment', 'llm_friendly_content_checklist'],
 };
 
 const SME_CONTENT_GENERATION: SopDefinition = {
