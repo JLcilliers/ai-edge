@@ -55,6 +55,32 @@ const TEMPERATURE_HIGH_PRIORITY = 0.7;
 const TEMPERATURE_STANDARD = 0;
 const TOP_PRIORITY_COUNT = 20;
 
+/**
+ * Wall-clock ceiling for the query-loop. Vercel's per-route `maxDuration`
+ * default is 60s; the dashboard pages that host `startAudit` are set to
+ * 300s (see `/dashboard/[firmSlug]/audits/page.tsx`). We stop dispatching
+ * new queries when elapsed > 240s so:
+ *   - the in-flight query has time to finish (one query is bounded by
+ *     PROVIDER_TIMEOUT_MS = 60s in run-provider.ts),
+ *   - the post-loop UPDATE that flips status from 'running' to
+ *     'completed_partial' has time to commit before Vercel kills the
+ *     function.
+ *
+ * Without this guard, a Brand Truth with 20 seed_query_intents at ~30s
+ * per query × providers would blow past the 300s ceiling, get killed
+ * mid-write, and leave the audit_run row stuck in 'running' indefinitely.
+ * The audit-sweep cron eventually rescues these (hourly, threshold 60min),
+ * but the operator-facing UX is "click Run audit → wait forever → manually
+ * intervene." This guard turns that into "click Run audit → see partial
+ * results after 4 minutes → re-run later for the rest."
+ *
+ * 240s leaves ~60s headroom for cleanup. Any query that starts inside the
+ * 240s window will have at most 60s (PROVIDER_TIMEOUT_MS) of provider
+ * latency plus a few seconds of scoring + DB writes, fitting comfortably
+ * inside the 300s overall ceiling.
+ */
+const QUERY_LOOP_BUDGET_MS = 240_000;
+
 interface SampleResult {
   providerName: string;
   model: string;
@@ -122,6 +148,12 @@ export async function runAudit(
     const providers = getEnabledProviders();
     let budgetHit = false;
     let cancelled = false;
+    let timeBudgetHit = false;
+    let queriesProcessed = 0;
+    // Track wall-clock from the moment the query loop starts (not from
+    // audit_run.started_at — that may already be a few hundred ms old by
+    // the time we enter the loop, depending on Brand Truth fetch latency).
+    const loopStartedAt = Date.now();
 
     for (let qi = 0; qi < seedQueries.length; qi++) {
       // Cancellation gate. `cancelAudit` (server action) flips status to
@@ -146,6 +178,21 @@ export async function runAudit(
       if (await isFirmOverBudget(firmId)) {
         budgetHit = true;
         console.log(`[audit] firm ${firmId} over budget at query ${qi}; aborting remaining queries`);
+        break;
+      }
+
+      // Wall-clock budget gate. Without this, a Brand Truth with 20 seed
+      // queries can outlast the Vercel function ceiling and leave the run
+      // orphaned in 'running'. Check at the START of each iteration so we
+      // don't begin a query we can't finish — and so the post-loop UPDATE
+      // has time to commit.
+      const elapsedMs = Date.now() - loopStartedAt;
+      if (elapsedMs > QUERY_LOOP_BUDGET_MS) {
+        timeBudgetHit = true;
+        console.log(
+          `[audit] firm ${firmId} run ${auditRunId} hit wall-clock budget (${(elapsedMs / 1000).toFixed(1)}s) at query ${qi} of ${seedQueries.length}; ` +
+            `marking completed_partial with ${queriesProcessed} queries scored.`,
+        );
         break;
       }
 
@@ -322,22 +369,49 @@ export async function runAudit(
           }
         }
       }));
+
+      // Mark the query as fully processed only AFTER all provider
+      // post-response writes commit. Done outside the per-provider
+      // Promise.all so a failure in one provider's write doesn't count
+      // toward "queries we cleanly finished".
+      queriesProcessed += 1;
     }
 
-    // Mark completed (or budget-truncated). If the loop exited because the
-    // run was cancelled (status already flipped to 'cancelled' by the server
-    // action), skip the final write entirely — the cancel already set
-    // status + finished_at + error in a single atomic UPDATE.
+    // Mark completed. If the loop exited because the run was cancelled
+    // (status already flipped to 'cancelled' by the server action), skip
+    // the final write entirely — the cancel already set status +
+    // finished_at + error in a single atomic UPDATE.
+    //
+    // Status precedence:
+    //   • cancelled (handled above by skipping)
+    //   • budget exceeded → completed_budget_truncated
+    //   • wall-clock budget hit before all queries done → completed_partial
+    //   • everything fits → completed
     //
     // The `status='running'` WHERE clause is the belt-and-braces guard in
     // case a race happens between the cancellation gate reading 'running'
     // and this final UPDATE firing: if something else flipped status in
     // the window, we won't overwrite it.
     if (!cancelled) {
-      const finalStatus = budgetHit ? 'completed_budget_truncated' : 'completed';
+      const finalStatus = budgetHit
+        ? 'completed_budget_truncated'
+        : timeBudgetHit
+          ? 'completed_partial'
+          : 'completed';
+      // When the wall-clock budget cuts the run short, record how far we
+      // got in the `error` column. It's a misnomer for a non-error path,
+      // but it's the only freeform string on the row and the operator
+      // benefits from "N of M scored" visibility in the audit drilldown.
+      const errorMessage = timeBudgetHit
+        ? `Wall-clock budget reached after ${queriesProcessed} of ${seedQueries.length} queries (${(((Date.now() - loopStartedAt) / 1000)).toFixed(0)}s). Remaining queries can be picked up by a fresh audit run.`
+        : null;
       await db
         .update(auditRuns)
-        .set({ status: finalStatus, finished_at: new Date() })
+        .set({
+          status: finalStatus,
+          finished_at: new Date(),
+          ...(errorMessage ? { error: errorMessage } : {}),
+        })
         .where(and(eq(auditRuns.id, auditRunId), eq(auditRuns.status, 'running')));
     }
   } catch (err) {
