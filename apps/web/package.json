@@ -7,7 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "demo:seed": "tsx scripts/seed-cellino.ts",
+    "demo:run": "tsx scripts/demo-cellino.ts",
+    "demo:dev": "dotenv -e ../../.env.local --override -- next dev --turbopack"
   },
   "dependencies": {
     "@ai-edge/db": "workspace:*",
@@ -31,8 +34,10 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vercel/config": "^0.2.0",
+    "dotenv": "^17.4.2",
     "postcss": "^8.4.0",
     "tailwindcss": "^4.0.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.6.0"
   }
 }
