@@ -37,8 +37,8 @@ export default async function FirmScopedLayout({
               src="/clixsy-logo.svg"
               alt="Clixsy"
               width={92}
-              height={24}
-              className="brightness-0 invert"
+              height={38}
+              priority
             />
             <span className="border-l border-white/10 pl-3 font-[family-name:var(--font-inter)] text-[9px] font-medium uppercase tracking-[0.3em] text-white/55">
               Intercept
