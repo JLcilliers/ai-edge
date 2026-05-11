@@ -30,6 +30,7 @@ import {
   PHASES,
 } from '../lib/sop/registry';
 import { dispatchStepGenerators } from '../lib/sop/generators';
+import { resolveDataInput, type ResolvedDataInput } from '../lib/sop/data-resolvers';
 import type {
   SopKey,
   SopRunStatus,
@@ -189,6 +190,12 @@ export interface SopRunDetail {
   }>;
   ticketCount: number;
   dependencies: Array<{ sopKey: SopKey; name: string; status: SopRunStatus }>;
+  /**
+   * Resolved data-input values for each step, keyed by step_number.
+   * Empty array for steps with no inputs configured. The workflow client
+   * renders these as live data cards beside the step's process bullets.
+   */
+  resolvedDataInputs: Record<number, ResolvedDataInput[]>;
 }
 
 /**
@@ -265,6 +272,45 @@ export async function getSopRunDetail(firmSlug: string, sopKey: SopKey): Promise
     };
   });
 
+  // Resolve data inputs per step. Only resolve for steps with at least
+  // one input; skip empty-skeleton Phase 2-7 steps and steps that have
+  // no data dependencies. Run all resolutions in parallel for each step.
+  const resolvedDataInputs: Record<number, ResolvedDataInput[]> = {};
+  if (run) {
+    const meta = (run.meta as Record<string, unknown>) ?? {};
+    await Promise.all(
+      def.steps.map(async (s) => {
+        if (s.dataInputs.length === 0) {
+          resolvedDataInputs[s.number] = [];
+          return;
+        }
+        const resolved = await Promise.all(
+          s.dataInputs.map((di) =>
+            resolveDataInput(
+              {
+                firmId,
+                sopRunMeta: meta,
+                sopKey,
+                stepNumber: s.number,
+                sopRunId: run.id,
+              },
+              di.kind,
+              di.label,
+              di.anchor,
+            ).catch((e) => ({
+              kind: di.kind,
+              label: di.label,
+              available: false,
+              summary: `Resolver error: ${e instanceof Error ? e.message : String(e)}`,
+              tone: 'warn' as const,
+            })),
+          ),
+        );
+        resolvedDataInputs[s.number] = resolved;
+      }),
+    );
+  }
+
   return {
     run: run
       ? {
@@ -292,6 +338,7 @@ export async function getSopRunDetail(firmSlug: string, sopKey: SopKey): Promise
     })),
     ticketCount,
     dependencies,
+    resolvedDataInputs,
   };
 }
 
