@@ -16,10 +16,31 @@ export default async function BrandTruthPage({
   searchParams,
 }: {
   params: Promise<{ firmSlug: string }>;
-  searchParams: Promise<{ bootstrap?: string; reason?: string }>;
+  searchParams: Promise<{
+    bootstrap?: string;
+    reason?: string;
+    // Per-scan enrichment summary encoded into the redirect by the
+    // new-client form so the banner can say "+ 7 findings + 3 sources +
+    // 2 AIO" without an extra DB round-trip.
+    sup?: string;
+    sup_count?: string;
+    ent?: string;
+    ent_count?: string;
+    aio?: string;
+    aio_count?: string;
+  }>;
 }) {
   const { firmSlug } = await params;
-  const { bootstrap: bootstrapFlag, reason: bootstrapReason } = await searchParams;
+  const {
+    bootstrap: bootstrapFlag,
+    reason: bootstrapReason,
+    sup,
+    sup_count,
+    ent,
+    ent_count,
+    aio,
+    aio_count,
+  } = await searchParams;
   const firm = await getFirmBySlug(firmSlug);
   if (!firm) notFound();
 
@@ -61,6 +82,48 @@ export default async function BrandTruthPage({
             <div className="mb-1 font-semibold text-white">
               Bootstrap complete — v1 pre-populated from {firm.name}'s website.
             </div>
+            {/* Per-scan summary chips. Rendered only when the new-client
+                form passed the corresponding query params; older bootstrap
+                redirects without the params still get the generic banner. */}
+            {(sup || ent || aio) ? (
+              <div className="mt-2 mb-3 flex flex-wrap gap-2">
+                {sup ? (
+                  <EnrichmentChip
+                    label="Suppression"
+                    status={sup}
+                    detail={
+                      sup === 'completed'
+                        ? `${sup_count ?? '0'} findings`
+                        : sup === 'failed'
+                          ? 'site likely WAF-blocked'
+                          : 'skipped'
+                    }
+                  />
+                ) : null}
+                {ent ? (
+                  <EnrichmentChip
+                    label="Entity"
+                    status={ent}
+                    detail={
+                      ent === 'completed'
+                        ? `${ent_count ?? '0'} sources`
+                        : 'failed'
+                    }
+                  />
+                ) : null}
+                {aio ? (
+                  <EnrichmentChip
+                    label="AI Overviews"
+                    status={aio}
+                    detail={
+                      aio === 'completed'
+                        ? `${aio_count ?? '0'} captured`
+                        : 'provider not configured'
+                    }
+                  />
+                ) : null}
+              </div>
+            ) : null}
             <p className="text-white/55">
               Review every field below. Common fixes: confirm the headquarters
               address, add any awards we couldn't find on the public site,
@@ -102,5 +165,41 @@ export default async function BrandTruthPage({
         versions={versions}
       />
     </div>
+  );
+}
+
+/**
+ * Small pill rendering the outcome of one of the chained enrichment scans
+ * (suppression / entity / AIO) so the operator can see at a glance which
+ * modules already have data when they land in the editor.
+ *
+ * Color tone tracks status:
+ *   completed → accent (green-ish)
+ *   skipped   → muted white (not an error, just disabled)
+ *   failed    → amber (worth a look — usually WAF or config issue)
+ */
+function EnrichmentChip({
+  label,
+  status,
+  detail,
+}: {
+  label: string;
+  status: string;
+  detail: string;
+}) {
+  const tone =
+    status === 'completed'
+      ? 'border-[var(--accent)]/30 bg-[var(--accent)]/10 text-[var(--accent)]'
+      : status === 'failed'
+        ? 'border-amber-500/30 bg-amber-500/10 text-amber-200'
+        : 'border-white/10 bg-white/5 text-white/60';
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs ${tone}`}
+    >
+      <span className="font-semibold">{label}</span>
+      <span className="text-white/55">·</span>
+      <span>{detail}</span>
+    </span>
   );
 }

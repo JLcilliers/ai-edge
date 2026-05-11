@@ -96,7 +96,35 @@ export function NewClientForm() {
         setPhase('bootstrapping');
         const bs = await bootstrapBrandTruthForFirm(result.slug, normalizedUrl);
         if (bs.ok) {
-          router.push(`/dashboard/${result.slug}/brand-truth?bootstrap=ok`);
+          // Encode the enrichment outcome into the redirect so the editor
+          // can show "Bootstrap + 3 scans complete — suppression: 7
+          // findings, entity: 3 sources, AIO: skipped". Keeps the banner
+          // server-renderable (no client-side fetch dance) and gives the
+          // operator immediate signal about what's already populated.
+          const params = new URLSearchParams({
+            bootstrap: 'ok',
+            sup: bs.enrichment.suppression.status,
+            ent: bs.enrichment.entity.status,
+            aio: bs.enrichment.aio.status,
+          });
+          if (bs.enrichment.suppression.status === 'completed') {
+            params.set(
+              'sup_count',
+              String(bs.enrichment.suppression.findingsCount),
+            );
+          }
+          if (bs.enrichment.entity.status === 'completed') {
+            params.set(
+              'ent_count',
+              String(bs.enrichment.entity.sourcesCount),
+            );
+          }
+          if (bs.enrichment.aio.status === 'completed') {
+            params.set('aio_count', String(bs.enrichment.aio.attempted));
+          }
+          router.push(
+            `/dashboard/${result.slug}/brand-truth?${params.toString()}`,
+          );
         } else {
           router.push(
             `/dashboard/${result.slug}/brand-truth?bootstrap=failed&reason=${encodeURIComponent(bs.reason ?? bs.error)}`,
@@ -229,8 +257,10 @@ export function NewClientForm() {
               Bootstrap Brand Truth from the website
             </span>
             <span className="text-xs text-white/55">
-              Scans the site + JSON-LD and pre-populates the Brand Truth v1. Takes ~30s and
-              costs ~$0.05. You'll land in the editor with everything filled in for review.
+              Scans the site + JSON-LD and pre-populates the Brand Truth v1, then
+              runs the initial suppression / entity / AIO scans so every report
+              section already has data when you land. Takes ~90s and costs
+              ~$0.05.
             </span>
           </span>
         </label>
@@ -251,7 +281,7 @@ export function NewClientForm() {
           {phase === 'bootstrapping' ? (
             <>
               <Loader2 size={14} strokeWidth={2} className="animate-spin" />
-              Bootstrapping Brand Truth (~30s)…
+              Bootstrapping + running initial scans (~90s)…
             </>
           ) : phase === 'creating' ? (
             <>
