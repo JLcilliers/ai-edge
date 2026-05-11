@@ -8,19 +8,24 @@ export const maxDuration = 300;
 /**
  * Live SERP capture cron (Phase B #3).
  *
- * For every firm in the workspace, capture top SERPs for the firm's
- * `seed_query_intents` via Bing Web Search v7. Persists each as a new
- * `serp_snapshot` (provider='bing-web-search') with up to 10 ranked
+ * For every firm in the workspace, capture top Google organic SERPs for
+ * the firm's `seed_query_intents` via DataForSEO. Persists each as a new
+ * `serp_snapshot` (provider='dataforseo') with up to 10 ranked
  * `serp_result` rows.
  *
- * Frequency: weekly recommended (vercel.ts cron schedule). Bing Web
- * Search free tier is 1,000 queries/month; capping at 5 queries per
- * firm per week + 4 weeks = 20 queries/firm/month → 50 firms before
- * we exceed the free quota. The captureSerpsForFirm helper enforces
- * the per-firm cap.
+ * History: previously used Bing Web Search v7 (free tier, 1,000 queries
+ * /month), but Microsoft retired the Bing Search API on Aug 11, 2025.
+ * Swapped to DataForSEO — credentials already provisioned for AIO
+ * capture, ~$0.0006/query for Google organic SERP. 5 queries/firm/week
+ * × 4 weeks × 50 firms ≈ $0.60/month. See `lib/scenarios/serp-capture.ts`
+ * header for rationale.
  *
- * Graceful skip: if BING_SEARCH_API_KEY is not set, every per-firm
- * call returns ok=false reason='BING_SEARCH_API_KEY not set' and the
+ * Frequency: weekly recommended (vercel.ts cron schedule). The
+ * captureSerpsForFirm helper enforces a per-firm cap (default 5
+ * queries) so the cron stays inside bounded cost.
+ *
+ * Graceful skip: if DataForSEO credentials are not set, every per-firm
+ * call returns ok=false reason='DATAFORSEO credentials not set' and the
  * cron records a `skipped: N` summary without touching the DB further.
  */
 export async function GET(request: Request) {
