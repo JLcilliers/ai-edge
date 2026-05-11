@@ -31,7 +31,7 @@ import {
   brandTruthVersions,
   pages,
 } from '@ai-edge/db';
-import { eq, and, desc, sql } from 'drizzle-orm';
+import { eq, and, desc, sql, inArray } from 'drizzle-orm';
 import type { SopKey } from './types';
 import { getSopDefinition } from './registry';
 
@@ -114,10 +114,14 @@ export async function ensurePhaseOneSopRuns(firmId: string): Promise<SopKey[]> {
   ];
 
   // Which Phase 1 SOPs already have a run for this firm?
+  // Use Drizzle's inArray() instead of sql`... = ANY(${array})` — the
+  // raw template doesn't auto-cast a JS array to a Postgres array
+  // parameter and throws "op ANY/ALL (array) requires array on right
+  // side" at runtime.
   const existing = await db
     .select({ sopKey: sopRuns.sop_key })
     .from(sopRuns)
-    .where(and(eq(sopRuns.firm_id, firmId), sql`${sopRuns.sop_key} = ANY(${phaseOneKeys})`));
+    .where(and(eq(sopRuns.firm_id, firmId), inArray(sopRuns.sop_key, phaseOneKeys)));
   const existingKeys = new Set(existing.map((r) => r.sopKey));
 
   const toCreate = phaseOneKeys.filter((k) => !existingKeys.has(k));

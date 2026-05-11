@@ -41,8 +41,12 @@ export default async function SopsPage({
 
   // Idempotent: on first visit, create Phase 1 SOP runs anchored to
   // existing scanner data (audit_run, legacy_findings, brand_truth).
-  // Subsequent visits no-op. Non-blocking failures don't break the page.
-  await ensurePhaseOneSopRunsBySlug(firmSlug).catch(() => { /* swallow */ });
+  // Subsequent visits no-op. Failures get logged so they surface in
+  // Vercel runtime logs — the original silent .catch() hid a
+  // production bug for a full day.
+  await ensurePhaseOneSopRunsBySlug(firmSlug).catch((e) => {
+    console.error('[sops:auto-start] failed:', e);
+  });
 
   const [runs, summaries] = await Promise.all([
     listSopRunsForFirm(firmSlug).catch(() => [] as SopRunSummary[]),
