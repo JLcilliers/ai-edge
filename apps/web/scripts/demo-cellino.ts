@@ -1,10 +1,13 @@
 /**
- * End-to-end demo runner for Cellino Law.
+ * End-to-end demo runner. Defaults to Cellino Law for backwards compat;
+ * override via `FIRM_SLUG=<slug>` env var to drive a different firm:
+ *
+ *   FIRM_SLUG=reimer-home-services pnpm demo:run
  *
  * Sequence:
- *   1. Load latest Brand Truth version for cellino-law
+ *   1. Load latest Brand Truth version for the firm
  *   2. Trust Alignment Audit  (caps to 3 queries by default — set DEMO_QUERY_LIMIT to change)
- *   3. Legacy Suppression scan against cellinolaw.com (caps to 15 URLs)
+ *   3. Legacy Suppression scan against the firm's primary_url (caps to 15 URLs)
  *   4. Entity / schema / KG probe
  *   5. Reddit sentiment scan (only if RAPIDAPI_REDDIT_KEY is set)
  *   6. AIO capture for the top query (only if DATAFORSEO_LOGIN is set)
@@ -49,7 +52,7 @@ import { runSuppressionScan } from '../app/lib/suppression/scan';
 import { runEntityScan } from '../app/lib/entity/scan';
 import { runRedditScan } from '../app/lib/reddit/scan';
 
-const FIRM_SLUG = 'cellino-law';
+const FIRM_SLUG = process.env.FIRM_SLUG ?? 'cellino-law';
 const QUERY_LIMIT = Number(process.env.DEMO_QUERY_LIMIT ?? '3');
 const MAX_URLS = Number(process.env.DEMO_MAX_URLS ?? '15');
 
@@ -143,8 +146,8 @@ async function stageAudit(firmId: string, btvId: string) {
 }
 
 // ────────────────────────────────────────────────────────────────────
-async function stageSuppression(firmId: string) {
-  banner('2/5', `Legacy Suppression scan against cellinolaw.com (maxUrls=${MAX_URLS})`);
+async function stageSuppression(firmId: string, firmName: string) {
+  banner('2/5', `Legacy Suppression scan against ${firmName}'s primary site (maxUrls=${MAX_URLS})`);
   const startedAt = Date.now();
   const runId = await runSuppressionScan(firmId, { maxUrls: MAX_URLS });
   const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
@@ -291,7 +294,10 @@ async function printSummary(firmId: string, firmName: string) {
     .from(remediationTickets)
     .where(eq(remediationTickets.firm_id, firmId));
   console.log(`\n  open remediation tickets: ${tickets?.count ?? 0}`);
-  console.log(`\n  → Dashboard: http://localhost:3000/dashboard/${FIRM_SLUG}`);
+  // Dev server may use 3000 (default) or 3001 (fallback when 3000 is occupied).
+  // Print the path so the operator can append it to whatever port their
+  // `pnpm demo:dev` is bound to.
+  console.log(`\n  → Dashboard path: /dashboard/${FIRM_SLUG}  (open against your dev server, default http://localhost:3000)`);
 }
 
 // ────────────────────────────────────────────────────────────────────
@@ -312,7 +318,7 @@ async function main() {
   // run is easier to follow during a live demo. Any single stage failure is
   // caught and logged; the demo continues.
   try { await stageAudit(firmId, btvId); } catch (e) { console.log('  stage failed:', e); }
-  try { await stageSuppression(firmId); } catch (e) { console.log('  stage failed:', e); }
+  try { await stageSuppression(firmId, firmName); } catch (e) { console.log('  stage failed:', e); }
   try { await stageEntity(firmId); } catch (e) { console.log('  stage failed:', e); }
   try { await stageReddit(firmId); } catch (e) { console.log('  stage failed:', e); }
   try { await stageAio(firmId); } catch (e) { console.log('  stage failed:', e); }

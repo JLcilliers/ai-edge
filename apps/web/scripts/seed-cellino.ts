@@ -1,7 +1,11 @@
 /**
- * Seed the Cellino Law demo firm.
+ * Seed a demo firm from a Brand Truth JSON file in docs/.
  *
- *   corepack pnpm --filter @ai-edge/web dotenv -e .env.local -- node --experimental-strip-types scripts/seed-cellino.ts
+ * Default file is docs/seed-brand-truth-cellino.json (kept for backwards
+ * compat with the original `demo:seed` script). Override with the
+ * `SEED_FILE` env var to seed a different firm:
+ *
+ *   SEED_FILE=docs/seed-brand-truth-reimer.json pnpm demo:seed
  *
  * Idempotent: re-running upserts the firm + competitor roster and writes a
  * fresh brand_truth_version row only if the payload changed.
@@ -39,7 +43,10 @@ async function main() {
   }
 
   // Anchor the path at this script's directory so it works from any CWD.
-  const seedPath = resolve(SCRIPT_DIR, '../../../docs/seed-brand-truth-cellino.json');
+  // Override via SEED_FILE env var (path relative to repo root, e.g.
+  // "docs/seed-brand-truth-reimer.json").
+  const seedFileRel = process.env.SEED_FILE ?? 'docs/seed-brand-truth-cellino.json';
+  const seedPath = resolve(SCRIPT_DIR, '../../../', seedFileRel);
   const seed = JSON.parse(readFileSync(seedPath, 'utf8')) as SeedFile;
 
   // Validate the BT payload up front — this is the same check `saveBrandTruth`
