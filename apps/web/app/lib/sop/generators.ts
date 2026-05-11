@@ -15,6 +15,10 @@ import { generatePriorityActions } from './ticket-factories/priority-actions';
 import { generateSuppressionTickets } from './ticket-factories/suppression-decisions';
 import { buildComparisonMatrixXlsx } from './deliverables/comparison-matrix-xlsx';
 import { buildSuppressionArtifacts } from './deliverables/suppression-artifacts';
+import {
+  buildMessagingArtifacts,
+  generateThirdPartyListingTickets,
+} from './deliverables/messaging-artifacts';
 
 interface DispatchInput {
   firmSlug: string;
@@ -67,6 +71,27 @@ export async function dispatchStepGenerators(input: DispatchInput): Promise<Disp
     }
   }
 
+  if (gen.ticketsFromFactory === 'third_party_listing_updates') {
+    try {
+      const [firmRow] = await db
+        .select({ name: firms.name })
+        .from(firms)
+        .where(eq(firms.id, input.firmId))
+        .limit(1);
+      const r = await generateThirdPartyListingTickets({
+        firmSlug: input.firmSlug,
+        firmId: input.firmId,
+        firmName: firmRow?.name ?? 'Firm',
+        sopKey: 'brand_messaging_standardization',
+        runId: input.runId,
+        stepNumber: input.stepNumber,
+      });
+      out.ticketsCreated += r.created.length;
+    } catch (e) {
+      out.warnings.push(`third_party_listing_updates failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
   if (gen.ticketsFromFactory === 'suppression_decisions_to_tickets') {
     try {
       const [firmRow] = await db
@@ -90,14 +115,15 @@ export async function dispatchStepGenerators(input: DispatchInput): Promise<Disp
     }
   }
 
-  // Other factories — third_party_listing_updates, schema_patches_per_page,
-  // etc. — land in Day 2E.
+  // Other factories — schema_patches_per_page, reddit_escalations,
+  // citation_diff_alerts — land in Day 3.
   if (
     gen.ticketsFromFactory &&
     gen.ticketsFromFactory !== 'priority_actions_from_visibility_audit' &&
-    gen.ticketsFromFactory !== 'suppression_decisions_to_tickets'
+    gen.ticketsFromFactory !== 'suppression_decisions_to_tickets' &&
+    gen.ticketsFromFactory !== 'third_party_listing_updates'
   ) {
-    out.warnings.push(`Factory '${gen.ticketsFromFactory}' wired on Day 2E.`);
+    out.warnings.push(`Factory '${gen.ticketsFromFactory}' wired on Day 3.`);
   }
 
   // Deliverable builders.
@@ -182,10 +208,50 @@ export async function dispatchStepGenerators(input: DispatchInput): Promise<Disp
         } catch (e) {
           out.warnings.push(`${kind} builder failed: ${e instanceof Error ? e.message : String(e)}`);
         }
+      } else if (
+        kind === 'messaging_framework_md' ||
+        kind === 'schema_bundle_jsonld' ||
+        kind === 'messaging_guide_md'
+      ) {
+        // Build all three from a single Brand Truth pass. Persist
+        // only the one matching this dispatcher call to avoid
+        // duplicates when multiple kinds share a step.
+        try {
+          const [firmRow] = await db
+            .select({ name: firms.name })
+            .from(firms)
+            .where(eq(firms.id, input.firmId))
+            .limit(1);
+          const artifacts = await buildMessagingArtifacts({
+            firmId: input.firmId,
+            firmName: firmRow?.name ?? 'Firm',
+            generatedAt: new Date(),
+          });
+          if (!artifacts) {
+            out.warnings.push(`${kind}: no brand_truth_version exists for this firm — skipping`);
+            continue;
+          }
+          const target =
+            kind === 'messaging_framework_md'
+              ? artifacts.framework
+              : kind === 'schema_bundle_jsonld'
+                ? artifacts.schemaBundle
+                : artifacts.guide;
+          await db.insert(sopDeliverables).values({
+            sop_run_id: input.runId,
+            kind,
+            name: target.filename,
+            payload: { filename: target.filename, bytes: target.bytes },
+            blob_url: target.blobUrl,
+          });
+          out.deliverablesCreated += 1;
+        } catch (e) {
+          out.warnings.push(`${kind} builder failed: ${e instanceof Error ? e.message : String(e)}`);
+        }
       } else {
-        // Other deliverable kinds (messaging_framework_md, schema_bundle_jsonld,
-        // messaging_guide_md, monitoring_log_md, etc.) — land in Day 2E.
-        out.warnings.push(`Deliverable '${kind}' builder lands in Day 2E.`);
+        // Other deliverable kinds (monitoring_log_md, weekly_report_md,
+        // audit_delivery_pdf) — Day 3 work.
+        out.warnings.push(`Deliverable '${kind}' builder lands in Day 3.`);
       }
     }
   }
