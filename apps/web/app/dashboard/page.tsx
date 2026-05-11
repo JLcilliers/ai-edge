@@ -73,8 +73,8 @@ export default async function ClientListPage() {
             src="/clixsy-logo.svg"
             alt="Clixsy"
             width={120}
-            height={32}
-            className="brightness-0 invert"
+            height={50}
+            priority
           />
           <span className="border-l border-white/10 pl-4 font-[family-name:var(--font-inter)] text-[10px] font-medium uppercase tracking-[0.3em] text-white/55">
             Intercept
