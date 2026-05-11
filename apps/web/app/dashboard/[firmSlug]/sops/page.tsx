@@ -16,6 +16,7 @@ import {
 } from '../../../actions/sop-actions';
 import { getFirmBySlug } from '../../../actions/firm-actions';
 import { PHASES, SOP_REGISTRY } from '../../../lib/sop/registry';
+import { ensurePhaseOneSopRunsBySlug } from '../../../lib/sop/auto-start';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,6 +38,11 @@ export default async function SopsPage({
   const { firmSlug } = await params;
   const firm = await getFirmBySlug(firmSlug);
   if (!firm) notFound();
+
+  // Idempotent: on first visit, create Phase 1 SOP runs anchored to
+  // existing scanner data (audit_run, legacy_findings, brand_truth).
+  // Subsequent visits no-op. Non-blocking failures don't break the page.
+  await ensurePhaseOneSopRunsBySlug(firmSlug).catch(() => { /* swallow */ });
 
   const [runs, summaries] = await Promise.all([
     listSopRunsForFirm(firmSlug).catch(() => [] as SopRunSummary[]),

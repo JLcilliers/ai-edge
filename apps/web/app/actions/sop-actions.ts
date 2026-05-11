@@ -29,6 +29,7 @@ import {
   isSopExecutable,
   PHASES,
 } from '../lib/sop/registry';
+import { dispatchStepGenerators } from '../lib/sop/generators';
 import type {
   SopKey,
   SopRunStatus,
@@ -439,6 +440,43 @@ export async function completeStep(input: CompleteStepInput): Promise<
       notes: input.notes ?? null,
     })
     .where(and(eq(sopStepStates.sop_run_id, input.runId), eq(sopStepStates.step_number, input.stepNumber)));
+
+  // Fire generators if the step defines any. Failures inside the
+  // dispatcher are non-fatal — they're returned as warnings and stored
+  // on the step's output_summary so the operator can see them.
+  let generatorWarnings: string[] = [];
+  if (stepDef.generates) {
+    try {
+      const firmId = await resolveFirmId(input.firmSlug);
+      const dispatchResult = await dispatchStepGenerators({
+        firmSlug: input.firmSlug,
+        firmId,
+        sopKey: input.sopKey,
+        runId: input.runId,
+        stepNumber: input.stepNumber,
+        stepDef,
+      });
+      generatorWarnings = dispatchResult.warnings;
+      if (dispatchResult.ticketsCreated > 0 || dispatchResult.deliverablesCreated > 0 || generatorWarnings.length > 0) {
+        // Patch the output_summary to record what generators did.
+        await db
+          .update(sopStepStates)
+          .set({
+            output_summary: {
+              ...(input.outputSummary ?? {}),
+              generators: {
+                ticketsCreated: dispatchResult.ticketsCreated,
+                deliverablesCreated: dispatchResult.deliverablesCreated,
+                warnings: generatorWarnings,
+              },
+            },
+          })
+          .where(and(eq(sopStepStates.sop_run_id, input.runId), eq(sopStepStates.step_number, input.stepNumber)));
+      }
+    } catch (e) {
+      generatorWarnings.push(`dispatchStepGenerators threw: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
 
   // Advance the run.
   const isLastStep = input.stepNumber === def.steps.length;
