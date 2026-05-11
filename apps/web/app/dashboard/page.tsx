@@ -68,17 +68,14 @@ export default async function ClientListPage() {
     <div className="mx-auto max-w-6xl px-8 py-10">
       {/* Header */}
       <div className="mb-10 flex items-start justify-between">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center">
           <Image
             src="/clixsy-logo.svg"
             alt="Clixsy"
-            width={120}
-            height={50}
+            width={220}
+            height={92}
             priority
           />
-          <span className="border-l border-white/10 pl-4 font-[family-name:var(--font-inter)] text-[10px] font-medium uppercase tracking-[0.3em] text-white/55">
-            Intercept
-          </span>
         </div>
         <div className="flex items-center gap-2">
           <Link
