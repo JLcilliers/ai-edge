@@ -8,6 +8,15 @@ import { FindingDetailClient } from './finding-detail-client';
 
 export const dynamic = 'force-dynamic';
 
+// Claude long-context rewrite of a 3000-word legacy page takes ~60-90s.
+// Server actions invoked on this page (generateRewriteDraft) inherit the
+// page's maxDuration; without this they hit the default 60s ceiling and the
+// browser sees a no-op silently — the action throws server-side, the
+// client's useTransition wrapper catches nothing useful, and the operator
+// stares at "No rewrite draft yet" forever. 300s is the platform max and
+// gives us comfortable headroom for the slowest realistic input.
+export const maxDuration = 300;
+
 /**
  * Legacy-finding detail page — the entry point for the AI-assisted rewrite
  * workflow (PLAN §5.3).

@@ -5,6 +5,10 @@ import { getFirmBudgetStatus } from '../../../lib/audit/budget';
 import { AuditListClient } from './audit-list-client';
 
 export const dynamic = 'force-dynamic';
+// `startAudit` runs a full audit fan-out (3-20 queries × 2-4 providers × k=3)
+// which can take 60-120s. Without this, the server action inherits the
+// default 60s timeout and silently fails for any non-trivial run.
+export const maxDuration = 300;
 
 export default async function AuditsPage({
   params,

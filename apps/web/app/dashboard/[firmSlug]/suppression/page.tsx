@@ -8,6 +8,10 @@ import { getFirmBySlug } from '../../../actions/firm-actions';
 import { SuppressionClient } from './suppression-client';
 
 export const dynamic = 'force-dynamic';
+// `startSuppressionScan` crawls the firm site + embeds every page, which can
+// take 30-90s for a 15-URL run. Without this, the server action inherits the
+// default 60s timeout and aborts mid-embed-batch.
+export const maxDuration = 300;
 
 export default async function SuppressionPage({
   params,
