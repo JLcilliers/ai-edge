@@ -124,6 +124,7 @@ export function SopWorkflowClient({
             def={detail.def}
             stepDef={activeStepDef}
             stepState={activeStepState}
+            resolvedDataInputs={detail.resolvedDataInputs[activeStepNumber] ?? []}
             canComplete={canCompleteCurrent}
             isPending={isPending}
             onComplete={(confirmations, notes) => {
@@ -342,6 +343,7 @@ function StepDetail({
   def,
   stepDef,
   stepState,
+  resolvedDataInputs,
   canComplete,
   isPending,
   onComplete,
@@ -350,10 +352,12 @@ function StepDetail({
   def: SopRunDetail['def'];
   stepDef: SopStep;
   stepState: SopRunDetail['steps'][number] | undefined;
+  resolvedDataInputs: SopRunDetail['resolvedDataInputs'][number];
   canComplete: boolean;
   isPending: boolean;
   onComplete: (confirmations: Record<string, string | boolean>, notes?: string) => void;
 }) {
+  const resolvedForStep = resolvedDataInputs;
   const [confirmations, setConfirmations] = useState<Record<string, string | boolean>>(() => {
     const init: Record<string, string | boolean> = {};
     for (const g of stepDef.gates) init[g.key] = false;
@@ -405,29 +409,56 @@ function StepDetail({
             </ol>
           </Section>
 
-          {/* Data inputs */}
+          {/* Data inputs — live values resolved server-side */}
           {stepDef.dataInputs.length > 0 && (
             <Section title="Auto-populated data">
               <ul className="flex flex-col gap-2">
-                {stepDef.dataInputs.map((d) => (
-                  <li
-                    key={`${d.kind}_${d.label}`}
-                    className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="rounded-full bg-white/10 px-1.5 py-0.5 font-[family-name:var(--font-geist-mono)] text-[10px] uppercase tracking-wider text-white/55">
-                        {d.kind}
-                      </span>
-                      <span className={d.required ? 'text-white/80' : 'text-white/55'}>{d.label}</span>
-                      {d.required && (
-                        <span className="text-[10px] uppercase tracking-wider text-[var(--rag-red)]">
-                          required
+                {stepDef.dataInputs.map((d, i) => {
+                  const resolved = resolvedForStep[i];
+                  const toneClass = resolved?.tone === 'ok'
+                    ? 'border-[var(--rag-green)]/30 bg-[var(--rag-green-bg)]/30'
+                    : resolved?.tone === 'warn'
+                      ? 'border-[var(--rag-yellow)]/30 bg-[var(--rag-yellow-bg)]/30'
+                      : 'border-white/10 bg-black/20';
+                  return (
+                    <li
+                      key={`${d.kind}_${d.label}`}
+                      className={`rounded-lg border px-3 py-2.5 text-sm ${toneClass}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="rounded-full bg-white/10 px-1.5 py-0.5 font-[family-name:var(--font-geist-mono)] text-[10px] uppercase tracking-wider text-white/55">
+                          {d.kind}
                         </span>
+                        <span className={d.required ? 'text-white/85' : 'text-white/55'}>{d.label}</span>
+                        {d.required && (
+                          <span className="text-[10px] uppercase tracking-wider text-[var(--rag-red)]">
+                            required
+                          </span>
+                        )}
+                      </div>
+                      {resolved && (
+                        <div className="mt-1.5 text-[12px] text-white/65">
+                          {resolved.summary}
+                        </div>
                       )}
-                    </div>
-                    {/* On Day 2 the per-kind data widget renders the live value here. */}
-                  </li>
-                ))}
+                      {resolved?.rows && resolved.rows.length > 0 && (
+                        <table className="mt-2 w-full font-[family-name:var(--font-geist-mono)] text-[11px]">
+                          <tbody>
+                            {resolved.rows.slice(0, 6).map((row, ri) => (
+                              <tr key={ri} className="border-t border-white/5 first:border-t-0">
+                                {Object.entries(row).map(([k, v], ci) => (
+                                  <td key={k} className={`py-1 ${ci === 0 ? 'text-white/55' : 'text-white/85'}`}>
+                                    {v == null || v === '' ? '—' : String(v)}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             </Section>
           )}
