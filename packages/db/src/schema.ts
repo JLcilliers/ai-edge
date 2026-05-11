@@ -22,6 +22,19 @@ export const brandTruthVersions = pgTable('brand_truth_version', {
   payload: jsonb('payload').$type<BrandTruth>().notNull(),
   created_by: text('created_by').notNull(),
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  // Provenance metadata when this version was produced by the auto-bootstrap
+  // (lib/brand-truth/bootstrap.ts). Null for manually authored versions —
+  // including every operator-saved version after the bootstrap one, because
+  // they reflect the operator's deliberate edits rather than an automated
+  // synthesis pass.
+  bootstrap_meta: jsonb('bootstrap_meta').$type<{
+    pagesScanned: number;
+    pagesUsed: string[];
+    jsonLdTypesDetected: string[];
+    modelUsed: string;
+    costUsd: number;
+    latencyMs: number;
+  }>(),
 }, (t) => ({
   firmVersionIdx: uniqueIndex('brand_truth_firm_version').on(t.firm_id, t.version),
 }));

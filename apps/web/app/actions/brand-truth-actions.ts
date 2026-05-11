@@ -1,8 +1,10 @@
 'use server';
 
 import { getDb, firms, brandTruthVersions } from '@ai-edge/db';
-import { brandTruthSchema, type BrandTruth, validateClaims } from '@ai-edge/shared';
+import { brandTruthSchema, type BrandTruth, type FirmType, validateClaims } from '@ai-edge/shared';
 import { eq, desc, sql } from 'drizzle-orm';
+import { revalidatePath } from 'next/cache';
+import { bootstrapBrandTruthFromUrl } from '../lib/brand-truth/bootstrap';
 
 /** Resolve firm id from URL slug. Throws if the slug doesn't match a firm. */
 async function resolveFirmId(slug: string): Promise<string> {
@@ -154,4 +156,110 @@ export async function saveBrandTruth(
   });
 
   return { success: true, version: nextVersion };
+}
+
+/**
+ * Bootstrap a Brand Truth v1 for a freshly-created firm by scanning its
+ * public website. Only writes a brand_truth_version row when:
+ *   1. The firm has zero existing versions (we never overwrite operator
+ *      edits — a re-bootstrap UX with diff/merge is v2).
+ *   2. The bootstrap call returns a Zod-validated payload.
+ *
+ * Returns either the persisted version + provenance, or a structured
+ * failure the UI can render to the operator.
+ *
+ * Cost: ~$0.20-0.40 per call (one Claude Sonnet 4.5 invocation with
+ * scraped page content). Charged out-of-band — not against the firm's
+ * monthly audit budget.
+ *
+ * Auth (future hardening): operator-only action. For now we trust the
+ * caller because the broader dashboard has no auth wrapper yet.
+ */
+export async function bootstrapBrandTruthForFirm(
+  firmSlug: string,
+  primaryUrl: string,
+): Promise<
+  | { ok: true; version: number; costUsd: number; latencyMs: number; pagesUsed: string[] }
+  | { ok: false; error: string; reason?: string }
+> {
+  const db = getDb();
+  const [firm] = await db
+    .select({ id: firms.id, name: firms.name, firm_type: firms.firm_type })
+    .from(firms)
+    .where(eq(firms.slug, firmSlug))
+    .limit(1);
+  if (!firm) return { ok: false, error: `Firm not found: ${firmSlug}` };
+
+  // Guard: refuse to bootstrap if the firm already has any brand_truth_version.
+  // We don't want a stray bootstrap call to land a v2 that overwrites the
+  // operator's deliberate edits. Re-bootstrap with diff/merge is v2.
+  const existing = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(brandTruthVersions)
+    .where(eq(brandTruthVersions.firm_id, firm.id));
+  if ((existing[0]?.count ?? 0) > 0) {
+    return {
+      ok: false,
+      error: 'Firm already has a Brand Truth version. Edit it manually in the editor.',
+      reason: 'has_existing_version',
+    };
+  }
+
+  // Surface URL validation here before paying for a Claude call. The
+  // bootstrap module accepts any string and will crawl-fail loudly, but
+  // we can fail faster client-side.
+  let normalizedUrl: string;
+  try {
+    normalizedUrl = new URL(primaryUrl).toString();
+  } catch {
+    return { ok: false, error: 'primaryUrl is not a valid URL', reason: 'invalid_url' };
+  }
+
+  const result = await bootstrapBrandTruthFromUrl({
+    firmName: firm.name,
+    firmType: firm.firm_type as FirmType,
+    primaryUrl: normalizedUrl,
+  });
+
+  if (!result.ok) {
+    return { ok: false, error: result.reason, reason: result.reason };
+  }
+
+  // Persist as v1 with the bootstrap provenance attached. `created_by`
+  // is tagged so the editor knows the version came from the bootstrap
+  // path (and the operator's first Save creates v2 with `created_by:
+  // 'dashboard'`).
+  await db.insert(brandTruthVersions).values({
+    firm_id: firm.id,
+    version: 1,
+    payload: result.payload as any,
+    created_by: 'bootstrap',
+    bootstrap_meta: {
+      pagesScanned: result.provenance.pagesScanned,
+      pagesUsed: result.provenance.pagesUsed,
+      jsonLdTypesDetected: result.provenance.jsonLdTypesDetected,
+      modelUsed: result.provenance.modelUsed,
+      costUsd: result.costUsd,
+      latencyMs: result.latencyMs,
+    },
+  });
+
+  // revalidatePath only works inside the Next.js request context — guard
+  // so this action can also be invoked from Node scripts (integration
+  // tests, manual cron triggers) without crashing the otherwise-successful
+  // write.
+  try {
+    revalidatePath(`/dashboard/${firmSlug}/brand-truth`);
+    revalidatePath(`/dashboard/${firmSlug}`);
+  } catch {
+    // Outside Next.js runtime — no-op, the page will re-fetch on next render.
+  }
+
+  return {
+    ok: true,
+    version: 1,
+    costUsd: result.costUsd,
+    latencyMs: result.latencyMs,
+    pagesUsed: result.provenance.pagesUsed,
+  };
 }
