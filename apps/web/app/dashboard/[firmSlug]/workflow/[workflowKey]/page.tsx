@@ -3,45 +3,55 @@ import Link from 'next/link';
 import { ArrowLeft, BookOpen, Clock } from 'lucide-react';
 import { getSopRunDetail } from '../../../../actions/sop-actions';
 import { getFirmBySlug } from '../../../../actions/firm-actions';
-import { SOP_REGISTRY } from '../../../../lib/sop/registry';
+import { SOP_REGISTRY, PHASES } from '../../../../lib/sop/registry';
 import type { SopKey } from '../../../../lib/sop/types';
-import { SopWorkflowClient } from './sop-workflow-client';
+import { WorkflowClient } from './workflow-client';
 
 export const dynamic = 'force-dynamic';
-// SOP workflow server actions (completeStep, generateDeliverable) can
-// run for tens of seconds — completing Step 7 of Brand Visibility Audit
-// generates an xlsx and a ticket bundle. Default 60s is enough now;
-// raise to 300s on Day 2 once the heavy builders are wired.
+// Workflow server actions (completeStep, generateDeliverable) can run for
+// tens of seconds — completing Step 7 of Brand Visibility Audit generates
+// an xlsx and a ticket bundle. Default 60s is enough now; raise to 300s
+// once the heavy builders are wired.
 
-export default async function SopWorkflowPage({
+export default async function WorkflowDetailPage({
   params,
 }: {
-  params: Promise<{ firmSlug: string; sopKey: string }>;
+  params: Promise<{ firmSlug: string; workflowKey: string }>;
 }) {
-  const { firmSlug, sopKey } = await params;
-  if (!(sopKey in SOP_REGISTRY)) notFound();
-  const typedKey = sopKey as SopKey;
+  const { firmSlug, workflowKey } = await params;
+  if (!(workflowKey in SOP_REGISTRY)) notFound();
+  const typedKey = workflowKey as SopKey;
 
   const firm = await getFirmBySlug(firmSlug);
   if (!firm) notFound();
 
   const detail = await getSopRunDetail(firmSlug, typedKey);
 
+  // Resolve the parent phase so the back-link goes to the right phase
+  // page (no longer to a dead /sops umbrella page).
+  const parentPhase = PHASES.find((p) => p.sopKeys.includes(typedKey));
+  const backHref = parentPhase
+    ? `/dashboard/${firmSlug}/${parentPhase.phaseKey}`
+    : `/dashboard/${firmSlug}`;
+  const backLabel = parentPhase ? `Back to ${parentPhase.name}` : 'Back to dashboard';
+
   return (
     <div>
       <Link
-        href={`/dashboard/${firmSlug}/sops`}
+        href={backHref}
         className="mb-4 inline-flex items-center gap-1 text-sm text-white/55 transition-colors hover:text-white"
       >
         <ArrowLeft size={14} strokeWidth={2} />
-        Back to SOPs
+        {backLabel}
       </Link>
 
       <div className="mb-6">
         <div className="mb-2 flex items-center gap-2">
-          <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 font-[family-name:var(--font-geist-mono)] text-[10px] font-semibold uppercase tracking-widest text-white/70">
-            Phase {detail.def.phase}
-          </span>
+          {parentPhase && (
+            <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 font-[family-name:var(--font-geist-mono)] text-[10px] font-semibold uppercase tracking-widest text-white/70">
+              {parentPhase.name}
+            </span>
+          )}
           <span className="inline-flex items-center gap-1 text-[11px] text-white/40">
             <Clock size={11} strokeWidth={2} />
             {detail.def.timeRequired}
@@ -69,7 +79,7 @@ export default async function SopWorkflowPage({
             {detail.dependencies.map((d) => (
               <li key={d.sopKey}>
                 <Link
-                  href={`/dashboard/${firmSlug}/sop/${d.sopKey}`}
+                  href={`/dashboard/${firmSlug}/workflow/${d.sopKey}`}
                   className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs text-white/80 transition-colors hover:border-white/30 hover:text-white"
                 >
                   {d.name}
@@ -91,7 +101,7 @@ export default async function SopWorkflowPage({
         </div>
       )}
 
-      <SopWorkflowClient firmSlug={firmSlug} detail={detail} />
+      <WorkflowClient firmSlug={firmSlug} detail={detail} />
     </div>
   );
 }

@@ -26,7 +26,7 @@ import {
 import type { SopStep, SopGate } from '../../../../lib/sop/types';
 
 /**
- * Workflow client — the interactive shell for one SOP run.
+ * Workflow client — the interactive shell for one workflow run.
  *
  * Left rail: the N steps with status pills and click-to-jump.
  * Main area: the selected step's data inputs / operator actions / gates,
@@ -36,8 +36,12 @@ import type { SopStep, SopGate } from '../../../../lib/sop/types';
  * step 1 if no run exists yet). They can click any step in the left
  * rail to inspect its definition / output, but only the current step's
  * Complete button is active.
+ *
+ * Internal types still use the `Sop*` prefix because the database tables
+ * (sop_run, sop_step_state) keep those names — only the operator-facing
+ * UI labels read "workflow."
  */
-export function SopWorkflowClient({
+export function WorkflowClient({
   firmSlug,
   detail,
 }: {
@@ -130,7 +134,7 @@ export function SopWorkflowClient({
             onComplete={(confirmations, notes) => {
               setError(null);
               if (!detail.run) {
-                setError('Start the SOP run first');
+                setError('Start the workflow first');
                 return;
               }
               start(async () => {
@@ -216,7 +220,7 @@ function RunStatusCard({
             className="inline-flex items-center justify-center gap-2 rounded-full bg-[var(--accent)] px-3 py-1.5 text-xs font-semibold text-black transition-colors hover:bg-[var(--accent-hover)] disabled:opacity-50"
           >
             {isPending ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} strokeWidth={2} />}
-            Start SOP
+            Start workflow
           </button>
         )}
         {!detail.run && !isExecutable && (
@@ -648,7 +652,7 @@ function TicketCountCard({ firmSlug, ticketCount }: { firmSlug: string; ticketCo
         </div>
         <div>
           <div className="text-sm font-semibold text-white">
-            {ticketCount} action item{ticketCount === 1 ? '' : 's'} from this SOP
+            {ticketCount} action item{ticketCount === 1 ? '' : 's'} from this workflow
           </div>
           <div className="text-xs text-white/55">View, assign, and triage in /tickets</div>
         </div>
