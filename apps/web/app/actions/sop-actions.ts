@@ -21,7 +21,7 @@ import {
   sopDeliverables,
   remediationTickets,
 } from '@ai-edge/db';
-import { eq, and, desc, sql } from 'drizzle-orm';
+import { eq, and, desc, sql, inArray } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import {
   SOP_REGISTRY,
@@ -112,7 +112,15 @@ export async function listSopRunsForFirm(firmSlug: string): Promise<SopRunSummar
     if (!latestByKey.has(r.sop_key)) latestByKey.set(r.sop_key, r);
   }
 
-  // Counts per run (tickets, deliverables) — one trip each, keyed by sop_run_id.
+  // Counts per run (tickets, deliverables) — one trip each, keyed by
+  // sop_run_id. Uses inArray() rather than sql`= ANY(${runIds})` —
+  // Drizzle does not auto-cast a JS array to a Postgres array parameter
+  // and the raw template throws "op ANY/ALL (array) requires array on
+  // right side" at runtime. Same bug we fixed in auto-start.ts. Worse
+  // here because the page's .catch swallowed the throw and silently
+  // returned an empty SopRunSummary list, which made every workflow
+  // card render as "Coming soon" on firms that already had sop_run
+  // rows.
   const runIds = [...latestByKey.values()].map((r) => r.id);
   const ticketCounts = new Map<string, number>();
   const deliverableCounts = new Map<string, number>();
@@ -120,7 +128,7 @@ export async function listSopRunsForFirm(firmSlug: string): Promise<SopRunSummar
     const tickets = await db
       .select({ sopRunId: remediationTickets.sop_run_id, count: sql<number>`count(*)::int` })
       .from(remediationTickets)
-      .where(sql`${remediationTickets.sop_run_id} = ANY(${runIds})`)
+      .where(inArray(remediationTickets.sop_run_id, runIds))
       .groupBy(remediationTickets.sop_run_id);
     for (const t of tickets) {
       if (t.sopRunId) ticketCounts.set(t.sopRunId, t.count);
@@ -128,7 +136,7 @@ export async function listSopRunsForFirm(firmSlug: string): Promise<SopRunSummar
     const dels = await db
       .select({ sopRunId: sopDeliverables.sop_run_id, count: sql<number>`count(*)::int` })
       .from(sopDeliverables)
-      .where(sql`${sopDeliverables.sop_run_id} = ANY(${runIds})`)
+      .where(inArray(sopDeliverables.sop_run_id, runIds))
       .groupBy(sopDeliverables.sop_run_id);
     for (const d of dels) {
       deliverableCounts.set(d.sopRunId, d.count);
