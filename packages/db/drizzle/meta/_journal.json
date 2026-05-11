@@ -85,6 +85,13 @@
       "when": 1777800000000,
       "tag": "0011_aio_capture",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1778505051808,
+      "tag": "0012_brand_truth_bootstrap_meta",
+      "breakpoints": true
     }
   ]
 }
