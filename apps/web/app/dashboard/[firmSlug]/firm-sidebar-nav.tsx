@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, FileText, ClipboardCheck, MessageSquare, Users, FileX, Database, ShieldCheck, FileBarChart, Eye, Settings, Inbox, FlaskConical } from 'lucide-react';
+import { LayoutDashboard, FileText, ClipboardCheck, MessageSquare, Users, FileX, Database, ShieldCheck, FileBarChart, Eye, Settings, Inbox, FlaskConical, Workflow } from 'lucide-react';
 
 type NavItem = {
   label: string;
@@ -21,6 +21,19 @@ const ITEMS: NavItem[] = [
     href: (slug) => `/dashboard/${slug}`,
     icon: LayoutDashboard,
     match: 'exact',
+  },
+  {
+    label: 'SOPs',
+    href: (slug) => `/dashboard/${slug}/sops`,
+    icon: Workflow,
+    match: 'prefix',
+  },
+  {
+    label: 'Action Items',
+    href: (slug) => `/dashboard/${slug}/tickets`,
+    icon: Inbox,
+    match: 'prefix',
+    badge: 'openTicketCount',
   },
   {
     label: 'Brand Truth',
@@ -45,13 +58,6 @@ const ITEMS: NavItem[] = [
     href: (slug) => `/dashboard/${slug}/reddit`,
     icon: MessageSquare,
     match: 'prefix',
-  },
-  {
-    label: 'Tickets',
-    href: (slug) => `/dashboard/${slug}/tickets`,
-    icon: Inbox,
-    match: 'prefix',
-    badge: 'openTicketCount',
   },
   {
     label: 'Competitors',
