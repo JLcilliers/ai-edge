@@ -9,6 +9,7 @@ import type { BrandTruth } from '@ai-edge/shared';
 import { eq, desc } from 'drizzle-orm';
 import { searchReddit, type RedditPost } from './client';
 import { classifySentiment, type RedditSentiment } from './sentiment';
+import { ensureSopRun } from '../sop/ensure-run';
 
 /**
  * Run a Reddit sentiment scan for a firm.
@@ -59,6 +60,15 @@ export async function runRedditScan(firmId: string): Promise<string> {
     .returning({ id: auditRuns.id });
 
   const runId = run!.id;
+
+  // Resolve the Reddit Brand Sentiment Monitoring sop_run up-front so
+  // every complaint ticket emitted below carries sop_run_id. See
+  // lib/sop/ensure-run.ts for rationale.
+  const sopRunId = await ensureSopRun(
+    firmId,
+    'reddit_brand_sentiment_monitoring',
+    'scanner:reddit',
+  );
 
   try {
     // Load latest Brand Truth
@@ -259,6 +269,7 @@ export async function runRedditScan(firmId: string): Promise<string> {
           firm_id: firmId,
           source_type: 'reddit' as const,
           source_id: row.id,
+          sop_run_id: sopRunId,
           status: 'open',
           playbook_step: 'reddit_triage',
           due_at: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days — Reddit rots fast

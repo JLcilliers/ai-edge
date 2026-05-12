@@ -14,6 +14,7 @@ import {
   embedSingle,
   semanticDistance,
 } from '../suppression/embeddings';
+import { ensureSopRun } from '../sop/ensure-run';
 
 /**
  * Cross-source vector alignment + third-party badge verification scanner
@@ -168,6 +169,15 @@ export async function runCrossSourceScan(
     })
     .returning({ id: auditRuns.id });
   const runId = run!.id;
+
+  // Cross-source divergence is an Entity Optimization concern — the
+  // scan emits tickets to be triaged in Phase 4 entity_optimization
+  // sop_run. Resolve it up-front so the inserts below carry sop_run_id.
+  const sopRunId = await ensureSopRun(
+    firmId,
+    'entity_optimization',
+    'scanner:cross-source',
+  );
 
   let outcome: CrossSourceOutcome = {
     runId,
@@ -338,6 +348,7 @@ export async function runCrossSourceScan(
           firm_id: firmId,
           source_type: 'entity',
           source_id: signal.id,
+          sop_run_id: sopRunId,
           status: 'open',
           playbook_step: playbookStep,
           due_at: new Date(Date.now() + dueDays * 24 * 60 * 60 * 1000),

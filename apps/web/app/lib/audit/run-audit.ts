@@ -21,6 +21,7 @@ import {
   isFirmOverBudget,
   recordRunCost,
 } from './budget';
+import { ensureSopRun } from '../sop/ensure-run';
 
 /**
  * Options for an audit run.
@@ -119,6 +120,16 @@ export async function runAudit(
     .returning({ id: auditRuns.id });
 
   const auditRunId = run!.id;
+
+  // Resolve the Brand Visibility Audit sop_run up-front so every Red-
+  // consensus ticket emitted below can attach to it. Without this the
+  // tickets land with sop_run_id=NULL and don't surface in the phase
+  // page's execution-task list or the per-phase sidebar count.
+  const sopRunId = await ensureSopRun(
+    firmId,
+    'brand_visibility_audit',
+    'scanner:audit-pipeline',
+  );
 
   try {
     // Fetch Brand Truth
@@ -333,6 +344,7 @@ export async function runAudit(
             firm_id: firmId,
             source_type: 'audit',
             source_id: alignmentRow.id,
+            sop_run_id: sopRunId,
             status: 'open',
             playbook_step: 'initial_triage',
             due_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
