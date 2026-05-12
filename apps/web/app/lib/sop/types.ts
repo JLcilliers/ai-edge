@@ -41,9 +41,13 @@ export type SopKey =
   | 'trust_alignment_audit'
   // Phase 7: Client Services
   | 'weekly_aeo_reporting'
-  | 'aeo_discovery_call'
-  | 'aeo_audit_delivery'
   | 'competitive_llm_monitoring';
+// AEO Discovery Call removed: sales / CRM workflow, not a site-improvement
+// scanner.
+// AEO Audit Delivery removed as a scanner: client-delivery workflow that
+// doesn't fit the scanner-output paradigm. The Toth methodology (headline
+// finding + priority matrix + 12-15 slide spec) is preserved + migrated
+// into the export module (lib/exports/build-audit-delivery.ts).
 
 export type SopPhase = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 

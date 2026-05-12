@@ -1696,52 +1696,21 @@ const WEEKLY_AEO_REPORTING: SopDefinition = {
     stub(5, 'send_to_client', 'Send to Client'),
   ],
   troubleshooting: [],
-  relatedSops: ['bi_weekly_llm_monitoring', 'aeo_audit_delivery'],
+  relatedSops: ['bi_weekly_llm_monitoring'],
 };
 
-const AEO_DISCOVERY_CALL: SopDefinition = {
-  key: 'aeo_discovery_call',
-  phase: 7,
-  name: 'AEO Discovery Call',
-  purpose:
-    'Confidently sell AEO services, qualify prospects effectively, and set clear expectations that lead to successful client engagements.',
-  timeRequired: '45-60 minutes per call',
-  scope: ['Every new prospect', 'Before any AEO proposal'],
-  prerequisites: { tools: ['Call recording', 'Discovery questionnaire'], access: [], data: ['Prospect background research'] },
-  dependsOnSops: [],
-  cadence: 'one-time',
-  steps: [
-    stub(1, 'prep_research', 'Pre-Call Research'),
-    stub(2, 'run_discovery_questions', 'Run Discovery Questions'),
-    stub(3, 'demo_aeo_concept', 'Demo AEO Concept'),
-    stub(4, 'qualify_fit', 'Qualify Fit'),
-    stub(5, 'next_steps', 'Define Next Steps'),
-  ],
-  troubleshooting: [],
-  relatedSops: ['aeo_audit_delivery'],
-};
-
-const AEO_AUDIT_DELIVERY: SopDefinition = {
-  key: 'aeo_audit_delivery',
-  phase: 7,
-  name: 'AEO Audit Delivery',
-  purpose:
-    'Deliver the initial AEO audit findings to a new client in a structured presentation that builds confidence, surfaces priorities, and lands the engagement.',
-  timeRequired: '1-2 hours per delivery + 30-minute call',
-  scope: ['Initial client engagement after Brand Visibility Audit is complete'],
-  prerequisites: { tools: ['Presentation tool', 'Brand Visibility Audit deliverables'], access: [], data: ['Completed Brand Visibility Audit', 'Suppression analysis if available'] },
-  dependsOnSops: ['brand_visibility_audit'],
-  cadence: 'one-time',
-  steps: [
-    stub(1, 'assemble_findings', 'Assemble Audit Findings'),
-    stub(2, 'craft_narrative', 'Craft Client-Facing Narrative'),
-    stub(3, 'build_slide_deck', 'Build Slide Deck'),
-    stub(4, 'present_to_client', 'Present to Client'),
-    stub(5, 'send_followup_doc', 'Send Follow-up Document'),
-  ],
-  troubleshooting: [],
-  relatedSops: ['weekly_aeo_reporting', 'aeo_discovery_call'],
-};
+// AEO_DISCOVERY_CALL removed: a sales-call workflow, not a site-audit
+// scanner. CRM territory rather than execution-task generation. Anyone
+// historically running it manually can continue to do so off-tool.
+//
+// AEO_AUDIT_DELIVERY removed as a scanner: the client-delivery workflow
+// doesn't fit the scanner-output paradigm — there's no input data the
+// scanner would read that doesn't already exist as tickets. The Steve
+// Toth methodology (headline finding + priority matrix + 12-15 slide
+// spec) is preserved + migrated into the export module
+// (lib/exports/build-audit-delivery.ts), which compiles the same slide
+// deck from open ticket data on demand. Use the "Audit delivery deck"
+// button on /tickets or /client-services.
 
 const COMPETITIVE_LLM_MONITORING: SopDefinition = {
   key: 'competitive_llm_monitoring',
@@ -1817,7 +1786,7 @@ export const PHASES: PhaseDefinition[] = [
     phaseKey: 'client-services',
     name: 'Client Services',
     description: 'Selling, delivering, and reporting AEO engagements.',
-    sopKeys: ['weekly_aeo_reporting', 'aeo_discovery_call', 'aeo_audit_delivery', 'competitive_llm_monitoring'],
+    sopKeys: ['weekly_aeo_reporting', 'competitive_llm_monitoring'],
   },
 ];
 
@@ -1854,8 +1823,6 @@ const ALL_SOPS_LIST: SopDefinition[] = [
   TRUST_ALIGNMENT_AUDIT,
   // Phase 7
   WEEKLY_AEO_REPORTING,
-  AEO_DISCOVERY_CALL,
-  AEO_AUDIT_DELIVERY,
   COMPETITIVE_LLM_MONITORING,
 ];
 
