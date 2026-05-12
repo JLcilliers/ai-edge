@@ -33,6 +33,10 @@ import {
   runSemanticHtmlScanBySlug,
   type SemanticHtmlScanResult,
 } from '../lib/content/semantic-html-scanner';
+import {
+  runSchemaMarkupScanBySlug,
+  type SchemaScanResult,
+} from '../lib/content/schema-markup-scanner';
 
 export type ContentScanKind = 'llm_friendly' | 'freshness' | 'both';
 
@@ -80,13 +84,19 @@ export async function runContentOptimizationScan(
 export interface TechnicalImplementationScanResponse {
   ok: true;
   semanticHtml: SemanticHtmlScanResult;
+  schemaMarkup: SchemaScanResult;
 }
 
 export async function runTechnicalImplementationScan(
   firmSlug: string,
 ): Promise<TechnicalImplementationScanResponse | ContentScanError> {
   try {
+    // Run both Phase 5 audit scanners sequentially. They each hit the
+    // network with concurrency 4 — running them in parallel would
+    // double the firm site's connection load without a wall-clock win
+    // big enough to matter.
     const semanticHtml = await runSemanticHtmlScanBySlug(firmSlug);
+    const schemaMarkup = await runSchemaMarkupScanBySlug(firmSlug);
 
     try {
       revalidatePath(`/dashboard/${firmSlug}/technical-implementation`);
@@ -95,7 +105,7 @@ export async function runTechnicalImplementationScan(
       /* not in a Next request context — safe to ignore */
     }
 
-    return { ok: true, semanticHtml };
+    return { ok: true, semanticHtml, schemaMarkup };
   } catch (err) {
     return {
       ok: false,
