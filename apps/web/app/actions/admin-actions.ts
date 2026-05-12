@@ -599,3 +599,42 @@ export async function getAdminDashboardBundle(): Promise<AdminDashboardBundle> {
   ]);
   return { workspaceMtd, workspaceYear, cronHealth, firmHealth };
 }
+
+// ─── Admin: delete account (firm) ───────────────────────────────────
+//
+// Mirrors deleteFirm in settings-actions.ts but does NOT redirect away
+// from the admin page — the operator stays on /dashboard/admin so the
+// firm-health table re-renders with the row gone. Same cascading
+// delete semantics (every firm-scoped row is removed via FK cascade
+// on firm.id).
+//
+// Confirmation requires the operator to type the firm name exactly,
+// same as the per-firm Danger Zone. Anything else is rejected without
+// touching the DB.
+
+import { revalidatePath } from 'next/cache';
+
+export async function deleteFirmFromAdmin(input: {
+  firmId: string;
+  confirmationName: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const db = getDb();
+  const [firm] = await db
+    .select({ id: firms.id, name: firms.name })
+    .from(firms)
+    .where(eq(firms.id, input.firmId))
+    .limit(1);
+  if (!firm) return { ok: false, error: 'Firm not found' };
+  if (input.confirmationName.trim() !== firm.name) {
+    return {
+      ok: false,
+      error: `Confirmation name did not match. Type "${firm.name}" exactly.`,
+    };
+  }
+  await db.delete(firms).where(eq(firms.id, firm.id));
+  // Revalidate both surfaces — admin table refreshes; all-clients page
+  // drops the deleted firm from the grid.
+  revalidatePath('/dashboard/admin');
+  revalidatePath('/dashboard');
+  return { ok: true };
+}
