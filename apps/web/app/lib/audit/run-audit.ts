@@ -12,7 +12,7 @@ import {
   competitorMentions,
 } from '@ai-edge/db';
 import type { BrandTruth } from '@ai-edge/shared';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { scoreAlignment } from './scoring/alignment-scorer';
 import { detectCompetitorMentions } from '../competitors/detect';
 import { getEnabledProviders, runProviderQuery, type ProviderDescriptor } from './run-provider';
@@ -79,7 +79,12 @@ const TOP_PRIORITY_COUNT = 20;
  * latency plus a few seconds of scoring + DB writes, fitting comfortably
  * inside the 300s overall ceiling.
  */
-const QUERY_LOOP_BUDGET_MS = 240_000;
+// Wall-clock budget before we break out of the query loop and run the
+// final UPDATE. Sized at 210s rather than 240s so even if the last
+// in-flight iteration takes the full 60s LLM timeout, the post-loop
+// UPDATE has 30s+ on a 300s Vercel function ceiling to actually commit
+// the status change.
+const QUERY_LOOP_BUDGET_MS = 210_000;
 
 interface SampleResult {
   providerName: string;
@@ -405,23 +410,58 @@ export async function runAudit(
       const errorMessage = timeBudgetHit
         ? `Wall-clock budget reached after ${queriesProcessed} of ${seedQueries.length} queries (${(((Date.now() - loopStartedAt) / 1000)).toFixed(0)}s). Remaining queries can be picked up by a fresh audit run.`
         : null;
-      await db
-        .update(auditRuns)
-        .set({
-          status: finalStatus,
-          finished_at: new Date(),
-          ...(errorMessage ? { error: errorMessage } : {}),
-        })
-        .where(and(eq(auditRuns.id, auditRunId), eq(auditRuns.status, 'running')));
+      // Outer try/catch around just the final UPDATE so a transient DB hiccup
+      // doesn't drop us into the catch arm below — that arm would clobber the
+      // status to 'failed' even though we have N successfully scored rows.
+      // If the UPDATE genuinely can't commit (network down, function killed),
+      // the audit-sweep cron promotes the row to completed_partial within ~6
+      // minutes anyway based on the consensus_response count.
+      try {
+        await db
+          .update(auditRuns)
+          .set({
+            status: finalStatus,
+            finished_at: new Date(),
+            ...(errorMessage ? { error: errorMessage } : {}),
+          })
+          .where(and(eq(auditRuns.id, auditRunId), eq(auditRuns.status, 'running')));
+      } catch (updateErr) {
+        console.error(
+          `[audit] firm ${firmId} run ${auditRunId} final UPDATE failed (status=${finalStatus}):`,
+          updateErr,
+        );
+      }
     }
   } catch (err) {
     // Mark failed — but only if still 'running'. A cancellation-in-progress
     // that races with a thrown error should keep the operator-intent
-    // 'cancelled' label rather than getting clobbered to 'failed'.
-    await db
-      .update(auditRuns)
-      .set({ status: 'failed', finished_at: new Date(), error: String(err) })
-      .where(and(eq(auditRuns.id, auditRunId), eq(auditRuns.status, 'running')));
+    // 'cancelled' label rather than getting clobbered to 'failed'. Same
+    // result-aware logic as audit-sweep: if at least one consensus row
+    // landed, the audit produced real signal so we promote to
+    // 'completed_partial' instead of 'failed' — the Visibility tab can
+    // still read from it.
+    try {
+      const [scoredRow] = await db
+        .select({ count: sql<number>`COUNT(*)::int` })
+        .from(queriesTable)
+        .innerJoin(consensusResponses, eq(consensusResponses.query_id, queriesTable.id))
+        .where(eq(queriesTable.audit_run_id, auditRunId));
+      const scoredCount = scoredRow?.count ?? 0;
+      const rescueStatus = scoredCount > 0 ? 'completed_partial' : 'failed';
+      const rescueError =
+        scoredCount > 0
+          ? `Run threw mid-loop after ${scoredCount} consensus row(s) landed; promoted to completed_partial. Underlying error: ${String(err).slice(0, 280)}`
+          : String(err);
+      await db
+        .update(auditRuns)
+        .set({ status: rescueStatus, finished_at: new Date(), error: rescueError })
+        .where(and(eq(auditRuns.id, auditRunId), eq(auditRuns.status, 'running')));
+    } catch (rescueErr) {
+      console.error(
+        `[audit] firm ${firmId} run ${auditRunId} could not flip to failed/partial after throw:`,
+        rescueErr,
+      );
+    }
   }
 
   return auditRunId;

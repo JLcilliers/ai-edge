@@ -614,39 +614,67 @@ export interface DeliverableResult {
 }
 
 /**
- * Generate a deliverable for a SOP run. The per-kind builder is dispatched
- * by `kind` and lives in lib/sop/deliverables/*.ts. On Day 1 this just
- * persists a placeholder; Day 2 wires the real builders for Phase 1.
+ * Manually regenerate a deliverable for a SOP run. Used by the operator
+ * when they want to refresh an artifact after editing Brand Truth /
+ * running a fresh audit / fixing an upstream input. Dispatches to the
+ * same per-kind builders in lib/sop/generators.ts that completeStep
+ * fires automatically on step completion — so this never persists
+ * placeholder data; if no builder is wired for the requested kind, we
+ * surface that as an error instead of pretending the deliverable was
+ * generated.
  */
 export async function generateDeliverable(input: {
   firmSlug: string;
   sopKey: SopKey;
   runId: string;
   kind: DeliverableKind;
+  stepNumber: number;
 }): Promise<DeliverableResult> {
-  const db = getDb();
-  // TODO Day 2: dispatch to per-kind builder (xlsx, csv, md, jsonld).
-  // For now, persist a stub deliverable so the workflow UI can render the
-  // "Deliverables" list.
   const def = getSopDefinition(input.sopKey);
-  const name = `${def.name} — ${input.kind} (placeholder)`;
-  const inserted = await db
-    .insert(sopDeliverables)
-    .values({
-      sop_run_id: input.runId,
-      kind: input.kind,
-      name,
-      payload: { placeholder: true, note: 'Builder lands Day 2' },
+  const stepDef = def.steps.find((s) => s.number === input.stepNumber);
+  if (!stepDef) throw new Error(`Step ${input.stepNumber} not found on ${input.sopKey}`);
+  if (!stepDef.generates?.deliverableKinds?.includes(input.kind)) {
+    throw new Error(
+      `Step ${input.stepNumber} of ${input.sopKey} does not declare deliverable ${input.kind}. ` +
+        `Use the SOP registry to wire the deliverable to a step first.`,
+    );
+  }
+
+  const firmId = await resolveFirmId(input.firmSlug);
+  const result = await dispatchStepGenerators({
+    firmSlug: input.firmSlug,
+    firmId,
+    sopKey: input.sopKey,
+    runId: input.runId,
+    stepNumber: input.stepNumber,
+    stepDef,
+  });
+
+  if (result.warnings.length > 0 && result.deliverablesCreated === 0) {
+    throw new Error(`Deliverable generation failed: ${result.warnings.join('; ')}`);
+  }
+
+  // Return the newest deliverable for this run+kind so the UI can link
+  // straight to it.
+  const db = getDb();
+  const [latest] = await db
+    .select({
+      id: sopDeliverables.id,
+      kind: sopDeliverables.kind,
+      name: sopDeliverables.name,
+      blobUrl: sopDeliverables.blob_url,
     })
-    .returning({ id: sopDeliverables.id, kind: sopDeliverables.kind, name: sopDeliverables.name, blobUrl: sopDeliverables.blob_url });
-  const d = inserted[0];
-  if (!d) throw new Error('Failed to insert sop_deliverable');
+    .from(sopDeliverables)
+    .where(and(eq(sopDeliverables.sop_run_id, input.runId), eq(sopDeliverables.kind, input.kind)))
+    .orderBy(desc(sopDeliverables.generated_at))
+    .limit(1);
+  if (!latest) throw new Error('Deliverable was not persisted by the builder');
   revalidateSop(input.firmSlug, input.sopKey);
   return {
-    id: d.id,
-    kind: d.kind as DeliverableKind,
-    name: d.name,
-    blobUrl: d.blobUrl,
+    id: latest.id,
+    kind: latest.kind as DeliverableKind,
+    name: latest.name,
+    blobUrl: latest.blobUrl,
   };
 }
 

@@ -47,10 +47,22 @@ interface PhaseOneAnchors {
  */
 async function gatherPhaseOneAnchors(firmId: string): Promise<PhaseOneAnchors> {
   const db = getDb();
+  // Prefer the latest *full* audit run (the one with alignment scores +
+  // citations) over entity/suppression audits. Bootstrap creates
+  // entity + suppression audit_run rows at firm-creation time; without
+  // this filter, auto-start would anchor Brand Visibility Audit to one
+  // of those, and the workflow's audit_run data card would always show
+  // "0 scored" even after a real audit completes.
   const [latestAudit] = await db
     .select({ id: auditRuns.id })
     .from(auditRuns)
-    .where(and(eq(auditRuns.firm_id, firmId), sql`${auditRuns.status} IN ('completed', 'completed_partial')`))
+    .where(
+      and(
+        eq(auditRuns.firm_id, firmId),
+        eq(auditRuns.kind, 'full'),
+        sql`${auditRuns.status} IN ('completed', 'completed_partial', 'completed_budget_truncated')`,
+      ),
+    )
     .orderBy(desc(auditRuns.finished_at))
     .limit(1);
   const [latestBT] = await db

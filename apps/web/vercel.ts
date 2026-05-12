@@ -16,9 +16,12 @@ export const config: VercelConfig = {
     // Monthly report generator — 05:00 UTC on the 1st, builds the
     // previous calendar month's roll-up and pushes JSON to Vercel Blob.
     { path: '/api/cron/report-monthly', schedule: '0 5 1 * *' },
-    // Stale audit-run sweeper — hourly at :15, marks any audit_run stuck
-    // in 'running' for >60 min as failed (process crash / deploy cycle).
-    { path: '/api/cron/audit-sweep', schedule: '15 * * * *' },
+    // Stale audit-run sweeper — every 5 minutes. The route's
+    // STALE_THRESHOLD_MINUTES is 7, so a stuck audit clears within
+    // ~12 minutes of getting stuck. Previously hourly at :15, which
+    // combined with a 15-minute threshold meant an audit could sit at
+    // 'running' for 75+ minutes — operators saw real 17-minute hangs.
+    { path: '/api/cron/audit-sweep', schedule: '*/5 * * * *' },
     // Live SERP capture cron — DISABLED (was the data feed for Scenario
     // Lab, which we removed because it's not part of the Steve Toth SOP
     // playbook). The cron handler at /api/cron/serp-capture still exists
