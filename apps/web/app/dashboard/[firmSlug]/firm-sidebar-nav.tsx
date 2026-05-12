@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, FileText, ClipboardCheck, MessageSquare, Users, FileX, Database, ShieldCheck, FileBarChart, Eye, Settings, Inbox, FlaskConical, ScanSearch, Activity, PenSquare, Globe2, Wrench, Sparkles, Briefcase } from 'lucide-react';
+import { LayoutDashboard, FileText, ClipboardCheck, MessageSquare, Users, FileX, Database, FileBarChart, Eye, Settings, Inbox, ScanSearch, Activity, PenSquare, Globe2, Wrench, Sparkles, Briefcase } from 'lucide-react';
 
 type NavItem = {
   label: string;
@@ -21,6 +21,15 @@ const ITEMS: NavItem[] = [
     href: (slug) => `/dashboard/${slug}`,
     icon: LayoutDashboard,
     match: 'exact',
+  },
+  // Brand Truth sits at the top right after Overview — it's the canonical
+  // positioning payload every workflow reads from, so it gets the most
+  // accessible slot in the nav.
+  {
+    label: 'Brand Truth',
+    href: (slug) => `/dashboard/${slug}/brand-truth`,
+    icon: FileText,
+    match: 'prefix',
   },
 
   // ── The Steve Toth playbook, surfaced as 7 ordered phase tabs ──
@@ -79,15 +88,11 @@ const ITEMS: NavItem[] = [
     match: 'prefix',
     badge: 'openTicketCount',
   },
-  {
-    label: 'Brand Truth',
-    href: (slug) => `/dashboard/${slug}/brand-truth`,
-    icon: FileText,
-    match: 'prefix',
-  },
 
-  // ── Legacy data views — will fold into their parent phase pages
-  // as we wire each phase's workflows. Kept top-level for continuity. ──
+  // ── Legacy data views — backing surfaces for the SOP workflows
+  // (each one is the data layer for one or more phase steps). Kept
+  // top-level for quick operator access; the workflows also drill
+  // into them in-context. ──
   {
     label: 'Audits',
     href: (slug) => `/dashboard/${slug}/audits`,
@@ -125,21 +130,9 @@ const ITEMS: NavItem[] = [
     match: 'prefix',
   },
   {
-    label: 'Compliance',
-    href: (slug) => `/dashboard/${slug}/compliance`,
-    icon: ShieldCheck,
-    match: 'prefix',
-  },
-  {
     label: 'Reports',
     href: (slug) => `/dashboard/${slug}/reports`,
     icon: FileBarChart,
-    match: 'prefix',
-  },
-  {
-    label: 'Scenario Lab',
-    href: (slug) => `/dashboard/${slug}/scenarios`,
-    icon: FlaskConical,
     match: 'prefix',
   },
   {

@@ -19,13 +19,13 @@ export const config: VercelConfig = {
     // Stale audit-run sweeper — hourly at :15, marks any audit_run stuck
     // in 'running' for >60 min as failed (process crash / deploy cycle).
     { path: '/api/cron/audit-sweep', schedule: '15 * * * *' },
-    // Live SERP capture via DataForSEO Google Organic SERP (Phase B #3) —
-    // weekly, Monday 09:00 UTC. Caps at 5 queries/firm/run to keep the
-    // DataForSEO bill bounded (~$0.0006/query). Originally Bing Web Search
-    // v7 — Microsoft retired that API in August 2025; we now reuse the
-    // DataForSEO credentials already provisioned for AIO capture. No-ops
-    // when DATAFORSEO_LOGIN/PASSWORD aren't set.
-    { path: '/api/cron/serp-capture', schedule: '0 9 * * 1' },
+    // Live SERP capture cron — DISABLED (was the data feed for Scenario
+    // Lab, which we removed because it's not part of the Steve Toth SOP
+    // playbook). The cron handler at /api/cron/serp-capture still exists
+    // and the lib code (lib/scenarios/serp-capture.ts) is intact, so this
+    // entry can be re-enabled if we ever bring scenarios back. With this
+    // disabled, no DataForSEO charges fire for SERP captures.
+    // { path: '/api/cron/serp-capture', schedule: '0 9 * * 1' },
     // Daily Search Console sync (Phase B #6) — pulls last 30 days of
     // clicks/impressions/ctr/position per connected firm at 06:30 UTC.
     // Firms without a gsc_connection row are silently skipped.
