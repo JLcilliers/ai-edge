@@ -65,6 +65,10 @@ import {
   runCompetitiveScanBySlug,
   type CompetitiveScanResult,
 } from '../lib/content/competitive-scanner';
+import {
+  runDeepResearchScanBySlug,
+  type DeepResearchScanResult,
+} from '../lib/content/deep-research-scanner';
 
 export interface ContentScanResponse {
   ok: true;
@@ -160,6 +164,51 @@ export async function runThirdPartyOptimizationScan(
     }
 
     return { ok: true, triage };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+export interface DeepResearchScanResponse {
+  ok: true;
+  result: DeepResearchScanResult;
+}
+
+/**
+ * Deep Research Content Audit — opt-in, LLM-cost-bearing scanner.
+ *
+ * Kept on its own server action (not chained into
+ * runContentOptimizationScan) because:
+ *   1. It costs real money per run (~$0.05-$0.20).
+ *   2. The SOP cadence is quarterly — chaining it into every scan
+ *      would burn the budget faster than intended.
+ *   3. The budget cap is per-firm-tier-configurable; explicit opt-in
+ *      gives operators a clear "I'm spending money now" affordance.
+ *
+ * The scanner itself enforces the firm_budget.deep_research_quarterly_
+ * cap_usd gate — it refuses to run and emits a manual-tier "Budget
+ * cap reached" ticket when adding the estimated cost would exceed the
+ * cap. So the explicit button is the UX layer; the budget gate is
+ * the safety net.
+ */
+export async function runDeepResearchAudit(
+  firmSlug: string,
+): Promise<DeepResearchScanResponse | ContentScanError> {
+  try {
+    const result = await runDeepResearchScanBySlug(firmSlug);
+
+    try {
+      revalidatePath(`/dashboard/${firmSlug}/content-optimization`);
+      revalidatePath(`/dashboard/${firmSlug}/action-items`);
+      revalidatePath(`/dashboard/${firmSlug}/sop/deep_research_content_audit`);
+    } catch {
+      /* not in a Next request context — safe to ignore */
+    }
+
+    return { ok: true, result };
   } catch (err) {
     return {
       ok: false,

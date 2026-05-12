@@ -106,6 +106,13 @@
       "when": 1778600000000,
       "tag": "0014_execution_tier",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1778700000000,
+      "tag": "0015_deep_research_budget",
+      "breakpoints": true
     }
   ]
 }
