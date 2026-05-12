@@ -51,7 +51,14 @@ export const maxDuration = 60;
  * `recordRunCost` before the crash; leaving them is correct — that's money
  * that actually went out to the providers.
  */
-const STALE_THRESHOLD_MINUTES = 15;
+// 7 minutes = ~1.4× the Vercel 300s function ceiling. Any audit_run
+// still 'running' past that is definitively dead. Previously 15 min,
+// which combined with an hourly cron schedule meant a stuck audit
+// could show 'running' for 75+ minutes — operators saw 17-minute
+// hangs in real demos. With this threshold + the 5-minute cron schedule
+// (vercel.ts), worst-case lingering 'running' state is ~12 minutes
+// instead of 75.
+const STALE_THRESHOLD_MINUTES = 7;
 const STALE_ERROR_PARTIAL =
   'Stale: process crashed or deployment cycled before the run could finish. Audit-sweep promoted to completed_partial because at least one query was scored; operators can read the rows that landed.';
 const STALE_ERROR_FAILED =

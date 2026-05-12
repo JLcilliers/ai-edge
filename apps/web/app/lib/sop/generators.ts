@@ -8,8 +8,33 @@
  * always retry generation from the step detail page.
  */
 
-import { getDb, sopRuns, sopDeliverables, firms } from '@ai-edge/db';
-import { eq } from 'drizzle-orm';
+import { getDb, sopRuns, sopDeliverables, firms, auditRuns } from '@ai-edge/db';
+import { eq, and, desc, sql } from 'drizzle-orm';
+
+/**
+ * Resolve the audit_run id this generator should read from. SOP runs
+ * carry `meta.anchors.auditRunId` set by auto-start, but auto-start
+ * fires at firm-creation time when the most recent audit is often the
+ * bootstrap-driven entity/suppression audit — which has no alignment
+ * scores or citations. The Brand Visibility Audit generators want the
+ * latest **full** audit run, so we prefer that over the anchor.
+ */
+async function resolveFullAuditRunId(firmId: string, anchored: string | undefined): Promise<string | undefined> {
+  const db = getDb();
+  const [fullRun] = await db
+    .select({ id: auditRuns.id })
+    .from(auditRuns)
+    .where(
+      and(
+        eq(auditRuns.firm_id, firmId),
+        eq(auditRuns.kind, 'full'),
+        sql`${auditRuns.status} IN ('completed', 'completed_partial', 'completed_budget_truncated')`,
+      ),
+    )
+    .orderBy(desc(auditRuns.finished_at))
+    .limit(1);
+  return fullRun?.id ?? anchored;
+}
 import type { SopDefinition, SopKey } from './types';
 import { generatePriorityActions } from './ticket-factories/priority-actions';
 import { generateSuppressionTickets } from './ticket-factories/suppression-decisions';
@@ -51,9 +76,10 @@ export async function dispatchStepGenerators(input: DispatchInput): Promise<Disp
 
   // Ticket factories.
   if (gen.ticketsFromFactory === 'priority_actions_from_visibility_audit') {
-    const auditRunId = typeof anchors.auditRunId === 'string' ? anchors.auditRunId : undefined;
+    const anchored = typeof anchors.auditRunId === 'string' ? anchors.auditRunId : undefined;
+    const auditRunId = await resolveFullAuditRunId(input.firmId, anchored);
     if (!auditRunId) {
-      out.warnings.push('priority_actions: no auditRunId in run.meta.anchors — skipping');
+      out.warnings.push('priority_actions: no full audit run exists for this firm yet — run an audit before completing this step');
     } else {
       try {
         const r = await generatePriorityActions({
@@ -130,9 +156,10 @@ export async function dispatchStepGenerators(input: DispatchInput): Promise<Disp
   if (gen.deliverableKinds?.length) {
     for (const kind of gen.deliverableKinds) {
       if (kind === 'comparison_matrix_xlsx') {
-        const auditRunId = typeof anchors.auditRunId === 'string' ? anchors.auditRunId : undefined;
+        const anchored = typeof anchors.auditRunId === 'string' ? anchors.auditRunId : undefined;
+        const auditRunId = await resolveFullAuditRunId(input.firmId, anchored);
         if (!auditRunId) {
-          out.warnings.push(`${kind}: no auditRunId in run.meta.anchors — skipping`);
+          out.warnings.push(`${kind}: no full audit run exists for this firm yet — run an audit first`);
           continue;
         }
         try {

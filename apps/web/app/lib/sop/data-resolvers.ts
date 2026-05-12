@@ -102,25 +102,69 @@ export async function resolveDataInput(
 
 async function resolveAuditRun(ctx: ResolveContext, label: string): Promise<ResolvedDataInput> {
   const db = getDb();
-  const auditRunId = ctx.sopRunMeta.anchors && typeof (ctx.sopRunMeta.anchors as Record<string, unknown>).auditRunId === 'string'
-    ? ((ctx.sopRunMeta.anchors as Record<string, unknown>).auditRunId as string)
-    : undefined;
+  const anchoredAuditRunId =
+    ctx.sopRunMeta.anchors &&
+    typeof (ctx.sopRunMeta.anchors as Record<string, unknown>).auditRunId === 'string'
+      ? ((ctx.sopRunMeta.anchors as Record<string, unknown>).auditRunId as string)
+      : undefined;
 
-  // Drizzle's typed chain doesn't allow reassignment; branch the full
-  // query inline. Either look up the anchored run or fall back to the
-  // firm's most recent completed run.
-  const run = auditRunId
-    ? (await db
-        .select({ id: auditRuns.id, finishedAt: auditRuns.finished_at, status: auditRuns.status })
-        .from(auditRuns)
-        .where(eq(auditRuns.id, auditRunId))
-        .limit(1))[0]
-    : (await db
-        .select({ id: auditRuns.id, finishedAt: auditRuns.finished_at, status: auditRuns.status })
-        .from(auditRuns)
-        .where(and(eq(auditRuns.firm_id, ctx.firmId), sql`${auditRuns.status} IN ('completed', 'completed_partial')`))
-        .orderBy(desc(auditRuns.finished_at))
-        .limit(1))[0];
+  // The anchor is what auto-start chose at firm-creation time — often a
+  // bootstrap-driven entity or suppression audit, which has no alignment
+  // scores. The Brand Visibility Audit workflow specifically wants the
+  // latest **full** audit run with scored consensus responses, so we
+  // prefer that signal even when an anchor exists. If no full audit has
+  // run yet for this firm we keep the anchored row so the operator at
+  // least sees something meaningful (start_at, kind) rather than empty
+  // state.
+  const fullAuditQuery = await db
+    .select({
+      id: auditRuns.id,
+      finishedAt: auditRuns.finished_at,
+      status: auditRuns.status,
+      kind: auditRuns.kind,
+    })
+    .from(auditRuns)
+    .where(
+      and(
+        eq(auditRuns.firm_id, ctx.firmId),
+        eq(auditRuns.kind, 'full'),
+        sql`${auditRuns.status} IN ('completed', 'completed_partial', 'completed_budget_truncated')`,
+      ),
+    )
+    .orderBy(desc(auditRuns.finished_at))
+    .limit(1);
+  const fullRun = fullAuditQuery[0];
+
+  // Fall back to the anchored row only if no full audit exists.
+  const run = fullRun
+    ? fullRun
+    : anchoredAuditRunId
+      ? (await db
+          .select({
+            id: auditRuns.id,
+            finishedAt: auditRuns.finished_at,
+            status: auditRuns.status,
+            kind: auditRuns.kind,
+          })
+          .from(auditRuns)
+          .where(eq(auditRuns.id, anchoredAuditRunId))
+          .limit(1))[0]
+      : (await db
+          .select({
+            id: auditRuns.id,
+            finishedAt: auditRuns.finished_at,
+            status: auditRuns.status,
+            kind: auditRuns.kind,
+          })
+          .from(auditRuns)
+          .where(
+            and(
+              eq(auditRuns.firm_id, ctx.firmId),
+              sql`${auditRuns.status} IN ('completed', 'completed_partial', 'completed_budget_truncated')`,
+            ),
+          )
+          .orderBy(desc(auditRuns.finished_at))
+          .limit(1))[0];
 
   if (!run) {
     return {
@@ -166,11 +210,35 @@ async function resolveAuditRun(ctx: ResolveContext, label: string): Promise<Reso
 
 async function resolveAuditCitations(ctx: ResolveContext, label: string): Promise<ResolvedDataInput> {
   const db = getDb();
-  const auditRunId = ctx.sopRunMeta.anchors && typeof (ctx.sopRunMeta.anchors as Record<string, unknown>).auditRunId === 'string'
-    ? ((ctx.sopRunMeta.anchors as Record<string, unknown>).auditRunId as string)
-    : undefined;
+  // Prefer the latest full audit run for this firm — the anchor on a
+  // sop_run can point at an entity/suppression audit (no citations at
+  // all) when auto-start fires before the first full audit completes.
+  const fullRunRows = await db
+    .select({ id: auditRuns.id })
+    .from(auditRuns)
+    .where(
+      and(
+        eq(auditRuns.firm_id, ctx.firmId),
+        eq(auditRuns.kind, 'full'),
+        sql`${auditRuns.status} IN ('completed', 'completed_partial', 'completed_budget_truncated')`,
+      ),
+    )
+    .orderBy(desc(auditRuns.finished_at))
+    .limit(1);
+  const auditRunId =
+    fullRunRows[0]?.id ??
+    (ctx.sopRunMeta.anchors &&
+    typeof (ctx.sopRunMeta.anchors as Record<string, unknown>).auditRunId === 'string'
+      ? ((ctx.sopRunMeta.anchors as Record<string, unknown>).auditRunId as string)
+      : undefined);
   if (!auditRunId) {
-    return { kind: 'audit_citations', label, available: false, summary: 'No audit anchored to this run yet', tone: 'warn' };
+    return {
+      kind: 'audit_citations',
+      label,
+      available: false,
+      summary: 'No completed full audit yet — citations will populate after the first audit run',
+      tone: 'warn',
+    };
   }
   const rows = await db
     .select({ domain: citations.domain, count: sql<number>`count(*)::int` })
