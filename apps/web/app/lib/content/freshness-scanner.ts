@@ -122,94 +122,117 @@ function parseHttpDate(s: string | null | undefined): Date | null {
 }
 
 /**
+ * Run a fetch under an independent AbortController + timeout. Returns
+ * the Response or null on any failure (timeout, network error, refusal).
+ *
+ * Why per-request: previously HEAD + GET shared one AbortController, so a
+ * HEAD timeout aborted the subsequent GET via the now-fired signal. Pages
+ * with slow HEAD (or HEAD-refusing servers that still serve GET fine)
+ * silently fell through to "unknown" age even though their Last-Modified
+ * header was on the GET response.
+ */
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+): Promise<Response | null> {
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), HEAD_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...init, signal: ac.signal, redirect: 'follow' });
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
  * Try a HEAD request first; fall back to a tiny GET if the server
- * returns an empty Last-Modified or a 405. We don't read more than
- * 32KB of HTML on the fallback — enough to capture <head>.
+ * returns no Last-Modified or refuses HEAD entirely. We don't read more
+ * than 32KB of HTML on the fallback — enough to capture <head>.
+ *
+ * HEAD and GET each run under their own AbortController + timer so a
+ * slow HEAD doesn't poison the GET attempt.
  */
 async function fetchLastModified(url: string): Promise<{
   date: Date | null;
   source: FreshnessFinding['source'];
 }> {
-  const ac = new AbortController();
-  const timer = setTimeout(() => ac.abort(), HEAD_TIMEOUT_MS);
-  try {
-    // HEAD first.
-    try {
-      const head = await fetch(url, { method: 'HEAD', signal: ac.signal, redirect: 'follow' });
-      const lm = parseHttpDate(head.headers.get('last-modified'));
-      if (lm) return { date: lm, source: 'last_modified_header' };
-    } catch {
-      // Some servers refuse HEAD — fall through to GET.
-    }
-
-    // Small GET — bounded by an explicit byte read so we don't pull the
-    // whole page. We use a streaming reader instead of `await res.text()`
-    // because some servers respond with multi-megabyte bodies.
-    const res = await fetch(url, { method: 'GET', signal: ac.signal, redirect: 'follow' });
-    if (!res.ok) return { date: null, source: 'unknown' };
-
-    const lm = parseHttpDate(res.headers.get('last-modified'));
+  // HEAD first.
+  const head = await fetchWithTimeout(url, { method: 'HEAD' });
+  if (head) {
+    const lm = parseHttpDate(head.headers.get('last-modified'));
     if (lm) return { date: lm, source: 'last_modified_header' };
+  }
 
-    const reader = res.body?.getReader();
-    if (!reader) return { date: null, source: 'unknown' };
+  // Small GET — bounded by an explicit byte read so we don't pull the
+  // whole page. We use a streaming reader instead of `await res.text()`
+  // because some servers respond with multi-megabyte bodies.
+  const res = await fetchWithTimeout(url, { method: 'GET' });
+  if (!res || !res.ok) return { date: null, source: 'unknown' };
 
-    const dec = new TextDecoder();
-    let html = '';
-    const maxBytes = 32_768;
-    let read = 0;
+  const lm = parseHttpDate(res.headers.get('last-modified'));
+  if (lm) return { date: lm, source: 'last_modified_header' };
+
+  const reader = res.body?.getReader();
+  if (!reader) return { date: null, source: 'unknown' };
+
+  const dec = new TextDecoder();
+  let html = '';
+  const maxBytes = 32_768;
+  let read = 0;
+  try {
     while (read < maxBytes) {
       const { done, value } = await reader.read();
       if (done) break;
       html += dec.decode(value, { stream: true });
       read += value.byteLength;
     }
+  } catch {
+    /* mid-read failure — fall through with whatever we managed to read */
+  } finally {
     try {
       await reader.cancel();
     } catch {
       /* harmless */
     }
+  }
 
-    // article:modified_time / og:updated_time meta tag.
-    const metaMatch =
-      /<meta\s+[^>]*property=["'](?:article:modified_time|og:updated_time)["'][^>]*content=["']([^"']+)["']/i.exec(
-        html,
-      ) ??
-      /<meta\s+[^>]*content=["']([^"']+)["'][^>]*property=["'](?:article:modified_time|og:updated_time)["']/i.exec(
-        html,
-      );
-    if (metaMatch && metaMatch[1]) {
-      const d = parseHttpDate(metaMatch[1]);
-      if (d) return { date: d, source: 'meta_tag' };
-    }
-
-    // schema.org dateModified inside any JSON-LD <script>.
-    const jsonLdMatches = html.match(
-      /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi,
+  // article:modified_time / og:updated_time meta tag.
+  const metaMatch =
+    /<meta\s+[^>]*property=["'](?:article:modified_time|og:updated_time)["'][^>]*content=["']([^"']+)["']/i.exec(
+      html,
+    ) ??
+    /<meta\s+[^>]*content=["']([^"']+)["'][^>]*property=["'](?:article:modified_time|og:updated_time)["']/i.exec(
+      html,
     );
-    if (jsonLdMatches) {
-      for (const block of jsonLdMatches) {
-        const inner = block.replace(/<script[^>]*>/i, '').replace(/<\/script>/i, '').trim();
-        if (!inner) continue;
-        try {
-          const parsed = JSON.parse(inner) as unknown;
-          const date = findDateModified(parsed);
-          if (date) {
-            const d = parseHttpDate(date);
-            if (d) return { date: d, source: 'schema_dateModified' };
-          }
-        } catch {
-          /* malformed JSON-LD; skip */
+  if (metaMatch && metaMatch[1]) {
+    const d = parseHttpDate(metaMatch[1]);
+    if (d) return { date: d, source: 'meta_tag' };
+  }
+
+  // schema.org dateModified inside any JSON-LD <script>.
+  const jsonLdMatches = html.match(
+    /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi,
+  );
+  if (jsonLdMatches) {
+    for (const block of jsonLdMatches) {
+      const inner = block.replace(/<script[^>]*>/i, '').replace(/<\/script>/i, '').trim();
+      if (!inner) continue;
+      try {
+        const parsed = JSON.parse(inner) as unknown;
+        const date = findDateModified(parsed);
+        if (date) {
+          const d = parseHttpDate(date);
+          if (d) return { date: d, source: 'schema_dateModified' };
         }
+      } catch {
+        /* malformed JSON-LD; skip */
       }
     }
-
-    return { date: null, source: 'unknown' };
-  } catch {
-    return { date: null, source: 'unknown' };
-  } finally {
-    clearTimeout(timer);
   }
+
+  return { date: null, source: 'unknown' };
 }
 
 /**

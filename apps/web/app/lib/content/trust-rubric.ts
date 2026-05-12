@@ -47,7 +47,14 @@ export interface TrustFinding {
 
 export interface ExtractedClaims {
   url: string;
-  /** Distinct years found in claim patterns ("since 1992", "founded 1995"). */
+  /**
+   * Distinct founding/establishment year claims. Only "strong" triggers
+   * count here — "founded", "established", "in business since" — phrases
+   * that unambiguously assert a firm's start date. The looser "since
+   * 2024 we've expanded" / "operating since X" forms are intentionally
+   * excluded because they routinely refer to milestones, expansions, or
+   * competitor mentions rather than the firm's founding year.
+   */
   yearClaims: number[];
   /** Distinct quantity claims ("500+", "1000+"). Normalised to numbers. */
   quantityClaims: Array<{ value: number; label: string }>;
@@ -57,8 +64,11 @@ export interface ExtractedClaims {
   bannedHits: string[];
 }
 
-const YEAR_CLAIM_RE =
-  /\b(?:since|established(?:\s+in)?|founded(?:\s+in)?|operating(?:\s+since)?|serving(?:\s+since)?|in\s+business\s+since)\s+(?:in\s+)?(\d{4})\b/gi;
+// Strong founding-claim trigger. "Founded" + "established" + "in business
+// since" — phrases where the year almost always refers to the firm's
+// start date. Used for the year-inconsistency detector.
+const YEAR_FOUNDING_RE =
+  /\b(?:established(?:\s+in)?|founded(?:\s+in)?|in\s+business\s+since)\s+(?:in\s+)?(\d{4})\b/gi;
 
 // "500+ cases", "1,000 happy clients", "50,000 satisfied customers"
 const QUANTITY_RE =
@@ -67,14 +77,43 @@ const QUANTITY_RE =
 const AWARD_TRIGGERS_RE =
   /\b(?:awarded|named|recognized\s+as|recipient\s+of|winner\s+of|inducted)\s+["“]?([A-Z][\w\s'\-&]+?)["”]?(?:\.|,|;|$)/g;
 
+/**
+ * Words that indicate the capture is plausibly an award name vs a person
+ * being named to a role. We require at least one of these in the captured
+ * string before treating it as an award claim. Eliminates the "named John
+ * Smith partner" → captured "John Smith partner" false positive class.
+ *
+ * Kept conservative — when the corpus is genuinely ambiguous we'd rather
+ * miss a real award (operator catches via Brand Truth review) than flag
+ * a real person's name as an award (operator dismisses tickets and loses
+ * trust in the scanner).
+ */
+const AWARD_NAME_WORDS = new Set<string>(
+  'award awards lawyer lawyers attorney attorneys dentist doctor honor honors recognition recipient year fame excellence outstanding best top winner finalist member fellow inducted hall society academy of-the-year'
+    .split(' '),
+);
+
+function looksLikeAwardName(captured: string): boolean {
+  const lc = captured.toLowerCase();
+  if (lc.length < 4 || lc.length > 80) return false;
+  // Tokenize on whitespace + punctuation; check tokens against the
+  // award-word allowlist. Single-match is enough — real awards
+  // typically carry exactly one of these words.
+  const tokens = lc.split(/[\s,'\-&]+/).filter(Boolean);
+  for (const t of tokens) {
+    if (AWARD_NAME_WORDS.has(t)) return true;
+  }
+  return false;
+}
+
 /** Extract every factual-claim signal from a page body. */
 export function extractClaims(url: string, body: string): ExtractedClaims {
   const text = body ?? '';
 
-  // Years.
+  // Years (founding/establishment only — see YEAR_FOUNDING_RE rationale).
   const years = new Set<number>();
   let m: RegExpExecArray | null;
-  while ((m = YEAR_CLAIM_RE.exec(text)) !== null) {
+  while ((m = YEAR_FOUNDING_RE.exec(text)) !== null) {
     const y = parseInt(m[1]!, 10);
     if (y >= 1800 && y <= new Date().getFullYear()) years.add(y);
   }
@@ -93,11 +132,14 @@ export function extractClaims(url: string, body: string): ExtractedClaims {
     }
   }
 
-  // Awards.
+  // Awards. The trigger regex captures any capitalized phrase after
+  // "named"/"awarded"/etc.; looksLikeAwardName filters out captures
+  // that are likely person names, role descriptions, or place names
+  // rather than actual awards.
   const awards = new Set<string>();
   while ((m = AWARD_TRIGGERS_RE.exec(text)) !== null) {
     const cleaned = m[1]!.trim();
-    if (cleaned.length >= 3 && cleaned.length <= 80) awards.add(cleaned);
+    if (looksLikeAwardName(cleaned)) awards.add(cleaned);
   }
 
   return {
@@ -134,7 +176,11 @@ export function checkBannedClaims(
     }
     if (!phrase) continue;
     const needle = phrase.trim().toLowerCase();
-    if (needle.length < 2) continue;
+    // Minimum 4 chars to avoid substring matches against common short
+    // words ("we" → "weeks", "win" → "winterize"). Brand-Truth banned
+    // claims are policy violations (FTC superlatives, bar-rule banned
+    // claims, etc.) which are always full phrases anyway.
+    if (needle.length < 4) continue;
     if (haystack.includes(needle)) hits.push(phrase);
   }
   return hits;
