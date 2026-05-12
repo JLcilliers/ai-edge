@@ -23,6 +23,7 @@ import type {
   FirmHealthRow,
   WorkspaceCostBreakdown,
 } from '../../actions/admin-actions';
+import { DeleteFirmButton } from './delete-firm-button';
 
 /**
  * Admin dashboard client shell. Pure presentation — all data arrives
@@ -313,6 +314,7 @@ function FirmHealthSection({ rows }: { rows: FirmHealthRow[] }) {
                 <th className="px-4 py-3 font-medium">This month report</th>
                 <th className="px-4 py-3 font-medium">Budget (MTD)</th>
                 <th className="px-4 py-3 font-medium">30d err</th>
+                <th className="px-4 py-3 font-medium text-right" />
               </tr>
             </thead>
             <tbody>
@@ -443,6 +445,9 @@ function FirmRow({ row }: { row: FirmHealthRow }) {
         </div>
       </td>
       <td className={`px-4 py-3 ${errorTone}`}>{row.lastAuditErrorCount30d}</td>
+      <td className="px-4 py-3 text-right">
+        <DeleteFirmButton firmId={row.firmId} firmName={row.name} />
+      </td>
     </tr>
   );
 }
