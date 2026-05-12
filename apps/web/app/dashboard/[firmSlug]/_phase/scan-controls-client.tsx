@@ -7,6 +7,7 @@ import {
   runContentGenerationScan,
   runContentOptimizationScan,
   runTechnicalImplementationScan,
+  runThirdPartyOptimizationScan,
 } from '../../../actions/content-scan-actions';
 
 /**
@@ -26,7 +27,11 @@ type ScanTrigger =
   | { mode: 'route'; href: string }
   | {
       mode: 'action';
-      key: 'content-optimization' | 'technical-implementation' | 'content-generation';
+      key:
+        | 'content-optimization'
+        | 'technical-implementation'
+        | 'content-generation'
+        | 'third-party-optimization';
     }
   | { mode: 'pending' };
 
@@ -41,7 +46,7 @@ function triggerFor(phaseKey: string, firmSlug: string): ScanTrigger {
     case 'content-generation':
       return { mode: 'action', key: 'content-generation' };
     case 'third-party-optimization':
-      return { mode: 'route', href: `/dashboard/${firmSlug}/entity` };
+      return { mode: 'action', key: 'third-party-optimization' };
     case 'client-services':
       return { mode: 'route', href: `/dashboard/${firmSlug}/reports` };
     case 'measurement-monitoring':
@@ -110,6 +115,28 @@ export function ScanControlsClient({
         const ticketTotal =
           (res.llmFriendly?.ticketsCreated ?? 0) + (res.freshness?.ticketsCreated ?? 0);
         parts.push(`${ticketTotal} execution task${ticketTotal === 1 ? '' : 's'} written`);
+        setBanner({ tone: 'ok', text: parts.join(' · ') });
+        router.refresh();
+      });
+      return;
+    }
+    if (trigger.mode === 'action' && trigger.key === 'third-party-optimization') {
+      setBanner(null);
+      start(async () => {
+        const res = await runThirdPartyOptimizationScan(firmSlug);
+        if (!res.ok) {
+          setBanner({ tone: 'error', text: res.error });
+          return;
+        }
+        const t = res.triage;
+        const parts: string[] = [
+          `Reddit: ${t.redditFindings} open complaint mention${t.redditFindings === 1 ? '' : 's'}`,
+          `Entity drift: ${t.entityFindings} listing${t.entityFindings === 1 ? '' : 's'} flagged`,
+          `Golden Links: requires Ahrefs API key (config gate ticket opened)`,
+          `${t.redditTicketsCreated + t.entityTicketsCreated + 1} execution task${
+            t.redditTicketsCreated + t.entityTicketsCreated + 1 === 1 ? '' : 's'
+          } written`,
+        ];
         setBanner({ tone: 'ok', text: parts.join(' · ') });
         router.refresh();
       });
