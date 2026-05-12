@@ -24,6 +24,7 @@ import {
   buildRationale,
   type BacklinkCount,
 } from './backlinks';
+import { ensureSopRun } from '../sop/ensure-run';
 
 /**
  * Suppression scan — see PLAN §5.3.
@@ -116,6 +117,16 @@ export async function runSuppressionScan(
     .returning({ id: auditRuns.id });
 
   const runId = run!.id;
+
+  // Resolve the Legacy Content Suppression sop_run up-front so every
+  // ticket emitted below attaches to it. Without this, tickets land
+  // with sop_run_id=NULL and don't surface in the phase page's
+  // execution-task list or the per-phase sidebar count.
+  const sopRunId = await ensureSopRun(
+    firmId,
+    'legacy_content_suppression',
+    'scanner:suppression',
+  );
 
   try {
     // Pull the latest Brand Truth payload.
@@ -347,6 +358,7 @@ export async function runSuppressionScan(
           firm_id: firmId,
           source_type: 'legacy',
           source_id: finding!.id,
+          sop_run_id: sopRunId,
           status: 'open',
           playbook_step: playbookStep,
           due_at: new Date(Date.now() + dueDays * 24 * 60 * 60 * 1000),

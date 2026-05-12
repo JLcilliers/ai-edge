@@ -171,8 +171,13 @@ export const remediationTickets = pgTable('remediation_ticket', {
   due_at: timestamp('due_at', { withTimezone: true }),
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   // ── SOP provenance + prescription layer (0013) ────────────
-  // sop_run_id is nullable: legacy tickets predate the SOP engine.
-  sop_run_id: uuid('sop_run_id').references((): any => sopRuns.id, { onDelete: 'set null' }),
+  // NOT NULL as of migration 0016: legacy scanner code paths
+  // (run-audit, suppression/scan, entity/scan, entity/cross-source-scan,
+  // reddit/scan) call ensureSopRun() before inserting tickets, and the
+  // backfill script handled the historical rows. The constraint acts as
+  // a fail-loud guardrail against future scanners bypassing the SOP
+  // engine path.
+  sop_run_id: uuid('sop_run_id').notNull().references((): any => sopRuns.id, { onDelete: 'cascade' }),
   sop_step_number: integer('sop_step_number'),
   // Human-readable. New tickets always populate `title`; the action-
   // items UI falls back to a derived title from `source_type` for legacy

@@ -9,6 +9,7 @@ import type { BrandTruth, FirmType } from '@ai-edge/shared';
 import { eq, desc } from 'drizzle-orm';
 import { scanJsonLd, diffExpectedTypes } from './schema-scan';
 import { probeWikidata, probeGoogleKg } from './kg-probe';
+import { ensureSopRun } from '../sop/ensure-run';
 
 /**
  * Entity-signals orchestrator (PLAN §5.6).
@@ -49,6 +50,14 @@ export async function runEntityScan(firmId: string): Promise<string> {
     .returning({ id: auditRuns.id });
 
   const runId = run!.id;
+
+  // Resolve the Entity Optimization sop_run up-front so every ticket
+  // emitted below attaches to it. See lib/sop/ensure-run.ts for why.
+  const sopRunId = await ensureSopRun(
+    firmId,
+    'entity_optimization',
+    'scanner:entity',
+  );
 
   try {
     const [btv] = await db
@@ -223,6 +232,7 @@ export async function runEntityScan(firmId: string): Promise<string> {
         firm_id: firmId,
         source_type: 'entity',
         source_id: t.source_id,
+        sop_run_id: sopRunId,
         status: 'open',
         playbook_step: t.playbook_step,
         due_at: new Date(Date.now() + t.due_days * 24 * 60 * 60 * 1000),
