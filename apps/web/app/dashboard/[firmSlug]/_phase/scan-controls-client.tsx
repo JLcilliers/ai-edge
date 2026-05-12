@@ -7,6 +7,7 @@ import {
   runClientServicesScan,
   runContentGenerationScan,
   runContentOptimizationScan,
+  runMeasurementMonitoringScan,
   runTechnicalImplementationScan,
   runThirdPartyOptimizationScan,
 } from '../../../actions/content-scan-actions';
@@ -33,7 +34,8 @@ type ScanTrigger =
         | 'technical-implementation'
         | 'content-generation'
         | 'third-party-optimization'
-        | 'client-services';
+        | 'client-services'
+        | 'measurement-monitoring';
     }
   | { mode: 'pending' };
 
@@ -52,6 +54,7 @@ function triggerFor(phaseKey: string, firmSlug: string): ScanTrigger {
     case 'client-services':
       return { mode: 'action', key: 'client-services' };
     case 'measurement-monitoring':
+      return { mode: 'action', key: 'measurement-monitoring' };
     default:
       return { mode: 'pending' };
   }
@@ -117,6 +120,26 @@ export function ScanControlsClient({
         const ticketTotal =
           (res.llmFriendly?.ticketsCreated ?? 0) + (res.freshness?.ticketsCreated ?? 0);
         parts.push(`${ticketTotal} execution task${ticketTotal === 1 ? '' : 's'} written`);
+        setBanner({ tone: 'ok', text: parts.join(' · ') });
+        router.refresh();
+      });
+      return;
+    }
+    if (trigger.mode === 'action' && trigger.key === 'measurement-monitoring') {
+      setBanner(null);
+      start(async () => {
+        const res = await runMeasurementMonitoringScan(firmSlug);
+        if (!res.ok) {
+          setBanner({ tone: 'error', text: res.error });
+          return;
+        }
+        const t = res.triage;
+        const parts: string[] = [
+          `GA4 OAuth: pending (config gate ticket opened)`,
+          `AI Bot Logs: pending (config gate ticket opened)`,
+          `Bi-weekly LLM monitoring: ${t.biWeeklyAuditsCurrent} audits this period vs ${t.biWeeklyAuditsPrior} prior`,
+          `${t.regressionFindings} regression finding${t.regressionFindings === 1 ? '' : 's'}, ${t.ticketsCreated} total task${t.ticketsCreated === 1 ? '' : 's'} written`,
+        ];
         setBanner({ tone: 'ok', text: parts.join(' · ') });
         router.refresh();
       });

@@ -49,6 +49,10 @@ import {
   runWeeklyReportingScanBySlug,
   type WeeklyReportingScanResult,
 } from '../lib/content/weekly-reporting-scanner';
+import {
+  runMeasurementTriageScanBySlug,
+  type MeasurementTriageResult,
+} from '../lib/content/measurement-scanner';
 
 export type ContentScanKind = 'llm_friendly' | 'freshness' | 'both';
 
@@ -139,6 +143,33 @@ export async function runThirdPartyOptimizationScan(
 
     try {
       revalidatePath(`/dashboard/${firmSlug}/third-party-optimization`);
+      revalidatePath(`/dashboard/${firmSlug}/action-items`);
+    } catch {
+      /* not in a Next request context — safe to ignore */
+    }
+
+    return { ok: true, triage };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+export interface MeasurementScanResponse {
+  ok: true;
+  triage: MeasurementTriageResult;
+}
+
+export async function runMeasurementMonitoringScan(
+  firmSlug: string,
+): Promise<MeasurementScanResponse | ContentScanError> {
+  try {
+    const triage = await runMeasurementTriageScanBySlug(firmSlug);
+
+    try {
+      revalidatePath(`/dashboard/${firmSlug}/measurement-monitoring`);
       revalidatePath(`/dashboard/${firmSlug}/action-items`);
     } catch {
       /* not in a Next request context — safe to ignore */
