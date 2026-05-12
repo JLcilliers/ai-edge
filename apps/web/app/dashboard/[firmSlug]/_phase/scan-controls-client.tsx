@@ -3,7 +3,10 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Activity, AlertCircle, CheckCircle2, Loader2, RefreshCw } from 'lucide-react';
-import { runContentOptimizationScan } from '../../../actions/content-scan-actions';
+import {
+  runContentOptimizationScan,
+  runTechnicalImplementationScan,
+} from '../../../actions/content-scan-actions';
 
 /**
  * The "Run scan" strip at the top of each phase page.
@@ -20,7 +23,7 @@ import { runContentOptimizationScan } from '../../../actions/content-scan-action
 
 type ScanTrigger =
   | { mode: 'route'; href: string }
-  | { mode: 'action'; key: 'content-optimization' }
+  | { mode: 'action'; key: 'content-optimization' | 'technical-implementation' }
   | { mode: 'pending' };
 
 function triggerFor(phaseKey: string, firmSlug: string): ScanTrigger {
@@ -29,8 +32,9 @@ function triggerFor(phaseKey: string, firmSlug: string): ScanTrigger {
       return { mode: 'route', href: `/dashboard/${firmSlug}/audits` };
     case 'content-optimization':
       return { mode: 'action', key: 'content-optimization' };
-    case 'third-party-optimization':
     case 'technical-implementation':
+      return { mode: 'action', key: 'technical-implementation' };
+    case 'third-party-optimization':
       return { mode: 'route', href: `/dashboard/${firmSlug}/entity` };
     case 'client-services':
       return { mode: 'route', href: `/dashboard/${firmSlug}/reports` };
@@ -102,7 +106,25 @@ export function ScanControlsClient({
           (res.llmFriendly?.ticketsCreated ?? 0) + (res.freshness?.ticketsCreated ?? 0);
         parts.push(`${ticketTotal} execution task${ticketTotal === 1 ? '' : 's'} written`);
         setBanner({ tone: 'ok', text: parts.join(' · ') });
-        // Pull fresh server data so the ranked task list below updates.
+        router.refresh();
+      });
+      return;
+    }
+    if (trigger.mode === 'action' && trigger.key === 'technical-implementation') {
+      setBanner(null);
+      start(async () => {
+        const res = await runTechnicalImplementationScan(firmSlug);
+        if (!res.ok) {
+          setBanner({ tone: 'error', text: res.error });
+          return;
+        }
+        const sh = res.semanticHtml;
+        const parts: string[] = [
+          `Semantic HTML: scored ${sh.pagesScanned} page${sh.pagesScanned === 1 ? '' : 's'} (avg ${sh.averageScore}/100)`,
+          `${sh.bandCounts.high} high · ${sh.bandCounts.medium} medium · ${sh.bandCounts.low} low · ${sh.bandCounts.maintenance} maintenance`,
+          `${sh.ticketsCreated} execution task${sh.ticketsCreated === 1 ? '' : 's'} written`,
+        ];
+        setBanner({ tone: 'ok', text: parts.join(' · ') });
         router.refresh();
       });
       return;
