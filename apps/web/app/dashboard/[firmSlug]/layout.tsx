@@ -32,7 +32,14 @@ export default async function FirmScopedLayout({
       <aside className="flex w-64 shrink-0 flex-col gap-6 border-r border-white/5 bg-black/20 px-5 py-6 backdrop-blur-sm">
         {/* Top: logo + back-to-clients */}
         <div>
-          <div className="mb-4 flex items-center">
+          {/* Logo → always links back to the all-clients dashboard.
+              Acts as the universal "home" button across every workflow
+              + data view. */}
+          <Link
+            href="/dashboard"
+            className="mb-4 inline-flex items-center transition-opacity hover:opacity-80"
+            aria-label="Back to all clients dashboard"
+          >
             <Image
               src="/clixsy-logo.svg"
               alt="Clixsy"
@@ -40,7 +47,7 @@ export default async function FirmScopedLayout({
               height={75}
               priority
             />
-          </div>
+          </Link>
           <Link
             href="/dashboard"
             className="inline-flex items-center gap-1.5 text-xs text-white/40 transition-colors hover:text-white/70"

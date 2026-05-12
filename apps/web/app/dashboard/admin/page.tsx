@@ -33,13 +33,19 @@ export default async function AdminPage() {
       {/* Header */}
       <div className="mb-10 flex items-start justify-between">
         <div className="flex items-center gap-4">
-          <Image
-            src="/clixsy-logo.svg"
-            alt="Clixsy"
-            width={180}
-            height={75}
-            priority
-          />
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center transition-opacity hover:opacity-80"
+            aria-label="Back to all clients dashboard"
+          >
+            <Image
+              src="/clixsy-logo.svg"
+              alt="Clixsy"
+              width={180}
+              height={75}
+              priority
+            />
+          </Link>
           <span className="border-l border-white/10 pl-4 font-[family-name:var(--font-inter)] text-[10px] font-medium uppercase tracking-[0.3em] text-white/55">
             Admin
           </span>
