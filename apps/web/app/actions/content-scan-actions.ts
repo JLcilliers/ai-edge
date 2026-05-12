@@ -41,6 +41,10 @@ import {
   runTrustAlignmentScanBySlug,
   type TrustScanResult,
 } from '../lib/content/trust-scanner';
+import {
+  runThirdPartyTriageScanBySlug,
+  type ThirdPartyTriageResult,
+} from '../lib/content/third-party-scanner';
 
 export type ContentScanKind = 'llm_friendly' | 'freshness' | 'both';
 
@@ -110,6 +114,33 @@ export async function runTechnicalImplementationScan(
     }
 
     return { ok: true, semanticHtml, schemaMarkup };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+export interface ThirdPartyScanResponse {
+  ok: true;
+  triage: ThirdPartyTriageResult;
+}
+
+export async function runThirdPartyOptimizationScan(
+  firmSlug: string,
+): Promise<ThirdPartyScanResponse | ContentScanError> {
+  try {
+    const triage = await runThirdPartyTriageScanBySlug(firmSlug);
+
+    try {
+      revalidatePath(`/dashboard/${firmSlug}/third-party-optimization`);
+      revalidatePath(`/dashboard/${firmSlug}/action-items`);
+    } catch {
+      /* not in a Next request context — safe to ignore */
+    }
+
+    return { ok: true, triage };
   } catch (err) {
     return {
       ok: false,
