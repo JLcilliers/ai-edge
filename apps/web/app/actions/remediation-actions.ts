@@ -57,6 +57,16 @@ export type RemediationTicketRow = {
   dueAt: Date | null;
   createdAt: Date;
   overdue: boolean;
+  // Execution-tier prescription columns from migration 0014 — null on
+  // legacy tickets, populated on scanner-produced tickets going forward.
+  title: string | null;
+  description: string | null;
+  priorityRank: number | null;
+  automationTier: 'auto' | 'assist' | 'manual' | null;
+  executeUrl: string | null;
+  executeLabel: string | null;
+  manualReason: string | null;
+  remediationCopy: string | null;
   /**
    * Human-readable context resolved from the source row. Shape depends on
    * sourceType — the UI renders per-type but each variant is small and
@@ -245,6 +255,14 @@ export async function listRemediationTickets(
       owner: remediationTickets.owner,
       dueAt: remediationTickets.due_at,
       createdAt: remediationTickets.created_at,
+      title: remediationTickets.title,
+      description: remediationTickets.description,
+      priorityRank: remediationTickets.priority_rank,
+      automationTier: remediationTickets.automation_tier,
+      executeUrl: remediationTickets.execute_url,
+      executeLabel: remediationTickets.execute_label,
+      manualReason: remediationTickets.manual_reason,
+      remediationCopy: remediationTickets.remediation_copy,
     })
     .from(remediationTickets)
     .where(and(...conditions))
@@ -260,6 +278,14 @@ export async function listRemediationTickets(
     owner: r.owner,
     dueAt: r.dueAt,
     createdAt: r.createdAt,
+    title: r.title,
+    description: r.description,
+    priorityRank: r.priorityRank,
+    automationTier: r.automationTier as 'auto' | 'assist' | 'manual' | null,
+    executeUrl: r.executeUrl,
+    executeLabel: r.executeLabel,
+    manualReason: r.manualReason,
+    remediationCopy: r.remediationCopy,
   }));
 
   const contexts = await loadContexts(

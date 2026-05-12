@@ -195,7 +195,50 @@ export async function generatePriorityActions(args: Args): Promise<{
     remediation: string;
     validation: Array<{ description: string }>;
     evidence: Array<{ kind: string; url: string; description?: string }>;
+    automationTier: 'auto' | 'assist' | 'manual';
+    executeUrl?: string;
+    executeLabel?: string;
+    manualReason?: string;
   }> = [];
+
+  // Per-platform automation classification — driven by the
+  // 2025/2026 research pass on programmatic write access:
+  //   auto    → public write API exists + permissive policy
+  //             (Google Business Profile, Wikidata)
+  //   assist  → no public write API OR permissive but operator must
+  //             paste on the platform UI; we drop a deep-link
+  //   manual  → blocked by policy (e.g. Wikipedia direct edit under
+  //             COI/PAID) or no admin URL pattern available
+  //
+  // KNOWN_PLATFORMS only includes domains the audit pipeline cites
+  // back to the firm context, so this lookup is complete for the
+  // tickets we actually generate.
+  const PLATFORM_AUTOMATION: Record<string, {
+    tier: 'auto' | 'assist' | 'manual';
+    adminUrlTemplate?: string; // %s gets replaced with firm slug for some, or just opened raw
+    manualReason?: string;
+  }> = {
+    'g2.com': { tier: 'assist', adminUrlTemplate: 'https://my.g2.com/products' },
+    'linkedin.com': { tier: 'assist', adminUrlTemplate: 'https://www.linkedin.com/company/' },
+    'en.wikipedia.org': {
+      tier: 'manual',
+      manualReason:
+        "Wikipedia's COI / Paid-contribution policy forbids direct article edits on behalf of the subject. The compliant path is a {{edit request}} on the article Talk page, which a volunteer reviews. Wire the Talk-page autopost workflow before re-classifying as 'assist'.",
+    },
+    'wikidata.org': {
+      tier: 'auto',
+      adminUrlTemplate: 'https://www.wikidata.org',
+    },
+    'crunchbase.com': { tier: 'assist', adminUrlTemplate: 'https://www.crunchbase.com' },
+    'capterra.com': { tier: 'assist', adminUrlTemplate: 'https://about.capterra.com/vendors/' },
+    'trustradius.com': { tier: 'assist', adminUrlTemplate: 'https://www.trustradius.com/vendor' },
+    'producthunt.com': { tier: 'assist', adminUrlTemplate: 'https://www.producthunt.com/maker' },
+    'justia.com': { tier: 'assist', adminUrlTemplate: 'https://lawyers.justia.com/edit_profile' },
+    'avvo.com': { tier: 'assist', adminUrlTemplate: 'https://www.avvo.com/account/profile' },
+    'lawyers.com': { tier: 'assist', adminUrlTemplate: 'https://www.lawyers.com/account' },
+    'superlawyers.com': { tier: 'assist', adminUrlTemplate: 'https://www.superlawyers.com' },
+    'bbb.org': { tier: 'assist', adminUrlTemplate: 'https://www.bbb.org/business-login' },
+  };
 
   // Generate "Update [Platform] description" tickets for each known
   // third-party platform that LLMs cited.
@@ -203,6 +246,7 @@ export async function generatePriorityActions(args: Args): Promise<{
     if (domain === firmHost) continue;
     const platformName = KNOWN_PLATFORMS.get(domain);
     if (!platformName) continue;
+    const automation = PLATFORM_AUTOMATION[domain] ?? { tier: 'assist' as const };
     candidates.push({
       baseImpact: 8,         // third-party listings carry high LLM-trust weight
       ease: 7,               // simple form edit on the platform
@@ -210,12 +254,12 @@ export async function generatePriorityActions(args: Args): Promise<{
       title: `Update ${platformName} description to reflect current positioning`,
       description: `${platformName} (${domain}) was cited ${count} time${count === 1 ? '' : 's'} by LLMs in this audit. Its current description likely poisons the LLM's understanding of ${firmName}. Update it to match the approved positioning.`,
       remediation: positioningStatement
-        ? `Update the ${platformName} listing's main description to:\n\n${positioningStatement}`
-        : `Update the ${platformName} listing's main description to match the approved positioning. See Brand Truth → positioning_statement.`,
+        ? `Replace the ${platformName} listing's main description with:\n\n${positioningStatement}`
+        : `Replace the ${platformName} listing's main description with the approved positioning. See Brand Truth → positioning_statement.`,
       validation: [
         { description: `Open the ${platformName} listing and replace the description` },
         { description: `Screenshot the before/after for the change log` },
-        { description: `Verify the new description appears live (may take up to 24 hours on Wikipedia)` },
+        { description: `Verify the new description appears live` },
       ],
       evidence: [
         {
@@ -224,6 +268,15 @@ export async function generatePriorityActions(args: Args): Promise<{
           description: `Cited ${count} time(s) by LLMs in the latest Brand Visibility Audit`,
         },
       ],
+      automationTier: automation.tier,
+      executeUrl: automation.adminUrlTemplate,
+      executeLabel:
+        automation.tier === 'auto'
+          ? `Update ${platformName} via API`
+          : automation.tier === 'assist'
+            ? `Open ${platformName}`
+            : undefined,
+      manualReason: automation.manualReason,
     });
   }
 
@@ -249,6 +302,13 @@ export async function generatePriorityActions(args: Args): Promise<{
         { description: 'Re-run the Brand Visibility Audit in 4-6 weeks to confirm LLM uptake' },
       ],
       evidence: [],
+      // CMS copy edits depend on which CMS the firm uses. Until the
+      // operator declares it in Settings, we ship as 'assist' — the
+      // remediation is drafted; deploy is via their CMS. When we
+      // detect WordPress/Webflow/Shopify and have valid credentials,
+      // these can flip to 'auto'.
+      automationTier: 'assist',
+      executeLabel: 'Edit on-site copy',
     });
   }
 
@@ -267,13 +327,16 @@ export async function generatePriorityActions(args: Args): Promise<{
         ? `Create or update the Wikipedia article with the first sentence:\n\n${positioningStatement}`
         : 'Create or update the Wikipedia article first sentence to match approved positioning.',
       validation: [
-        { description: 'Verify Wikipedia notability criteria are met' },
-        { description: 'Edit the article first sentence with neutral phrasing + citations' },
-        { description: 'Monitor edit retention for 30 days (Wikipedia may revert)' },
+        { description: 'Verify Wikipedia notability criteria are met (NCORP: multiple independent secondary sources)' },
+        { description: 'Use a third-party editor (e.g. Beutler Ink) OR post {{edit request}} on Talk page with proposed wording + sources' },
+        { description: 'Monitor edit retention for 30 days' },
       ],
       evidence: [
         { kind: 'third_party_listing', url: 'https://en.wikipedia.org', description: 'Not cited in current audit' },
       ],
+      automationTier: 'manual',
+      manualReason:
+        "Wikipedia's Conflict-of-Interest and Paid-Contribution policies (binding under WMF Terms of Use) forbid the subject from editing their own article. Undisclosed edits get reverted and the account banned. The compliant path is either a Talk-page {{edit request}} (which a volunteer reviews — outcome not guaranteed) or hiring a specialist editor (Beutler Ink, ReputationX). For brands without an existing article, NCORP notability criteria reject ~80% of corporate stubs, so drafting one programmatically has near-zero survival probability. We surface this as manual and stop there.",
     });
   }
 
@@ -302,6 +365,10 @@ export async function generatePriorityActions(args: Args): Promise<{
       remediationCopy: detail.remediation,
       validationSteps: detail.validation,
       evidenceLinks: detail.evidence,
+      automationTier: detail.automationTier,
+      executeUrl: detail.executeUrl,
+      executeLabel: detail.executeLabel,
+      manualReason: detail.manualReason,
     });
     created.push({ id: result.id, title: detail.title, priorityRank: r.priorityRank });
   }

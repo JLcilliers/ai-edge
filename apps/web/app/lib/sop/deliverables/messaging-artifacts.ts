@@ -357,20 +357,51 @@ export async function generateThirdPartyListingTickets(args: FactoryArgs): Promi
   const sorted = [...listings].sort((a, b) => priorityForUrl(a.url) - priorityForUrl(b.url));
   const created: Array<{ id: string; title: string; priorityRank: number }> = [];
 
+  // Automation tier per platform — same matrix as the priority-actions
+  // factory keeps in sync with the late-2025 / 2026 write-API research.
+  //   auto    → Wikidata, Google Business Profile (when on Brand Truth)
+  //   assist  → G2, Capterra, TrustRadius, LinkedIn, Crunchbase,
+  //             Product Hunt — no public write API, paste-via-admin-UI
+  //   manual  → Wikipedia (COI policy enforced by reverts + ToU)
+  function classifyPlatform(host: string): {
+    tier: 'auto' | 'assist' | 'manual';
+    manualReason?: string;
+  } {
+    if (host === 'wikidata.org') return { tier: 'auto' };
+    if (host === 'google.com' || host.endsWith('business.google.com')) return { tier: 'auto' };
+    if (host === 'en.wikipedia.org' || host.endsWith('.wikipedia.org')) {
+      return {
+        tier: 'manual',
+        manualReason:
+          "Wikipedia's COI / Paid-contribution policy (binding under WMF Terms of Use) forbids the subject from editing their own article. Compliant paths: Talk-page {{edit request}} or specialist editor (Beutler Ink, ReputationX). Direct API edits get reverted and the account banned.",
+      };
+    }
+    return { tier: 'assist' };
+  }
+
   for (let i = 0; i < sorted.length; i++) {
     const l = sorted[i]!;
-    const platformName = l.name ?? new URL(l.url).host.replace(/^www\./, '');
+    const host = new URL(l.url).host.replace(/^www\./, '');
+    const platformName = l.name ?? host;
+    const cls = classifyPlatform(host);
     const title = `Update ${platformName} description`;
     const description = `Replace the current description on ${platformName} with the approved positioning. Screenshot before/after for the change log.`;
     const remediation = positioning
       ? `**New description (copy-paste):**\n\n${positioning}\n\n**Admin URL:** ${l.url}`
       : `**Admin URL:** ${l.url}\n\nNo approved positioning in Brand Truth yet — author Step 2 first.`;
-    const validation = [
-      { description: `Screenshot the existing description` },
-      { description: `Paste the new description and save` },
-      { description: `Screenshot the live result` },
-      { description: `Log the change date in the messaging guide platform log` },
-    ];
+    const validation =
+      cls.tier === 'manual'
+        ? [
+            { description: 'Post {{edit request}} on the article Talk page with proposed wording + 2-3 supporting sources' },
+            { description: 'Or engage a third-party Wikipedia editor (Beutler Ink, ReputationX) to apply the edit on your behalf' },
+            { description: 'Monitor edit retention for 30 days; volunteer reviewers may decline insufficiently sourced changes' },
+          ]
+        : [
+            { description: `Screenshot the existing description` },
+            { description: `Paste the new description and save` },
+            { description: `Screenshot the live result` },
+            { description: `Log the change date in the messaging guide platform log` },
+          ];
 
     const r = await createTicketFromStep({
       firmSlug: args.firmSlug,
@@ -383,6 +414,15 @@ export async function generateThirdPartyListingTickets(args: FactoryArgs): Promi
       remediationCopy: remediation,
       validationSteps: validation,
       evidenceLinks: [{ kind: 'third_party_listing', url: l.url, description: platformName }],
+      automationTier: cls.tier,
+      executeUrl: l.url,
+      executeLabel:
+        cls.tier === 'auto'
+          ? `Update ${platformName} via API`
+          : cls.tier === 'assist'
+            ? `Open ${platformName}`
+            : undefined,
+      manualReason: cls.manualReason,
     });
     created.push({ id: r.id, title, priorityRank: i + 1 });
   }

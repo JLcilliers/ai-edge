@@ -117,6 +117,21 @@ export async function generateSuppressionTickets(args: Args): Promise<{
       validation.push({ description: 'Update internal links pointing to the old URL' });
     }
 
+    // Automation tier per action type. All four currently ship as
+    // 'assist' — the operator implements the noindex/301/delete via
+    // their CMS. We can flip these to 'auto' once a firm has wired
+    // CMS credentials in Settings (WordPress REST, Webflow Custom
+    // Code API, Shopify urlRedirectCreate, Cloudflare Rulesets API).
+    const automationTier: 'auto' | 'assist' | 'manual' = 'assist';
+    const executeLabel =
+      d.action === 'noindex'
+        ? 'Apply noindex meta tag'
+        : d.action === 'redirect'
+          ? 'Configure 301 redirect'
+          : d.action === 'delete'
+            ? 'Delete via CMS'
+            : 'Refresh content (Phase 3)';
+
     const r = await createTicketFromStep({
       firmSlug: args.firmSlug,
       sopKey: args.sopKey,
@@ -128,6 +143,9 @@ export async function generateSuppressionTickets(args: Args): Promise<{
       remediationCopy: remediation,
       validationSteps: validation,
       evidenceLinks: [{ kind: 'page_url', url: d.url, description: `Drifted from Brand Truth (d=${d.semanticDistance.toFixed(2)})` }],
+      automationTier,
+      executeUrl: d.url,
+      executeLabel,
     });
     created.push({ id: r.id, title, priorityRank: rankCounter - 1, action: d.action });
   }

@@ -200,6 +200,35 @@ export const remediationTickets = pgTable('remediation_ticket', {
     url: string;
     description?: string;
   }>>(),
+  // ── Execution tier (0014) ──────────────────────────────────
+  // Drives the UI affordance per task:
+  //   'auto'   → green badge + [Apply] button that fires the auto-fix
+  //              integration (Wikidata write, CMS schema deploy,
+  //              Cloudflare 301, Google Business Profile description,
+  //              etc.).
+  //   'assist' → yellow badge + [Open <Platform> →] deep-link to the
+  //              platform's admin UI. The operator pastes the
+  //              remediation_copy. Used when no public write API exists
+  //              (G2, Capterra, TrustRadius, LinkedIn page description,
+  //              Wikipedia direct edit, Squarespace, Wix).
+  //   'manual' → red badge + manual_reason for human-only work that has
+  //              no automation path (SME interview, sales call,
+  //              LinkedIn outreach prohibited by TOS).
+  automation_tier: text('automation_tier').$type<'auto' | 'assist' | 'manual'>(),
+  // For 'auto' tickets: the internal endpoint the [Apply] button POSTs
+  // to (e.g. '/api/auto-fix/wikidata-description'). For 'assist':
+  // the platform admin URL the [Open <Platform> →] button opens in a
+  // new tab (e.g. 'https://my.g2.com/...').
+  execute_url: text('execute_url'),
+  // Short label for the action button. 'Apply schema patch', 'Open
+  // Google Business Profile', 'Post edit request on Talk page', etc.
+  execute_label: text('execute_label'),
+  // Why this ticket is manual when automation_tier='manual'. Quoted
+  // verbatim to the operator so they understand the constraint
+  // ("LinkedIn TOS forbids automated outreach", "Wikipedia COI policy
+  // requires Talk-page edit request, not direct edit", "SME interview
+  // is a 1:1 conversation").
+  manual_reason: text('manual_reason'),
 });
 
 // ── Reddit ──────────────────────────────────────────────────
