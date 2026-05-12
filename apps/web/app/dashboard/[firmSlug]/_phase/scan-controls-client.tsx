@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Activity, AlertCircle, CheckCircle2, Loader2, RefreshCw } from 'lucide-react';
 import {
+  runContentGenerationScan,
   runContentOptimizationScan,
   runTechnicalImplementationScan,
 } from '../../../actions/content-scan-actions';
@@ -23,7 +24,10 @@ import {
 
 type ScanTrigger =
   | { mode: 'route'; href: string }
-  | { mode: 'action'; key: 'content-optimization' | 'technical-implementation' }
+  | {
+      mode: 'action';
+      key: 'content-optimization' | 'technical-implementation' | 'content-generation';
+    }
   | { mode: 'pending' };
 
 function triggerFor(phaseKey: string, firmSlug: string): ScanTrigger {
@@ -34,12 +38,13 @@ function triggerFor(phaseKey: string, firmSlug: string): ScanTrigger {
       return { mode: 'action', key: 'content-optimization' };
     case 'technical-implementation':
       return { mode: 'action', key: 'technical-implementation' };
+    case 'content-generation':
+      return { mode: 'action', key: 'content-generation' };
     case 'third-party-optimization':
       return { mode: 'route', href: `/dashboard/${firmSlug}/entity` };
     case 'client-services':
       return { mode: 'route', href: `/dashboard/${firmSlug}/reports` };
     case 'measurement-monitoring':
-    case 'content-generation':
     default:
       return { mode: 'pending' };
   }
@@ -105,6 +110,28 @@ export function ScanControlsClient({
         const ticketTotal =
           (res.llmFriendly?.ticketsCreated ?? 0) + (res.freshness?.ticketsCreated ?? 0);
         parts.push(`${ticketTotal} execution task${ticketTotal === 1 ? '' : 's'} written`);
+        setBanner({ tone: 'ok', text: parts.join(' · ') });
+        router.refresh();
+      });
+      return;
+    }
+    if (trigger.mode === 'action' && trigger.key === 'content-generation') {
+      setBanner(null);
+      start(async () => {
+        const res = await runContentGenerationScan(firmSlug);
+        if (!res.ok) {
+          setBanner({ tone: 'error', text: res.error });
+          return;
+        }
+        const t = res.trustAlignment;
+        const f = t.findingsByKind;
+        const total =
+          f.year_inconsistency + f.quantity_inconsistency + f.banned_claim + f.unverified_award;
+        const parts: string[] = [
+          `Trust Alignment: scanned ${t.pagesScanned} page${t.pagesScanned === 1 ? '' : 's'}, ${total} finding${total === 1 ? '' : 's'}`,
+          `${f.year_inconsistency} year · ${f.quantity_inconsistency} qty · ${f.banned_claim} banned · ${f.unverified_award} unverified`,
+          `${t.ticketsCreated} execution task${t.ticketsCreated === 1 ? '' : 's'} written`,
+        ];
         setBanner({ tone: 'ok', text: parts.join(' · ') });
         router.refresh();
       });
