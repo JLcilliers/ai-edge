@@ -10,21 +10,34 @@ type NavItem = {
   icon: typeof LayoutDashboard;
   // Match mode: "exact" only matches the exact href; "prefix" matches the href or any child path.
   match: 'exact' | 'prefix';
-  // Optional numeric badge key (sidebar-owned, not per-item flag). The nav
-  // decides how to render it from the label.
-  badge?: 'openTicketCount';
+  // Numeric badge source. The sidebar maps each badge kind to a data
+  // source the parent layout fetched (Action Items total, per-phase
+  // count). Nav items without a badge field render bare.
+  badge?:
+    | { kind: 'openTicketCount' }
+    | { kind: 'phaseTicketCount'; phase: number };
 };
 
+// Order: Action Items first so the operator's "what do I need to do?"
+// surface is the most accessible entry, then Overview + Brand Truth as
+// firm-scoped context surfaces, then the 7 phase tabs with inline
+// task counts, then operator-facing data views, then settings.
 const ITEMS: NavItem[] = [
+  // ── Top: the task list. Everything the operator does flows from here. ──
+  {
+    label: 'Action Items',
+    href: (slug) => `/dashboard/${slug}/tickets`,
+    icon: Inbox,
+    match: 'prefix',
+    badge: { kind: 'openTicketCount' },
+  },
   {
     label: 'Overview',
     href: (slug) => `/dashboard/${slug}`,
     icon: LayoutDashboard,
     match: 'exact',
   },
-  // Brand Truth sits at the top right after Overview — it's the canonical
-  // positioning payload every workflow reads from, so it gets the most
-  // accessible slot in the nav.
+  // Brand Truth — canonical positioning payload every workflow reads from.
   {
     label: 'Brand Truth',
     href: (slug) => `/dashboard/${slug}/brand-truth`,
@@ -36,57 +49,57 @@ const ITEMS: NavItem[] = [
   // Each tab is one phase of the AEO program. The label IS the phase
   // name — no "Phase 1" / "Phase 2" prefixes, no umbrella "SOPs" tab.
   // Order matters: top → bottom mirrors the program sequence the
-  // operator runs through.
+  // operator runs through. Each phase carries an inline count badge
+  // showing open tickets in that phase — surfaces empty phases at a
+  // glance instead of requiring a click to discover them.
   {
     label: 'Brand Audit & Analysis',
     href: (slug) => `/dashboard/${slug}/brand-audit-analysis`,
     icon: ScanSearch,
     match: 'prefix',
+    badge: { kind: 'phaseTicketCount', phase: 1 },
   },
   {
     label: 'Measurement & Monitoring',
     href: (slug) => `/dashboard/${slug}/measurement-monitoring`,
     icon: Activity,
     match: 'prefix',
+    badge: { kind: 'phaseTicketCount', phase: 2 },
   },
   {
     label: 'Content Optimization',
     href: (slug) => `/dashboard/${slug}/content-optimization`,
     icon: PenSquare,
     match: 'prefix',
+    badge: { kind: 'phaseTicketCount', phase: 3 },
   },
   {
     label: 'Third-Party Optimization',
     href: (slug) => `/dashboard/${slug}/third-party-optimization`,
     icon: Globe2,
     match: 'prefix',
+    badge: { kind: 'phaseTicketCount', phase: 4 },
   },
   {
     label: 'Technical Implementation',
     href: (slug) => `/dashboard/${slug}/technical-implementation`,
     icon: Wrench,
     match: 'prefix',
+    badge: { kind: 'phaseTicketCount', phase: 5 },
   },
   {
     label: 'Content Generation',
     href: (slug) => `/dashboard/${slug}/content-generation`,
     icon: Sparkles,
     match: 'prefix',
+    badge: { kind: 'phaseTicketCount', phase: 6 },
   },
   {
     label: 'Client Services',
     href: (slug) => `/dashboard/${slug}/client-services`,
     icon: Briefcase,
     match: 'prefix',
-  },
-
-  // ── Operator surfaces (separate from the playbook phases) ──
-  {
-    label: 'Action Items',
-    href: (slug) => `/dashboard/${slug}/tickets`,
-    icon: Inbox,
-    match: 'prefix',
-    badge: 'openTicketCount',
+    badge: { kind: 'phaseTicketCount', phase: 7 },
   },
 
   // ── Legacy data views — backing surfaces for the SOP workflows
@@ -146,9 +159,11 @@ const ITEMS: NavItem[] = [
 export function FirmSidebarNav({
   firmSlug,
   openTicketCount = 0,
+  openTicketCountsByPhase = {},
 }: {
   firmSlug: string;
   openTicketCount?: number;
+  openTicketCountsByPhase?: Record<number, number>;
 }) {
   const pathname = usePathname();
   return (
@@ -160,10 +175,18 @@ export function FirmSidebarNav({
             ? pathname === href
             : pathname === href || pathname.startsWith(`${href}/`);
         const Icon = item.icon;
-        const badgeValue =
-          item.badge === 'openTicketCount' && openTicketCount > 0
-            ? openTicketCount
-            : null;
+
+        // Resolve the badge value.
+        let badgeValue: number | null = null;
+        if (item.badge) {
+          if (item.badge.kind === 'openTicketCount' && openTicketCount > 0) {
+            badgeValue = openTicketCount;
+          } else if (item.badge.kind === 'phaseTicketCount') {
+            const n = openTicketCountsByPhase[item.badge.phase] ?? 0;
+            if (n > 0) badgeValue = n;
+          }
+        }
+
         return (
           <Link
             key={item.label}
