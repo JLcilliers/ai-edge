@@ -150,12 +150,17 @@ export function ScanControlsClient({
           return;
         }
         const w = res.weeklyReport;
+        const c = res.competitive;
         const start = new Date(w.windowStart).toISOString().slice(0, 10);
         const end = new Date(w.windowEnd).toISOString().slice(0, 10);
-        setBanner({
-          tone: 'ok',
-          text: `Weekly report generated for ${start} → ${end} (${w.auditsThisWeek} audits · ${w.ticketsOpenedThisWeek} new tasks · ${w.ticketsResolvedThisWeek} resolved). 1 "Send to client" task written.`,
-        });
+        const parts: string[] = [
+          `Weekly report ${start} → ${end} (${w.auditsThisWeek} audits · ${w.ticketsOpenedThisWeek} new · ${w.ticketsResolvedThisWeek} resolved)`,
+          c.competitorsTracked > 0
+            ? `Competitive: ${c.competitorsTracked} competitor${c.competitorsTracked === 1 ? '' : 's'} tracked, ${c.threatsFound} threat${c.threatsFound === 1 ? '' : 's'} + ${c.opportunitiesFound} opportunit${c.opportunitiesFound === 1 ? 'y' : 'ies'}`
+            : `Competitive: no competitor mentions in last 30d`,
+          `${1 + c.ticketsCreated} task${1 + c.ticketsCreated === 1 ? '' : 's'} written`,
+        ];
+        setBanner({ tone: 'ok', text: parts.join(' · ') });
         router.refresh();
       });
       return;
