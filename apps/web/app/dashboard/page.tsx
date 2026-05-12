@@ -69,13 +69,19 @@ export default async function ClientListPage() {
       {/* Header */}
       <div className="mb-10 flex items-start justify-between">
         <div className="flex items-center">
-          <Image
-            src="/clixsy-logo.svg"
-            alt="Clixsy"
-            width={220}
-            height={92}
-            priority
-          />
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center transition-opacity hover:opacity-80"
+            aria-label="All clients dashboard"
+          >
+            <Image
+              src="/clixsy-logo.svg"
+              alt="Clixsy"
+              width={220}
+              height={92}
+              priority
+            />
+          </Link>
         </div>
         <div className="flex items-center gap-2">
           <Link
