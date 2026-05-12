@@ -695,6 +695,26 @@ export interface CreateTicketInput {
   evidenceLinks?: Array<{ kind: string; url: string; description?: string }>;
   owner?: string;
   dueAt?: Date;
+  // Execution tier (0014):
+  //   'auto'   → tool fixes it on [Apply] click (Wikidata write, CMS
+  //              schema deploy, Cloudflare 301, Google Business Profile
+  //              description update, GA4 setup via Admin API, etc.).
+  //              The execute_url is an internal endpoint that the
+  //              [Apply] button POSTs to.
+  //   'assist' → tool drafted the fix in remediation_copy; operator
+  //              clicks execute_url (the platform's admin UI) and
+  //              pastes. Used when no public write API exists (G2,
+  //              Capterra, TrustRadius, LinkedIn page description,
+  //              Wikipedia direct edit, Crunchbase, BBB, Yelp, Avvo,
+  //              Justia, Lawyers.com, Squarespace, Wix).
+  //   'manual' → no automation path. manual_reason explains why
+  //              (SME interview is a 1:1 conversation; AEO Discovery
+  //              Call is a sales call; LinkedIn outreach forbidden by
+  //              TOS; Wikipedia direct edit forbidden by COI policy).
+  automationTier?: 'auto' | 'assist' | 'manual';
+  executeUrl?: string;
+  executeLabel?: string;
+  manualReason?: string;
 }
 
 export async function createTicketFromStep(input: CreateTicketInput): Promise<{ id: string }> {
@@ -730,6 +750,10 @@ export async function createTicketFromStep(input: CreateTicketInput): Promise<{ 
       owner: input.owner,
       due_at: input.dueAt,
       playbook_step: `${input.sopKey}/step-${input.stepNumber}`,
+      automation_tier: input.automationTier,
+      execute_url: input.executeUrl,
+      execute_label: input.executeLabel,
+      manual_reason: input.manualReason,
     })
     .returning({ id: remediationTickets.id });
   const t = ticketRows[0];
@@ -785,4 +809,187 @@ export async function getPhaseGridSummary(firmSlug: string): Promise<PhaseGridSu
       completed: phaseRuns.filter((r) => r.status === 'completed').length,
     };
   });
+}
+
+// ───────────────────────────────────────────────────────────────
+// Execution tasks for a phase — what the scanner-output UI reads
+// ───────────────────────────────────────────────────────────────
+
+export interface ExecutionTask {
+  id: string;
+  title: string;
+  description: string | null;
+  priorityRank: number | null;
+  status: string;
+  automationTier: 'auto' | 'assist' | 'manual' | null;
+  executeUrl: string | null;
+  executeLabel: string | null;
+  manualReason: string | null;
+  remediationCopy: string | null;
+  validationSteps: Array<{ description: string; completed_at?: string }> | null;
+  evidenceLinks: Array<{ kind: string; url: string; description?: string }> | null;
+  owner: string | null;
+  dueAt: Date | null;
+  sopKey: string | null;
+  sopStepNumber: number | null;
+  createdAt: Date;
+}
+
+export interface PhaseExecutionTasks {
+  phaseKey: string;
+  phaseName: string;
+  /** Tasks scoped to this phase's SOP runs, ranked by priority. */
+  tasks: ExecutionTask[];
+  /** Latest scan summary for the phase (most recent sop_run across the
+   *  phase's workflows). */
+  lastScan: {
+    completedAt: Date | null;
+    runsByKey: Array<{
+      sopKey: string;
+      sopName: string;
+      status: string;
+      currentStep: number;
+      totalSteps: number;
+    }>;
+  };
+}
+
+/**
+ * Load the ranked execution-task list for one phase. This is what the
+ * new scanner-output phase page renders instead of workflow cards.
+ *
+ * A task is a remediation_ticket whose sop_run belongs to a workflow in
+ * this phase. We rank by:
+ *   1. priority_rank ASC (1 = highest)
+ *   2. automation_tier order (auto first, assist next, manual last)
+ *   3. created_at DESC (newest first as tiebreaker)
+ */
+export async function getPhaseExecutionTasks(
+  firmSlug: string,
+  phaseKey: string,
+): Promise<PhaseExecutionTasks> {
+  const phase = PHASES.find((p) => p.phaseKey === phaseKey);
+  if (!phase) throw new Error(`Unknown phaseKey: ${phaseKey}`);
+  const firmId = await resolveFirmId(firmSlug);
+  const db = getDb();
+
+  // Phase runs across this firm.
+  const runs = await db
+    .select({
+      id: sopRuns.id,
+      sopKey: sopRuns.sop_key,
+      status: sopRuns.status,
+      currentStep: sopRuns.current_step,
+      completedAt: sopRuns.completed_at,
+      startedAt: sopRuns.started_at,
+    })
+    .from(sopRuns)
+    .where(and(eq(sopRuns.firm_id, firmId), eq(sopRuns.phase, phase.phase)));
+
+  const runIdsForPhase = runs.map((r) => r.id);
+  let tasks: ExecutionTask[] = [];
+  if (runIdsForPhase.length > 0) {
+    const rows = await db
+      .select()
+      .from(remediationTickets)
+      .where(
+        and(
+          eq(remediationTickets.firm_id, firmId),
+          inArray(remediationTickets.sop_run_id, runIdsForPhase),
+        ),
+      );
+    tasks = rows.map((r) => ({
+      id: r.id,
+      title: r.title ?? deriveTitleFromSource(r.source_type),
+      description: r.description,
+      priorityRank: r.priority_rank,
+      status: r.status,
+      automationTier: r.automation_tier as ExecutionTask['automationTier'],
+      executeUrl: r.execute_url,
+      executeLabel: r.execute_label,
+      manualReason: r.manual_reason,
+      remediationCopy: r.remediation_copy,
+      validationSteps: r.validation_steps as ExecutionTask['validationSteps'],
+      evidenceLinks: r.evidence_links as ExecutionTask['evidenceLinks'],
+      owner: r.owner,
+      dueAt: r.due_at,
+      sopKey: (runs.find((run) => run.id === r.sop_run_id)?.sopKey ?? null),
+      sopStepNumber: r.sop_step_number,
+      createdAt: r.created_at,
+    }));
+
+    // Rank: priority_rank ASC (NULLs last), then tier order, then newest first.
+    const tierOrder: Record<string, number> = { auto: 0, assist: 1, manual: 2 };
+    tasks.sort((a, b) => {
+      const ap = a.priorityRank ?? 1_000_000;
+      const bp = b.priorityRank ?? 1_000_000;
+      if (ap !== bp) return ap - bp;
+      const at = tierOrder[a.automationTier ?? 'assist'] ?? 1;
+      const bt = tierOrder[b.automationTier ?? 'assist'] ?? 1;
+      if (at !== bt) return at - bt;
+      return b.createdAt.getTime() - a.createdAt.getTime();
+    });
+  }
+
+  // Latest scan summary — pick the most-recently-completed run per sopKey.
+  const runsByKey = phase.sopKeys.map((k) => {
+    const matching = runs.filter((r) => r.sopKey === k);
+    if (matching.length === 0) {
+      const def = SOP_REGISTRY[k];
+      return {
+        sopKey: k as string,
+        sopName: def.name,
+        status: 'not_started',
+        currentStep: 0,
+        totalSteps: def.steps.length,
+      };
+    }
+    // Pick the most recent (by completed_at or started_at).
+    matching.sort((a, b) => {
+      const aDate = (a.completedAt ?? a.startedAt)?.getTime() ?? 0;
+      const bDate = (b.completedAt ?? b.startedAt)?.getTime() ?? 0;
+      return bDate - aDate;
+    });
+    const r = matching[0]!;
+    const def = SOP_REGISTRY[k];
+    return {
+      sopKey: k as string,
+      sopName: def.name,
+      status: r.status,
+      currentStep: r.currentStep,
+      totalSteps: def.steps.length,
+    };
+  });
+
+  const latestCompleted = runs
+    .filter((r) => r.completedAt != null)
+    .map((r) => r.completedAt!)
+    .sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
+
+  return {
+    phaseKey: phase.phaseKey,
+    phaseName: phase.name,
+    tasks,
+    lastScan: {
+      completedAt: latestCompleted,
+      runsByKey,
+    },
+  };
+}
+
+function deriveTitleFromSource(sourceType: string): string {
+  switch (sourceType) {
+    case 'audit':
+      return 'Audit finding — alignment off-brand';
+    case 'legacy':
+      return 'Page drifts from Brand Truth';
+    case 'entity':
+      return 'Entity / schema gap';
+    case 'reddit':
+      return 'Reddit mention flagged';
+    case 'sop':
+      return 'Workflow-generated task';
+    default:
+      return 'Action item';
+  }
 }

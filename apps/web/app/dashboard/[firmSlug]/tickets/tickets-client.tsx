@@ -243,6 +243,12 @@ function TicketRow({
           <div className="flex flex-wrap items-center gap-2">
             <SourceBadge source={ticket.sourceType} />
             <StatusBadge status={ticket.status} />
+            {ticket.automationTier && <TierBadge tier={ticket.automationTier} />}
+            {ticket.priorityRank != null && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 font-[family-name:var(--font-geist-mono)] text-[10px] font-semibold uppercase tracking-wider text-white/65">
+                #{ticket.priorityRank}
+              </span>
+            )}
             {ticket.overdue && !isClosed && (
               <span className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-red-300">
                 <AlertTriangle size={10} strokeWidth={2.5} />
@@ -575,6 +581,39 @@ function StatusBadge({ status }: { status: TicketStatus }) {
       className={`rounded-full px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider ${styles[status]}`}
     >
       {STATUS_LABEL[status]}
+    </span>
+  );
+}
+
+/**
+ * Execution-tier badge (column added in migration 0014). Driven by the
+ * platform-write-API research:
+ *   - auto   = green: tool fixes via API (Wikidata, GBP, CMS w/ creds)
+ *   - assist = yellow: tool drafted copy, operator pastes on platform
+ *   - manual = red: policy/TOS/human-only (Wikipedia COI, LinkedIn TOS,
+ *              SME interview, sales call)
+ */
+function TierBadge({ tier }: { tier: 'auto' | 'assist' | 'manual' }) {
+  const styles: Record<typeof tier, { label: string; cls: string }> = {
+    auto: {
+      label: 'Auto',
+      cls: 'bg-[var(--rag-green)]/15 text-[var(--rag-green)]',
+    },
+    assist: {
+      label: 'Assist',
+      cls: 'bg-[var(--rag-yellow-bg)] text-[var(--rag-yellow)]',
+    },
+    manual: {
+      label: 'Manual',
+      cls: 'bg-[var(--rag-red-bg)] text-[var(--rag-red)]',
+    },
+  };
+  const s = styles[tier];
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${s.cls}`}
+    >
+      {s.label}
     </span>
   );
 }
