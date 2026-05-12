@@ -53,13 +53,20 @@ import {
   runMeasurementTriageScanBySlug,
   type MeasurementTriageResult,
 } from '../lib/content/measurement-scanner';
-
-export type ContentScanKind = 'llm_friendly' | 'freshness' | 'both';
+import {
+  runRepositioningScanBySlug,
+  type RepositioningScanResult,
+} from '../lib/content/repositioning-scanner';
+import {
+  runAiInfoScanBySlug,
+  type AiInfoScanResult,
+} from '../lib/content/ai-info-scanner';
 
 export interface ContentScanResponse {
   ok: true;
-  llmFriendly?: LlmFriendlyScanResult;
-  freshness?: FreshnessScanResult;
+  llmFriendly: LlmFriendlyScanResult;
+  freshness: FreshnessScanResult;
+  repositioning: RepositioningScanResult;
 }
 export interface ContentScanError {
   ok: false;
@@ -68,18 +75,15 @@ export interface ContentScanError {
 
 export async function runContentOptimizationScan(
   firmSlug: string,
-  kind: ContentScanKind = 'both',
 ): Promise<ContentScanResponse | ContentScanError> {
   try {
-    let llmFriendly: LlmFriendlyScanResult | undefined;
-    let freshness: FreshnessScanResult | undefined;
-
-    if (kind === 'llm_friendly' || kind === 'both') {
-      llmFriendly = await runLlmFriendlyScanBySlug(firmSlug);
-    }
-    if (kind === 'freshness' || kind === 'both') {
-      freshness = await runFreshnessScanBySlug(firmSlug);
-    }
+    // All three Phase 3 scanners run sequentially. Each is cheap
+    // (read-only or single HEAD/GET sweep over already-crawled pages)
+    // and they share the same underlying corpus so the network /
+    // database overhead is amortized.
+    const llmFriendly = await runLlmFriendlyScanBySlug(firmSlug);
+    const freshness = await runFreshnessScanBySlug(firmSlug);
+    const repositioning = await runRepositioningScanBySlug(firmSlug);
 
     try {
       revalidatePath(`/dashboard/${firmSlug}/content-optimization`);
@@ -88,7 +92,7 @@ export async function runContentOptimizationScan(
       /* not in a Next request context — safe to ignore */
     }
 
-    return { ok: true, llmFriendly, freshness };
+    return { ok: true, llmFriendly, freshness, repositioning };
   } catch (err) {
     return {
       ok: false,
@@ -101,18 +105,21 @@ export interface TechnicalImplementationScanResponse {
   ok: true;
   semanticHtml: SemanticHtmlScanResult;
   schemaMarkup: SchemaScanResult;
+  aiInfo: AiInfoScanResult;
 }
 
 export async function runTechnicalImplementationScan(
   firmSlug: string,
 ): Promise<TechnicalImplementationScanResponse | ContentScanError> {
   try {
-    // Run both Phase 5 audit scanners sequentially. They each hit the
-    // network with concurrency 4 — running them in parallel would
-    // double the firm site's connection load without a wall-clock win
-    // big enough to matter.
+    // Run all three Phase 5 scanners sequentially. semantic-html +
+    // schema-markup each hit the network with concurrency 4 — running
+    // them in parallel would double the firm site's connection load
+    // without a wall-clock win big enough to matter. ai-info is a
+    // cheap DB-only check that runs last.
     const semanticHtml = await runSemanticHtmlScanBySlug(firmSlug);
     const schemaMarkup = await runSchemaMarkupScanBySlug(firmSlug);
+    const aiInfo = await runAiInfoScanBySlug(firmSlug);
 
     try {
       revalidatePath(`/dashboard/${firmSlug}/technical-implementation`);
@@ -121,7 +128,7 @@ export async function runTechnicalImplementationScan(
       /* not in a Next request context — safe to ignore */
     }
 
-    return { ok: true, semanticHtml, schemaMarkup };
+    return { ok: true, semanticHtml, schemaMarkup, aiInfo };
   } catch (err) {
     return {
       ok: false,

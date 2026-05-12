@@ -99,26 +99,22 @@ export function ScanControlsClient({
     if (trigger.mode === 'action' && trigger.key === 'content-optimization') {
       setBanner(null);
       start(async () => {
-        const res = await runContentOptimizationScan(firmSlug, 'both');
+        const res = await runContentOptimizationScan(firmSlug);
         if (!res.ok) {
           setBanner({ tone: 'error', text: res.error });
           return;
         }
-        const parts: string[] = [];
-        if (res.llmFriendly) {
-          parts.push(
-            `LLM-Friendly: scored ${res.llmFriendly.pagesScanned} page${
-              res.llmFriendly.pagesScanned === 1 ? '' : 's'
-            }, ${res.llmFriendly.pagesFailing} below the bar (avg ${res.llmFriendly.averageScore}/7)`,
-          );
-        }
-        if (res.freshness) {
-          parts.push(
-            `Freshness: ${res.freshness.fresh} fresh / ${res.freshness.aging} aging / ${res.freshness.stale} stale / ${res.freshness.dormant} dormant / ${res.freshness.unknown} undated`,
-          );
-        }
+        const parts: string[] = [
+          `LLM-Friendly: ${res.llmFriendly.pagesScanned} pages, ${res.llmFriendly.pagesFailing} below the bar (avg ${res.llmFriendly.averageScore}/7)`,
+          `Freshness: ${res.freshness.fresh}/${res.freshness.aging}/${res.freshness.stale}/${res.freshness.dormant}/${res.freshness.unknown} (fresh/aging/stale/dormant/undated)`,
+          res.repositioning.blockedOnSuppression
+            ? `Repositioning: blocked (run Suppression first)`
+            : `Repositioning: ${res.repositioning.candidatesFound} high-traffic pages to refresh (${res.repositioning.totalKeepClicks} clicks/mo total)`,
+        ];
         const ticketTotal =
-          (res.llmFriendly?.ticketsCreated ?? 0) + (res.freshness?.ticketsCreated ?? 0);
+          res.llmFriendly.ticketsCreated +
+          res.freshness.ticketsCreated +
+          res.repositioning.ticketsCreated;
         parts.push(`${ticketTotal} execution task${ticketTotal === 1 ? '' : 's'} written`);
         setBanner({ tone: 'ok', text: parts.join(' · ') });
         router.refresh();
@@ -218,11 +214,17 @@ export function ScanControlsClient({
         }
         const sh = res.semanticHtml;
         const sm = res.schemaMarkup;
+        const ai = res.aiInfo;
+        const aiInfoSummary = ai.pageExists
+          ? `AI Info page: present at ${ai.detectedUrl}`
+          : 'AI Info page: missing (create-page ticket opened)';
+        const aiTickets = ai.ticketCreated ? 1 : 0;
         const parts: string[] = [
           `Semantic HTML: avg ${sh.averageScore}/100 across ${sh.pagesScanned} page${sh.pagesScanned === 1 ? '' : 's'} (${sh.bandCounts.high} high · ${sh.bandCounts.medium} medium · ${sh.bandCounts.low} low · ${sh.bandCounts.maintenance} maintenance)`,
           `Schema: ${sm.pagesWithFindings}/${sm.pagesScanned} pages flagged (${sm.severityCounts.high} high · ${sm.severityCounts.medium} medium · ${sm.severityCounts.low} low; ${sm.pagesClean} clean)`,
-          `${sh.ticketsCreated + sm.ticketsCreated} execution task${
-            sh.ticketsCreated + sm.ticketsCreated === 1 ? '' : 's'
+          aiInfoSummary,
+          `${sh.ticketsCreated + sm.ticketsCreated + aiTickets} execution task${
+            sh.ticketsCreated + sm.ticketsCreated + aiTickets === 1 ? '' : 's'
           } written`,
         ];
         setBanner({ tone: 'ok', text: parts.join(' · ') });
