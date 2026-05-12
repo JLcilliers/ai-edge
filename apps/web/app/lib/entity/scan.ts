@@ -10,6 +10,7 @@ import { eq, desc } from 'drizzle-orm';
 import { scanJsonLd, diffExpectedTypes } from './schema-scan';
 import { probeWikidata, probeGoogleKg } from './kg-probe';
 import { ensureSopRun } from '../sop/ensure-run';
+import { prescribeEntityTicket } from '../sop/legacy-prescription';
 
 /**
  * Entity-signals orchestrator (PLAN §5.6).
@@ -228,6 +229,24 @@ export async function runEntityScan(firmId: string): Promise<string> {
     }
 
     for (const t of tickets) {
+      // Derive source label from the playbook_step prefix so the
+      // prescription helper can compose a meaningful title.
+      //   entity:wikidata:create     → wikidata
+      //   entity:google-kg:claim     → gbp
+      //   entity:schema:Person       → website
+      const source = t.playbook_step.startsWith('entity:wikidata')
+        ? 'wikidata'
+        : t.playbook_step.startsWith('entity:google-kg')
+          ? 'gbp'
+          : t.playbook_step.startsWith('entity:schema')
+            ? 'website'
+            : 'entity';
+      const presc = prescribeEntityTicket({
+        source,
+        url: null,
+        divergenceFlags: [],
+        playbookStep: t.playbook_step,
+      });
       await db.insert(remediationTickets).values({
         firm_id: firmId,
         source_type: 'entity',
@@ -236,6 +255,15 @@ export async function runEntityScan(firmId: string): Promise<string> {
         status: 'open',
         playbook_step: t.playbook_step,
         due_at: new Date(Date.now() + t.due_days * 24 * 60 * 60 * 1000),
+        title: presc.title,
+        description: presc.description,
+        priority_rank: presc.priorityRank,
+        remediation_copy: presc.remediationCopy,
+        validation_steps: presc.validationSteps,
+        evidence_links: presc.evidenceLinks,
+        automation_tier: presc.automationTier,
+        execute_url: presc.executeUrl,
+        execute_label: presc.executeLabel,
       });
     }
 
