@@ -11,6 +11,7 @@ import {
 } from '../../../actions/remediation-constants';
 import { getFirmBySlug } from '../../../actions/firm-actions';
 import { TicketsClient } from './tickets-client';
+import { ExportToolbar } from '../_exports/export-toolbar';
 
 export const dynamic = 'force-dynamic';
 
@@ -62,7 +63,7 @@ export default async function TicketsPage({
 
   return (
     <div>
-      <div className="mb-8">
+      <div className="mb-6">
         <h1 className="font-[family-name:var(--font-jakarta)] text-3xl font-extrabold tracking-tight text-white">
           Remediation Tickets
         </h1>
@@ -71,6 +72,9 @@ export default async function TicketsPage({
           entity gaps, and high-karma Reddit complaints surface as tickets —
           close them out as you act.
         </p>
+      </div>
+      <div className="mb-6">
+        <ExportToolbar firmSlug={firmSlug} />
       </div>
       <TicketsClient
         firmSlug={firmSlug}
