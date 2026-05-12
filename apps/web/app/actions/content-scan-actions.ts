@@ -45,6 +45,10 @@ import {
   runThirdPartyTriageScanBySlug,
   type ThirdPartyTriageResult,
 } from '../lib/content/third-party-scanner';
+import {
+  runWeeklyReportingScanBySlug,
+  type WeeklyReportingScanResult,
+} from '../lib/content/weekly-reporting-scanner';
 
 export type ContentScanKind = 'llm_friendly' | 'freshness' | 'both';
 
@@ -141,6 +145,34 @@ export async function runThirdPartyOptimizationScan(
     }
 
     return { ok: true, triage };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+export interface ClientServicesScanResponse {
+  ok: true;
+  weeklyReport: WeeklyReportingScanResult;
+}
+
+export async function runClientServicesScan(
+  firmSlug: string,
+): Promise<ClientServicesScanResponse | ContentScanError> {
+  try {
+    const weeklyReport = await runWeeklyReportingScanBySlug(firmSlug);
+
+    try {
+      revalidatePath(`/dashboard/${firmSlug}/client-services`);
+      revalidatePath(`/dashboard/${firmSlug}/action-items`);
+      revalidatePath(`/dashboard/${firmSlug}/sop/weekly_aeo_reporting`);
+    } catch {
+      /* not in a Next request context — safe to ignore */
+    }
+
+    return { ok: true, weeklyReport };
   } catch (err) {
     return {
       ok: false,

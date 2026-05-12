@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Activity, AlertCircle, CheckCircle2, Loader2, RefreshCw } from 'lucide-react';
 import {
+  runClientServicesScan,
   runContentGenerationScan,
   runContentOptimizationScan,
   runTechnicalImplementationScan,
@@ -31,7 +32,8 @@ type ScanTrigger =
         | 'content-optimization'
         | 'technical-implementation'
         | 'content-generation'
-        | 'third-party-optimization';
+        | 'third-party-optimization'
+        | 'client-services';
     }
   | { mode: 'pending' };
 
@@ -48,7 +50,7 @@ function triggerFor(phaseKey: string, firmSlug: string): ScanTrigger {
     case 'third-party-optimization':
       return { mode: 'action', key: 'third-party-optimization' };
     case 'client-services':
-      return { mode: 'route', href: `/dashboard/${firmSlug}/reports` };
+      return { mode: 'action', key: 'client-services' };
     case 'measurement-monitoring':
     default:
       return { mode: 'pending' };
@@ -116,6 +118,25 @@ export function ScanControlsClient({
           (res.llmFriendly?.ticketsCreated ?? 0) + (res.freshness?.ticketsCreated ?? 0);
         parts.push(`${ticketTotal} execution task${ticketTotal === 1 ? '' : 's'} written`);
         setBanner({ tone: 'ok', text: parts.join(' · ') });
+        router.refresh();
+      });
+      return;
+    }
+    if (trigger.mode === 'action' && trigger.key === 'client-services') {
+      setBanner(null);
+      start(async () => {
+        const res = await runClientServicesScan(firmSlug);
+        if (!res.ok) {
+          setBanner({ tone: 'error', text: res.error });
+          return;
+        }
+        const w = res.weeklyReport;
+        const start = new Date(w.windowStart).toISOString().slice(0, 10);
+        const end = new Date(w.windowEnd).toISOString().slice(0, 10);
+        setBanner({
+          tone: 'ok',
+          text: `Weekly report generated for ${start} → ${end} (${w.auditsThisWeek} audits · ${w.ticketsOpenedThisWeek} new tasks · ${w.ticketsResolvedThisWeek} resolved). 1 "Send to client" task written.`,
+        });
         router.refresh();
       });
       return;
