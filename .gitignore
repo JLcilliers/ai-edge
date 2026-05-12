@@ -37,5 +37,8 @@ Thumbs.db
 !.vscode/extensions.json
 !.vscode/settings.json
 
+# Tooling / debug screenshots
+.playwright-mcp/
+
 .vercel
 .env*.local

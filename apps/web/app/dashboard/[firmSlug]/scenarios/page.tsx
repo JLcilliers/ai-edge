@@ -9,6 +9,13 @@ import { getFirmBySlug } from '../../../actions/firm-actions';
 import { ScenariosClient } from './scenarios-client';
 
 export const dynamic = 'force-dynamic';
+// Scenario-lab server actions (recrawlFeaturesViaHtml, runFirmCalibration,
+// captureSerpsViaBing) iterate over every crawled page on the firm's site —
+// 75+ pages × ~250ms politeness + per-page HTTP fetch routinely runs 2-3
+// minutes. Without lifting maxDuration the function dies at Vercel's 60s
+// default and the UI shows "nothing happened" because the transport error
+// can't surface a clean error message.
+export const maxDuration = 300;
 
 /**
  * Scenario Lab — `/dashboard/[firmSlug]/scenarios`.
