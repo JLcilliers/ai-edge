@@ -303,6 +303,15 @@ export const firmBudgets = pgTable('firm_budget', {
   // Optional operator note — who set the cap and why.
   note: text('note'),
   updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  // ── Deep Research budget (0015) ────────────────────────────
+  // Separate quarterly cap for Deep Research Content Audit because it's
+  // a different cost profile from the audit pipeline. Default $5/quarter
+  // — agencies paying for monthly Deep Research can raise per firm.
+  // The running total + quarter_key are advisory mirrors maintained by
+  // the scanner; the actual cost ledger is in the LLM-call cost rows.
+  deep_research_quarterly_cap_usd: real('deep_research_quarterly_cap_usd').notNull().default(5.0),
+  deep_research_quarter_to_date_usd: real('deep_research_quarter_to_date_usd').notNull().default(0.0),
+  deep_research_quarter_key: text('deep_research_quarter_key'),
 });
 
 // ── Cron observability ──────────────────────────────────────

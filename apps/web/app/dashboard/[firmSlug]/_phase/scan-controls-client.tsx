@@ -2,11 +2,12 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Activity, AlertCircle, CheckCircle2, Loader2, RefreshCw } from 'lucide-react';
+import { Activity, AlertCircle, CheckCircle2, DollarSign, Loader2, RefreshCw, Sparkles } from 'lucide-react';
 import {
   runClientServicesScan,
   runContentGenerationScan,
   runContentOptimizationScan,
+  runDeepResearchAudit,
   runMeasurementMonitoringScan,
   runTechnicalImplementationScan,
   runThirdPartyOptimizationScan,
@@ -265,21 +266,27 @@ export function ScanControlsClient({
             </div>
           </div>
         </div>
-        {trigger.mode === 'pending' ? (
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] text-white/55">
-            Scanner wiring in progress
-          </span>
-        ) : (
-          <button
-            type="button"
-            onClick={handleRunScan}
-            disabled={isPending}
-            className="inline-flex items-center gap-2 rounded-full bg-[var(--accent)] px-4 py-2 text-xs font-semibold text-black transition-colors hover:bg-[var(--accent-hover)] disabled:opacity-50"
-          >
-            {isPending ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} strokeWidth={2} />}
-            Run scan
-          </button>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {trigger.mode === 'pending' ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] text-white/55">
+              Scanner wiring in progress
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={handleRunScan}
+              disabled={isPending}
+              className="inline-flex items-center gap-2 rounded-full bg-[var(--accent)] px-4 py-2 text-xs font-semibold text-black transition-colors hover:bg-[var(--accent-hover)] disabled:opacity-50"
+            >
+              {isPending ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} strokeWidth={2} />}
+              Run scan
+            </button>
+          )}
+          {/* Deep Research opt-in button — only on Content Optimization. */}
+          {phaseKey === 'content-optimization' && (
+            <DeepResearchButton firmSlug={firmSlug} onComplete={() => router.refresh()} setBanner={setBanner} />
+          )}
+        </div>
       </div>
 
       {banner && (
@@ -307,6 +314,65 @@ export function ScanControlsClient({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Deep Research button — separate from the main Run scan because it
+ * costs real money per click. Yellow/gold treatment + the $ icon make
+ * the cost-bearing nature unambiguous; the scanner itself enforces the
+ * firm_budget.deep_research_quarterly_cap_usd gate.
+ */
+function DeepResearchButton({
+  firmSlug,
+  onComplete,
+  setBanner,
+}: {
+  firmSlug: string;
+  onComplete: () => void;
+  setBanner: (b: { tone: 'ok' | 'error'; text: string } | null) => void;
+}) {
+  const [isPending, start] = useTransition();
+  const handle = () => {
+    setBanner(null);
+    start(async () => {
+      const res = await runDeepResearchAudit(firmSlug);
+      if (!res.ok) {
+        setBanner({ tone: 'error', text: res.error });
+        return;
+      }
+      const r = res.result;
+      if (r.blockedByBudget) {
+        setBanner({
+          tone: 'error',
+          text: `Deep Research blocked — quarterly cap $${r.budgetCapUsd.toFixed(2)} reached (used $${r.quarterToDateUsd.toFixed(2)}). Budget-gate ticket opened with options.`,
+        });
+        onComplete();
+        return;
+      }
+      setBanner({
+        tone: 'ok',
+        text: `Deep Research: ${r.findingsFound} content gap${r.findingsFound === 1 ? '' : 's'} identified · ${r.ticketsCreated} task${r.ticketsCreated === 1 ? '' : 's'} written · cost $${r.actualCostUsd.toFixed(4)} (quarter to date: $${r.quarterToDateUsd.toFixed(4)} / cap $${r.budgetCapUsd.toFixed(2)})`,
+      });
+      onComplete();
+    });
+  };
+  return (
+    <button
+      type="button"
+      onClick={handle}
+      disabled={isPending}
+      title="Runs a one-time LLM synthesis pass to identify content gaps. Costs ~$0.05-$0.20 per run. Quarterly cap configurable on firm_budget."
+      className="inline-flex items-center gap-2 rounded-full border border-[var(--rag-yellow)]/40 bg-[var(--rag-yellow-bg)] px-3.5 py-2 text-[11px] font-semibold text-[var(--rag-yellow)] transition-colors hover:bg-[var(--rag-yellow-bg)]/80 disabled:opacity-50"
+    >
+      {isPending ? (
+        <Loader2 size={12} className="animate-spin" />
+      ) : (
+        <Sparkles size={12} strokeWidth={2.5} />
+      )}
+      Deep Research
+      <DollarSign size={10} strokeWidth={3} className="opacity-60" />
+    </button>
   );
 }
 
