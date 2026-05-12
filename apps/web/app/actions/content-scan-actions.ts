@@ -1,8 +1,8 @@
 'use server';
 
 /**
- * Phase 3 (Content Optimization) + Phase 5 (Technical Implementation)
- * scanner triggers.
+ * Phase 3 (Content Optimization), Phase 5 (Technical Implementation),
+ * and Phase 6 (Content Generation) scanner triggers.
  *
  * Each scanner is a read-only-or-bounded-fetch pass over the firm's
  * `pages` corpus — the operator must run the Suppression scan first to
@@ -37,6 +37,10 @@ import {
   runSchemaMarkupScanBySlug,
   type SchemaScanResult,
 } from '../lib/content/schema-markup-scanner';
+import {
+  runTrustAlignmentScanBySlug,
+  type TrustScanResult,
+} from '../lib/content/trust-scanner';
 
 export type ContentScanKind = 'llm_friendly' | 'freshness' | 'both';
 
@@ -106,6 +110,33 @@ export async function runTechnicalImplementationScan(
     }
 
     return { ok: true, semanticHtml, schemaMarkup };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+export interface ContentGenerationScanResponse {
+  ok: true;
+  trustAlignment: TrustScanResult;
+}
+
+export async function runContentGenerationScan(
+  firmSlug: string,
+): Promise<ContentGenerationScanResponse | ContentScanError> {
+  try {
+    const trustAlignment = await runTrustAlignmentScanBySlug(firmSlug);
+
+    try {
+      revalidatePath(`/dashboard/${firmSlug}/content-generation`);
+      revalidatePath(`/dashboard/${firmSlug}/action-items`);
+    } catch {
+      /* not in a Next request context — safe to ignore */
+    }
+
+    return { ok: true, trustAlignment };
   } catch (err) {
     return {
       ok: false,
