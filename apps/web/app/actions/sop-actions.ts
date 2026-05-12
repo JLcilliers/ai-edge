@@ -961,9 +961,16 @@ export async function getPhaseExecutionTasks(
     };
   });
 
-  const latestCompleted = runs
-    .filter((r) => r.completedAt != null)
-    .map((r) => r.completedAt!)
+  // Last-scan timestamp for the strip header. Prefer completed_at when
+  // a run is fully done; fall back to started_at when a scanner is still
+  // awaiting_input — operators want to see "ran 2 min ago" even before
+  // they ratify the run. Scanner-managed SOPs (Phase 3+) stay in
+  // awaiting_input forever by design, so the completed-only filter would
+  // hide every successful scan.
+  const latestScanAt = runs
+    .filter((r) => r.status !== 'not_started' && r.status !== 'cancelled')
+    .map((r) => r.completedAt ?? r.startedAt)
+    .filter((d): d is Date => d != null)
     .sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
 
   return {
@@ -971,7 +978,7 @@ export async function getPhaseExecutionTasks(
     phaseName: phase.name,
     tasks,
     lastScan: {
-      completedAt: latestCompleted,
+      completedAt: latestScanAt,
       runsByKey,
     },
   };

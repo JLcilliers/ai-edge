@@ -1,18 +1,51 @@
 'use client';
 
-import { useTransition } from 'react';
+import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Activity, Loader2, RefreshCw } from 'lucide-react';
+import { Activity, AlertCircle, CheckCircle2, Loader2, RefreshCw } from 'lucide-react';
+import { runContentOptimizationScan } from '../../../actions/content-scan-actions';
 
 /**
  * The "Run scan" strip at the top of each phase page.
  *
- * Phase 1 wires through to the existing scanner triggers (audit,
- * suppression, entity, AIO). Phases 2-7 disable the button with a
- * "Scanner wiring lands in the next iteration" hint until the
- * underlying scanner is implemented — no fake progress, no placeholder
- * spinner.
+ * Three trigger modes per phase:
+ *   - 'route' — the existing scanner UI lives at another URL (Phase 1's
+ *               /audits, Phase 4's /entity). Button does a router.push.
+ *   - 'action' — phase has a direct scanner server action (Phase 3's
+ *                LLM-Friendly + Freshness). Button awaits the action and
+ *                surfaces the result inline.
+ *   - 'pending' — no scanner wired yet. Button is replaced with a
+ *                  "Scanner wiring in progress" pill.
  */
+
+type ScanTrigger =
+  | { mode: 'route'; href: string }
+  | { mode: 'action'; key: 'content-optimization' }
+  | { mode: 'pending' };
+
+function triggerFor(phaseKey: string, firmSlug: string): ScanTrigger {
+  switch (phaseKey) {
+    case 'brand-audit-analysis':
+      return { mode: 'route', href: `/dashboard/${firmSlug}/audits` };
+    case 'content-optimization':
+      return { mode: 'action', key: 'content-optimization' };
+    case 'third-party-optimization':
+    case 'technical-implementation':
+      return { mode: 'route', href: `/dashboard/${firmSlug}/entity` };
+    case 'client-services':
+      return { mode: 'route', href: `/dashboard/${firmSlug}/reports` };
+    case 'measurement-monitoring':
+    case 'content-generation':
+    default:
+      return { mode: 'pending' };
+  }
+}
+
+type Banner =
+  | { tone: 'ok'; text: string }
+  | { tone: 'error'; text: string }
+  | null;
+
 export function ScanControlsClient({
   firmSlug,
   phaseKey,
@@ -33,29 +66,47 @@ export function ScanControlsClient({
 }) {
   const router = useRouter();
   const [isPending, start] = useTransition();
+  const [banner, setBanner] = useState<Banner>(null);
 
-  // Map phaseKey → which scanner route to invoke. Phase 1 reuses the
-  // existing audit + suppression + entity triggers. As we wire scanners
-  // for the other phases, add their endpoints here.
-  const scannerHref: Record<string, string | null> = {
-    'brand-audit-analysis': `/dashboard/${firmSlug}/audits`,
-    'measurement-monitoring': null,
-    'content-optimization': null,
-    'third-party-optimization': `/dashboard/${firmSlug}/entity`,
-    'technical-implementation': `/dashboard/${firmSlug}/entity`,
-    'content-generation': null,
-    'client-services': `/dashboard/${firmSlug}/reports`,
-  };
-  const scannerHrefForPhase = scannerHref[phaseKey] ?? null;
+  const trigger = triggerFor(phaseKey, firmSlug);
 
   const handleRunScan = () => {
-    if (!scannerHrefForPhase) return;
-    start(() => {
-      // Route to the underlying scanner UI. Once scanner triggers are
-      // fully wired as a single phase-level action, this gets replaced
-      // by a direct server-action call.
-      router.push(scannerHrefForPhase);
-    });
+    if (trigger.mode === 'route') {
+      start(() => {
+        router.push(trigger.href);
+      });
+      return;
+    }
+    if (trigger.mode === 'action' && trigger.key === 'content-optimization') {
+      setBanner(null);
+      start(async () => {
+        const res = await runContentOptimizationScan(firmSlug, 'both');
+        if (!res.ok) {
+          setBanner({ tone: 'error', text: res.error });
+          return;
+        }
+        const parts: string[] = [];
+        if (res.llmFriendly) {
+          parts.push(
+            `LLM-Friendly: scored ${res.llmFriendly.pagesScanned} page${
+              res.llmFriendly.pagesScanned === 1 ? '' : 's'
+            }, ${res.llmFriendly.pagesFailing} below the bar (avg ${res.llmFriendly.averageScore}/7)`,
+          );
+        }
+        if (res.freshness) {
+          parts.push(
+            `Freshness: ${res.freshness.fresh} fresh / ${res.freshness.aging} aging / ${res.freshness.stale} stale / ${res.freshness.dormant} dormant / ${res.freshness.unknown} undated`,
+          );
+        }
+        const ticketTotal =
+          (res.llmFriendly?.ticketsCreated ?? 0) + (res.freshness?.ticketsCreated ?? 0);
+        parts.push(`${ticketTotal} execution task${ticketTotal === 1 ? '' : 's'} written`);
+        setBanner({ tone: 'ok', text: parts.join(' · ') });
+        // Pull fresh server data so the ranked task list below updates.
+        router.refresh();
+      });
+      return;
+    }
   };
 
   const formatRelative = (iso: string | null): string => {
@@ -84,7 +135,11 @@ export function ScanControlsClient({
             </div>
           </div>
         </div>
-        {scannerHrefForPhase ? (
+        {trigger.mode === 'pending' ? (
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] text-white/55">
+            Scanner wiring in progress
+          </span>
+        ) : (
           <button
             type="button"
             onClick={handleRunScan}
@@ -94,12 +149,25 @@ export function ScanControlsClient({
             {isPending ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} strokeWidth={2} />}
             Run scan
           </button>
-        ) : (
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] text-white/55">
-            Scanner wiring in progress
-          </span>
         )}
       </div>
+
+      {banner && (
+        <div
+          className={`mt-3 flex items-start gap-2 rounded-md border px-3 py-2 text-[11px] ${
+            banner.tone === 'ok'
+              ? 'border-[var(--rag-green)]/30 bg-[var(--rag-green-bg)] text-[var(--rag-green)]'
+              : 'border-[var(--rag-red)]/30 bg-[var(--rag-red-bg)] text-[var(--rag-red)]'
+          }`}
+        >
+          {banner.tone === 'ok' ? (
+            <CheckCircle2 size={12} strokeWidth={2.5} className="mt-0.5 shrink-0" />
+          ) : (
+            <AlertCircle size={12} strokeWidth={2.5} className="mt-0.5 shrink-0" />
+          )}
+          <span className="break-words">{banner.text}</span>
+        </div>
+      )}
 
       {lastScan.runsByKey.length > 0 && (
         <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
