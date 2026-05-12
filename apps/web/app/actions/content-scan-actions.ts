@@ -61,6 +61,10 @@ import {
   runAiInfoScanBySlug,
   type AiInfoScanResult,
 } from '../lib/content/ai-info-scanner';
+import {
+  runCompetitiveScanBySlug,
+  type CompetitiveScanResult,
+} from '../lib/content/competitive-scanner';
 
 export interface ContentScanResponse {
   ok: true;
@@ -194,23 +198,29 @@ export async function runMeasurementMonitoringScan(
 export interface ClientServicesScanResponse {
   ok: true;
   weeklyReport: WeeklyReportingScanResult;
+  competitive: CompetitiveScanResult;
 }
 
 export async function runClientServicesScan(
   firmSlug: string,
 ): Promise<ClientServicesScanResponse | ContentScanError> {
   try {
+    // Weekly Reporting + Competitive LLM Monitoring share the
+    // Client Services phase. Both read from existing data (no
+    // re-crawl) and complete in seconds.
     const weeklyReport = await runWeeklyReportingScanBySlug(firmSlug);
+    const competitive = await runCompetitiveScanBySlug(firmSlug);
 
     try {
       revalidatePath(`/dashboard/${firmSlug}/client-services`);
       revalidatePath(`/dashboard/${firmSlug}/action-items`);
       revalidatePath(`/dashboard/${firmSlug}/sop/weekly_aeo_reporting`);
+      revalidatePath(`/dashboard/${firmSlug}/sop/competitive_llm_monitoring`);
     } catch {
       /* not in a Next request context — safe to ignore */
     }
 
-    return { ok: true, weeklyReport };
+    return { ok: true, weeklyReport, competitive };
   } catch (err) {
     return {
       ok: false,
