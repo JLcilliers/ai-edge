@@ -3,7 +3,10 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowLeft } from 'lucide-react';
 import { listFirms, getFirmBySlug } from '../../actions/firm-actions';
-import { getOpenTicketCount } from '../../actions/remediation-actions';
+import {
+  getOpenTicketCount,
+  getOpenTicketCountsByPhase,
+} from '../../actions/remediation-actions';
 import { FirmSwitcher } from './firm-switcher';
 import { FirmSidebarNav } from './firm-sidebar-nav';
 
@@ -17,12 +20,13 @@ export default async function FirmScopedLayout({
   params: Promise<{ firmSlug: string }>;
 }) {
   const { firmSlug } = await params;
-  const [current, firms, openTicketCount] = await Promise.all([
+  const [current, firms, openTicketCount, openTicketCountsByPhase] = await Promise.all([
     getFirmBySlug(firmSlug),
     listFirms(),
-    // getOpenTicketCount swallows errors internally so a DB hiccup can't
-    // crash the layout — it just renders as "no badge".
+    // Both ticket-count actions swallow errors internally so a DB hiccup
+    // can't crash the layout — they just render as "no badge".
     getOpenTicketCount(firmSlug),
+    getOpenTicketCountsByPhase(firmSlug),
   ]);
   if (!current) notFound();
 
@@ -61,7 +65,11 @@ export default async function FirmScopedLayout({
         <FirmSwitcher current={current} firms={firms} />
 
         {/* Nav */}
-        <FirmSidebarNav firmSlug={firmSlug} openTicketCount={openTicketCount} />
+        <FirmSidebarNav
+          firmSlug={firmSlug}
+          openTicketCount={openTicketCount}
+          openTicketCountsByPhase={openTicketCountsByPhase}
+        />
       </aside>
 
       {/* Main content */}

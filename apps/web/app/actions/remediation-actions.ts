@@ -398,6 +398,40 @@ export async function getOpenTicketCount(firmSlug: string): Promise<number> {
 }
 
 /**
+ * Per-phase open ticket counts. Used by the sidebar nav to surface a
+ * count badge next to each phase entry. One round-trip; missing phases
+ * fall back to 0 in the consumer.
+ *
+ * Joined through sop_run because remediation_ticket doesn't carry phase
+ * directly — sop_run.phase is the authoritative location.
+ */
+export async function getOpenTicketCountsByPhase(
+  firmSlug: string,
+): Promise<Record<number, number>> {
+  try {
+    const db = getDb();
+    const firmId = await resolveFirmId(firmSlug);
+    const rows = await db.execute<{ phase: number; ticket_count: number }>(
+      sql`
+        SELECT sop_run.phase::int AS phase, COUNT(*)::int AS ticket_count
+        FROM remediation_ticket
+        INNER JOIN sop_run ON sop_run.id = remediation_ticket.sop_run_id
+        WHERE remediation_ticket.firm_id = ${firmId}
+          AND remediation_ticket.status IN ('open', 'in_progress')
+        GROUP BY sop_run.phase
+      `,
+    );
+    const out: Record<number, number> = {};
+    for (const row of rows.rows ?? []) {
+      out[Number(row.phase)] = Number(row.ticket_count);
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+/**
  * Move a ticket between statuses. Idempotent — re-writing the same status
  * is a no-op but still revalidates so the UI reconciles if a stale client
  * got out of sync.
