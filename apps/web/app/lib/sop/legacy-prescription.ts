@@ -156,33 +156,73 @@ interface LegacyPrescriptionInput {
   pageUrl: string;
   pageTitle: string | null;
   wordCount: number | null;
-  action: 'delete' | 'redirect' | 'noindex' | 'keep' | 'rewrite' | string;
+  action: 'delete' | 'redirect' | 'noindex' | 'keep' | 'keep_update' | 'rewrite' | string;
   rationale: string;
   semanticDistance: number;
+  /**
+   * Per-URL GSC clicks/month over the last 30 days. Null when the firm
+   * has no GSC connection or the URL has zero impressions.
+   * Added in C1 (Suppression Decision Framework Rewrite) so the ticket
+   * description carries the click data the operator needs to validate
+   * the bucket choice.
+   */
+  clicksPerMonth?: number | null;
+  /**
+   * True when Toth's click-based STEP3 framework decided this bucket.
+   * False when the no-GSC fallback path picked it. Surfaced in the
+   * ticket description so operators know the data backing the call —
+   * and so a re-bucketing query can find provisional buckets when GSC
+   * eventually connects.
+   */
+  decidedWithGsc?: boolean;
 }
+
+const ACTION_LABEL: Record<string, string> = {
+  delete: 'Delete',
+  redirect: 'Redirect',
+  noindex: 'No-index',
+  keep_update: 'Keep + update',
+  keep: 'Keep + update',
+  rewrite: 'Rewrite',
+};
 
 export function prescribeLegacyTicket(input: LegacyPrescriptionInput): TicketPrescription {
   const action = input.action.toLowerCase();
   const titleText = input.pageTitle?.trim() || input.pageUrl;
-  const actionLabel = action[0]!.toUpperCase() + action.slice(1);
-  const title = `${actionLabel} ${truncate(titleText, 80)}`;
+  const actionLabel = ACTION_LABEL[action] ?? (action[0]!.toUpperCase() + action.slice(1));
+  const title = `${actionLabel}: ${truncate(titleText, 80)}`;
 
-  const description =
-    `${input.rationale}\n\n` +
-    `URL: ${input.pageUrl}\n` +
-    `Semantic distance from Brand Truth: ${input.semanticDistance.toFixed(3)}\n` +
-    `Word count: ${input.wordCount ?? 'unknown'}`;
+  const descLines: string[] = [];
+  descLines.push(input.rationale);
+  descLines.push('');
+  descLines.push(`URL: ${input.pageUrl}`);
+  descLines.push(`Semantic distance from Brand Truth: ${input.semanticDistance.toFixed(3)}`);
+  descLines.push(`Word count: ${input.wordCount ?? 'unknown'}`);
+  if (input.clicksPerMonth != null) {
+    descLines.push(`GSC clicks (last 30 days): ${input.clicksPerMonth}`);
+  }
+  if (input.decidedWithGsc === false) {
+    descLines.push(
+      `Note: No GSC connection — bucket decided from distance + backlinks only. ` +
+        `Will be re-evaluated once Google Search Console is connected (see Phase 1 → Connect Search Console).`,
+    );
+  }
+  const description = descLines.join('\n');
 
   const remediationByAction: Record<string, string> = {
-    delete: `**Action:** Delete \`${input.pageUrl}\`.\n\n1. Back up the page content first (export HTML, save in archive folder).\n2. Set the page to draft / trash in CMS.\n3. After 2-4 weeks of monitoring, permanently delete.\n4. Verify the URL returns 404 (not 500).\n5. Optionally submit URL removal in GSC → Removals.`,
-    redirect: `**Action:** Create a 301 redirect from \`${input.pageUrl}\` to the closest aligned page.\n\n1. Identify the target page that best covers this topic under current Brand Truth.\n2. Add the redirect (CMS / .htaccess / Cloudflare Page Rules).\n3. Verify the redirect returns 301 (not 302).\n4. Update internal links pointing at the old URL.\n5. Submit the change in GSC.`,
-    noindex: `**Action:** Add \`noindex\` meta tag to \`${input.pageUrl}\`.\n\n1. Edit the page in CMS.\n2. Add the meta tag (Yoast / RankMath / manual \`<meta name="robots" content="noindex">\`).\n3. Verify via View Source.\n4. Leave page in sitemap so internal crawl still works.`,
-    rewrite: `**Action:** Rewrite \`${input.pageUrl}\` to align with current Brand Truth.\n\n1. Audit current copy against Brand Truth (\`primary_url\`, \`required_positioning_phrases\`, \`unique_differentiators\`, \`banned_claims\`).\n2. Rewrite intro + H1 + meta description.\n3. Restructure body for AEO (scannable headings, citable facts, required positioning phrases verbatim).\n4. Update schema markup.\n5. Publish + verify in browser.\n6. Re-run LLM-Friendly Content Checklist scan; confirm score ≥ 5/7.`,
-    keep: `**Action:** Page has high traffic (≥50 clicks/mo). This is a Content Repositioning candidate, not a suppression target — move to the Repositioning workflow under Phase 3.`,
+    delete: `**Action:** Delete \`${input.pageUrl}\`.\n\nToth STEP3: low-traffic (<5 clicks/mo) page with <5 referring domains and drift from Brand Truth — safe to remove.\n\n1. Back up the page content first (export HTML, save in archive folder).\n2. Set the page to draft / trash in CMS.\n3. After 2-4 weeks of monitoring, permanently delete.\n4. Verify the URL returns 404 (not 500).\n5. Optionally submit URL removal in GSC → Removals.`,
+    redirect: `**Action:** Create a 301 redirect from \`${input.pageUrl}\` to the closest aligned page.\n\nToth STEP3: page either has 10-49 clicks/mo (medium traffic worth preserving) OR <5 clicks/mo but ≥5 referring domains (preserve link equity).\n\n1. Identify the target page that best covers this topic under current Brand Truth.\n2. Add the redirect (CMS / .htaccess / Cloudflare Page Rules).\n3. Verify the redirect returns 301 (not 302).\n4. Update internal links pointing at the old URL.\n5. Submit the change in GSC.`,
+    noindex: `**Action:** Add \`noindex\` meta tag to \`${input.pageUrl}\`.\n\nToth STEP3: page has 5-9 clicks/mo — low-but-present traffic. Hide from search rather than redirect or delete, so the page can stay live without contaminating LLM training surfaces.\n\n1. Edit the page in CMS.\n2. Add the meta tag (Yoast / RankMath / manual \`<meta name="robots" content="noindex">\`).\n3. Verify via View Source.\n4. Leave page in sitemap so internal crawl still works.`,
+    keep_update: `**Action:** Refresh \`${input.pageUrl}\` in place — do NOT suppress.\n\nToth STEP3: ≥50 clicks/mo means this page is too valuable to delete or hide. It drifts from Brand Truth but the traffic mandates we fix the content, not the URL. This ticket lives under **Content Repositioning** (Phase 3), not Suppression.\n\n1. Audit current copy against Brand Truth (\`primary_url\`, \`required_positioning_phrases\`, \`unique_differentiators\`, \`banned_claims\`).\n2. Rewrite intro + H1 + meta description while keeping the URL stable.\n3. Restructure body for AEO (scannable headings, citable facts, required positioning phrases verbatim).\n4. Update schema markup.\n5. Publish + verify in browser.\n6. Re-run LLM-Friendly Content Checklist scan; confirm score ≥ 5/7.\n7. Watch GSC for 2-4 weeks — clicks should hold or rise, distance should drop.`,
+    rewrite: `**Action:** Rewrite \`${input.pageUrl}\` to align with current Brand Truth.\n\nNo GSC connection yet — bucket may shift to **keep_update** (high-traffic) or **delete** (low-traffic) once Search Console is wired up. Refresh the content now anyway; the work is the same.\n\n1. Audit current copy against Brand Truth (\`primary_url\`, \`required_positioning_phrases\`, \`unique_differentiators\`, \`banned_claims\`).\n2. Rewrite intro + H1 + meta description.\n3. Restructure body for AEO (scannable headings, citable facts, required positioning phrases verbatim).\n4. Update schema markup.\n5. Publish + verify in browser.\n6. Re-run LLM-Friendly Content Checklist scan; confirm score ≥ 5/7.`,
+    // Legacy alias for pre-C1 'keep' rows surfaced by the backfill.
+    keep: `**Action:** Refresh \`${input.pageUrl}\` in place — high-traffic page worth keeping. Move to the Repositioning workflow under Phase 3.`,
   };
 
   const remediationCopy =
-    `**Page:** ${input.pageUrl}\n\n**Distance:** ${input.semanticDistance.toFixed(3)} (above 0.40 rewrite threshold)\n\n${remediationByAction[action] ?? `**Action:** Operator decision required for unhandled action \`${action}\`.`}`;
+    `**Page:** ${input.pageUrl}\n\n**Distance:** ${input.semanticDistance.toFixed(3)} (above 0.40 drift threshold)\n${
+      input.clicksPerMonth != null ? `**Clicks/mo:** ${input.clicksPerMonth}\n` : ''
+    }\n${remediationByAction[action] ?? `**Action:** Operator decision required for unhandled action \`${action}\`.`}`;
 
   const validationSteps: Array<{ description: string }> = [
     { description: `Apply the ${actionLabel.toLowerCase()} action in CMS` },

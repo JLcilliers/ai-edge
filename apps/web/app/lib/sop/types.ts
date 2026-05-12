@@ -18,6 +18,11 @@ export type SopKey =
   | 'brand_visibility_audit'
   | 'legacy_content_suppression'
   | 'brand_messaging_standardization'
+  // gsc_setup is a Phase 1 prerequisite for Legacy Content Suppression's
+  // Toth STEP3 click-based bucketing (Delete / 301 / NoIndex / Keep-
+  // Update). Single-step OAuth-flow SOP — emits a config-gate ticket
+  // when no gsc_connection exists for the firm.
+  | 'gsc_setup'
   // Phase 2: Measurement & Monitoring
   | 'ga4_llm_traffic_setup'
   | 'ai_bot_log_file_analysis'

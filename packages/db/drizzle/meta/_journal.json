@@ -120,6 +120,13 @@
       "when": 1778800000000,
       "tag": "0016_remediation_ticket_sop_run_not_null",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1778900000000,
+      "tag": "0017_gsc_url_metrics_and_decided_with_gsc",
+      "breakpoints": true
     }
   ]
 }
