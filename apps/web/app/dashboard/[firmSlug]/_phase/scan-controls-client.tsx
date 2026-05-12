@@ -119,10 +119,13 @@ export function ScanControlsClient({
           return;
         }
         const sh = res.semanticHtml;
+        const sm = res.schemaMarkup;
         const parts: string[] = [
-          `Semantic HTML: scored ${sh.pagesScanned} page${sh.pagesScanned === 1 ? '' : 's'} (avg ${sh.averageScore}/100)`,
-          `${sh.bandCounts.high} high · ${sh.bandCounts.medium} medium · ${sh.bandCounts.low} low · ${sh.bandCounts.maintenance} maintenance`,
-          `${sh.ticketsCreated} execution task${sh.ticketsCreated === 1 ? '' : 's'} written`,
+          `Semantic HTML: avg ${sh.averageScore}/100 across ${sh.pagesScanned} page${sh.pagesScanned === 1 ? '' : 's'} (${sh.bandCounts.high} high · ${sh.bandCounts.medium} medium · ${sh.bandCounts.low} low · ${sh.bandCounts.maintenance} maintenance)`,
+          `Schema: ${sm.pagesWithFindings}/${sm.pagesScanned} pages flagged (${sm.severityCounts.high} high · ${sm.severityCounts.medium} medium · ${sm.severityCounts.low} low; ${sm.pagesClean} clean)`,
+          `${sh.ticketsCreated + sm.ticketsCreated} execution task${
+            sh.ticketsCreated + sm.ticketsCreated === 1 ? '' : 's'
+          } written`,
         ];
         setBanner({ tone: 'ok', text: parts.join(' · ') });
         router.refresh();
