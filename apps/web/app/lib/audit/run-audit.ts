@@ -22,6 +22,7 @@ import {
   recordRunCost,
 } from './budget';
 import { ensureSopRun } from '../sop/ensure-run';
+import { prescribeAuditTicket } from '../sop/legacy-prescription';
 
 /**
  * Options for an audit run.
@@ -338,8 +339,21 @@ export async function runAudit(
             canonical.score.remediation_priority === 'yellow' ? 2 : 3,
         }).returning({ id: alignmentScores.id });
 
-        // Remediation ticket for Red consensus.
+        // Remediation ticket for Red consensus. We compose the
+        // prescription-layer fields up-front so the ticket the operator
+        // sees actually explains the gap + lists the factual errors the
+        // LLM made + tells them how to fix it. Without this, the ticket
+        // is a bare status row that says "something happened, go look."
         if (canonical.score.remediation_priority === 'red' && alignmentRow) {
+          const presc = prescribeAuditTicket({
+            queryText,
+            provider: canonical.sample.providerName,
+            ragLabel: canonical.score.remediation_priority,
+            gapReasons: canonical.score.gap_reasons,
+            factualErrors: canonical.score.factual_accuracy?.errors ?? [],
+            citations: canonical.score.citations,
+            mentioned: majorityMentioned,
+          });
           await db.insert(remediationTickets).values({
             firm_id: firmId,
             source_type: 'audit',
@@ -348,6 +362,16 @@ export async function runAudit(
             status: 'open',
             playbook_step: 'initial_triage',
             due_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+            title: presc.title,
+            description: presc.description,
+            priority_rank: presc.priorityRank,
+            remediation_copy: presc.remediationCopy,
+            validation_steps: presc.validationSteps,
+            evidence_links: presc.evidenceLinks,
+            automation_tier: presc.automationTier,
+            execute_url: presc.executeUrl,
+            execute_label: presc.executeLabel,
+            manual_reason: presc.manualReason,
           });
         }
 

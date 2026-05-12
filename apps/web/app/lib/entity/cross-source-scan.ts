@@ -15,6 +15,7 @@ import {
   semanticDistance,
 } from '../suppression/embeddings';
 import { ensureSopRun } from '../sop/ensure-run';
+import { prescribeEntityTicket } from '../sop/legacy-prescription';
 
 /**
  * Cross-source vector alignment + third-party badge verification scanner
@@ -344,6 +345,12 @@ export async function runCrossSourceScan(
         const playbookStep = badgeUnverified
           ? `entity:cross-source:badge-unverified:${f.candidate.source}`
           : `entity:cross-source:divergent:${f.candidate.source}`;
+        const presc = prescribeEntityTicket({
+          source: f.candidate.source,
+          url: f.candidate.url,
+          divergenceFlags: flags,
+          playbookStep,
+        });
         await db.insert(remediationTickets).values({
           firm_id: firmId,
           source_type: 'entity',
@@ -352,6 +359,15 @@ export async function runCrossSourceScan(
           status: 'open',
           playbook_step: playbookStep,
           due_at: new Date(Date.now() + dueDays * 24 * 60 * 60 * 1000),
+          title: presc.title,
+          description: presc.description,
+          priority_rank: presc.priorityRank,
+          remediation_copy: presc.remediationCopy,
+          validation_steps: presc.validationSteps,
+          evidence_links: presc.evidenceLinks,
+          automation_tier: presc.automationTier,
+          execute_url: presc.executeUrl,
+          execute_label: presc.executeLabel,
         });
         outcome.ticketsOpened += 1;
       }

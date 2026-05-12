@@ -25,6 +25,7 @@ import {
   type BacklinkCount,
 } from './backlinks';
 import { ensureSopRun } from '../sop/ensure-run';
+import { prescribeLegacyTicket } from '../sop/legacy-prescription';
 
 /**
  * Suppression scan — see PLAN §5.3.
@@ -354,6 +355,17 @@ export async function runSuppressionScan(
             : action === 'redirect'
               ? 'redirect'
               : 'rewrite';
+        // Compose the prescription-layer fields so the operator sees a
+        // useful ticket (title, rationale, fix steps) instead of a bare
+        // status row.
+        const presc = prescribeLegacyTicket({
+          pageUrl: page.url,
+          pageTitle: page.title,
+          wordCount: page.wordCount,
+          action,
+          rationale,
+          semanticDistance: distance,
+        });
         await db.insert(remediationTickets).values({
           firm_id: firmId,
           source_type: 'legacy',
@@ -362,6 +374,15 @@ export async function runSuppressionScan(
           status: 'open',
           playbook_step: playbookStep,
           due_at: new Date(Date.now() + dueDays * 24 * 60 * 60 * 1000),
+          title: presc.title,
+          description: presc.description,
+          priority_rank: presc.priorityRank,
+          remediation_copy: presc.remediationCopy,
+          validation_steps: presc.validationSteps,
+          evidence_links: presc.evidenceLinks,
+          automation_tier: presc.automationTier,
+          execute_url: presc.executeUrl,
+          execute_label: presc.executeLabel,
         });
       }
     }

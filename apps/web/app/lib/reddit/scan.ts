@@ -10,6 +10,7 @@ import { eq, desc } from 'drizzle-orm';
 import { searchReddit, type RedditPost } from './client';
 import { classifySentiment, type RedditSentiment } from './sentiment';
 import { ensureSopRun } from '../sop/ensure-run';
+import { prescribeRedditTicket } from '../sop/legacy-prescription';
 
 /**
  * Run a Reddit sentiment scan for a firm.
@@ -260,20 +261,45 @@ export async function runRedditScan(firmId: string): Promise<string> {
           id: redditMentions.id,
           sentiment: redditMentions.sentiment,
           karma: redditMentions.karma,
+          subreddit: redditMentions.subreddit,
+          url: redditMentions.url,
+          text: redditMentions.text,
+          postedAt: redditMentions.posted_at,
         });
 
-      // Open remediation tickets for real complaints (karma >= 10)
+      // Open remediation tickets for real complaints (karma >= 10).
+      // Compose prescription content per-ticket so the operator sees
+      // thread URL + decision tree, not a bare status row.
       const ticketRows = inserted
         .filter((row) => row.sentiment === 'complaint' && (row.karma ?? 0) >= 10)
-        .map((row) => ({
-          firm_id: firmId,
-          source_type: 'reddit' as const,
-          source_id: row.id,
-          sop_run_id: sopRunId,
-          status: 'open',
-          playbook_step: 'reddit_triage',
-          due_at: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days — Reddit rots fast
-        }));
+        .map((row) => {
+          const presc = prescribeRedditTicket({
+            subreddit: row.subreddit,
+            threadUrl: row.url,
+            karma: row.karma,
+            sentiment: row.sentiment,
+            text: row.text,
+            postedAt: row.postedAt,
+          });
+          return {
+            firm_id: firmId,
+            source_type: 'reddit' as const,
+            source_id: row.id,
+            sop_run_id: sopRunId,
+            status: 'open',
+            playbook_step: 'reddit_triage',
+            due_at: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days — Reddit rots fast
+            title: presc.title,
+            description: presc.description,
+            priority_rank: presc.priorityRank,
+            remediation_copy: presc.remediationCopy,
+            validation_steps: presc.validationSteps,
+            evidence_links: presc.evidenceLinks,
+            automation_tier: presc.automationTier,
+            execute_url: presc.executeUrl,
+            execute_label: presc.executeLabel,
+          };
+        });
 
       if (ticketRows.length > 0) {
         await db.insert(remediationTickets).values(ticketRows);
