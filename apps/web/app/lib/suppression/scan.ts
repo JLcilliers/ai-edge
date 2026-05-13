@@ -5,6 +5,7 @@ import {
   legacyFindings,
   remediationTickets,
   brandTruthVersions,
+  sopStepStates,
 } from '@ai-edge/db';
 import type { BrandTruth } from '@ai-edge/shared';
 import { eq, desc, and, inArray } from 'drizzle-orm';
@@ -20,12 +21,20 @@ import {
 } from './embeddings';
 import {
   getBacklinksProvider,
-  decideSuppressionAction,
-  buildRationale,
   type BacklinkCount,
 } from './backlinks';
 import { ensureSopRun } from '../sop/ensure-run';
 import { prescribeLegacyTicket } from '../sop/legacy-prescription';
+import {
+  decideAction,
+  targetSopKeyForAction,
+  DISTANCE_THRESHOLD_DRIFT,
+} from './decide-action';
+import {
+  firmHasGscConnection,
+  ensureFreshPerUrlMetrics,
+  getClicksPerMonthForUrl,
+} from '../gsc/per-url-metrics';
 
 /**
  * Suppression scan — see PLAN §5.3.
@@ -69,8 +78,9 @@ import { prescribeLegacyTicket } from '../sop/legacy-prescription';
 const PAGE_CONCURRENCY = 1; // Be polite — firm sites are small targets.
 const MAX_URLS_DEFAULT = 75;
 
-const DISTANCE_THRESHOLD_REWRITE = 0.40;
-const DISTANCE_THRESHOLD_SUPPRESS = 0.55;
+// Distance thresholds re-exported from decide-action.ts for symmetry
+// with what we used to define locally. Caller uses
+// DISTANCE_THRESHOLD_DRIFT as the gate; decideAction() handles the rest.
 const MIN_WORDS_TO_SCORE = 150; // Skip thin pages (contact, thank-you, etc).
 
 export interface RunSuppressionOptions {
@@ -119,15 +129,46 @@ export async function runSuppressionScan(
 
   const runId = run!.id;
 
-  // Resolve the Legacy Content Suppression sop_run up-front so every
-  // ticket emitted below attaches to it. Without this, tickets land
-  // with sop_run_id=NULL and don't surface in the phase page's
-  // execution-task list or the per-phase sidebar count.
-  const sopRunId = await ensureSopRun(
+  // Resolve sop_runs up-front. After C1 (SOP Alignment Audit) we route
+  // tickets to TWO different sop_runs based on bucket:
+  //   delete / redirect / noindex → legacy_content_suppression (Phase 1)
+  //   keep_update / rewrite        → content_repositioning      (Phase 3)
+  // Resolving both here so neither code path needs to ensure-on-demand.
+  const suppressionRunId = await ensureSopRun(
     firmId,
     'legacy_content_suppression',
     'scanner:suppression',
   );
+  const repositioningRunId = await ensureSopRun(
+    firmId,
+    'content_repositioning',
+    'scanner:suppression',
+  );
+
+  // GSC dual-mode gate. Per Toth STEP3, the bucket selection (Delete /
+  // 301 / NoIndex / Keep-Update) depends on per-URL clicks/month. If
+  // GSC isn't connected, we fall back to distance-only logic AND emit
+  // a single "Connect GSC" config-gate ticket attached to the gsc_setup
+  // sop_run. Operators see the config-gate ticket in Phase 1 with a
+  // clear next action.
+  const gscConnected = await firmHasGscConnection(firmId);
+  if (gscConnected) {
+    // Lazy backfill — fetches last-30-days per-URL clicks for the firm
+    // in a single GSC API call. No-op if data is already fresh (<7 days).
+    // Errors here don't kill the scan; we degrade to no-GSC mode for the
+    // current run and surface a config-gate ticket so the operator can
+    // re-auth.
+    try {
+      await ensureFreshPerUrlMetrics(firmId);
+    } catch (err) {
+      console.warn(
+        `[suppression] GSC per-URL fetch failed for firm ${firmId}:`,
+        err,
+      );
+    }
+  } else {
+    await emitGscSetupConfigGateTicket(firmId);
+  }
 
   try {
     // Pull the latest Brand Truth payload.
@@ -302,95 +343,106 @@ export async function runSuppressionScan(
         pageId = inserted!.id;
       }
 
-      // Classify + record. With Phase B #4 wiring: when distance > suppress
-      // threshold AND backlinks ≥ 5 ref-domains, action becomes 'redirect'
-      // instead of 'noindex' — preserves link equity for pages worth saving.
-      // backlinksProvider is resolved once outside the loop; the per-URL
-      // lookup is async + paid, so we only call it when distance is in
-      // the suppress range (the only place the result changes our action).
-      if (distance > DISTANCE_THRESHOLD_REWRITE) {
-        let backlinks: BacklinkCount | null = null;
-        if (distance > DISTANCE_THRESHOLD_SUPPRESS) {
-          // Only ask the backlinks provider when the action might flip to
-          // redirect — for rewrite-bucket findings the answer is irrelevant
-          // and we'd waste API quota.
-          backlinks = await backlinksProvider.getBacklinks(page.url);
-        }
-        const action = decideSuppressionAction(
-          distance,
-          {
-            rewrite: DISTANCE_THRESHOLD_REWRITE,
-            suppress: DISTANCE_THRESHOLD_SUPPRESS,
-          },
-          backlinks,
-        );
-        // 'aligned' shouldn't reach here (we gated on > rewrite threshold)
-        // but the type makes us handle it explicitly.
-        if (action === 'aligned') continue;
-        const rationale = buildRationale(
-          distance,
-          action,
-          {
-            rewrite: DISTANCE_THRESHOLD_REWRITE,
-            suppress: DISTANCE_THRESHOLD_SUPPRESS,
-          },
-          backlinks,
-        );
+      // Distance gate — below the drift threshold the page reads on-
+      // brand to LLMs, no action.
+      if (distance <= DISTANCE_THRESHOLD_DRIFT) continue;
 
-        const [finding] = await db
-          .insert(legacyFindings)
-          .values({
-            page_id: pageId,
-            semantic_distance: distance,
-            action,
-            rationale,
-          })
-          .returning({ id: legacyFindings.id });
-
-        // Ticket policy:
-        //   noindex  → 3-day due (unaligned page leaking to LLMs is urgent)
-        //   redirect → 7-day due (less urgent than noindex; preserves link
-        //                          equity but operator needs to map to the
-        //                          closest aligned page)
-        //   rewrite  → 14-day due (content work, longest runway)
-        const dueDays =
-          action === 'noindex' ? 3 : action === 'redirect' ? 7 : 14;
-        const playbookStep =
-          action === 'noindex'
-            ? 'suppress'
-            : action === 'redirect'
-              ? 'redirect'
-              : 'rewrite';
-        // Compose the prescription-layer fields so the operator sees a
-        // useful ticket (title, rationale, fix steps) instead of a bare
-        // status row.
-        const presc = prescribeLegacyTicket({
-          pageUrl: page.url,
-          pageTitle: page.title,
-          wordCount: page.wordCount,
-          action,
-          rationale,
-          semanticDistance: distance,
-        });
-        await db.insert(remediationTickets).values({
-          firm_id: firmId,
-          source_type: 'legacy',
-          source_id: finding!.id,
-          sop_run_id: sopRunId,
-          status: 'open',
-          playbook_step: playbookStep,
-          due_at: new Date(Date.now() + dueDays * 24 * 60 * 60 * 1000),
-          title: presc.title,
-          description: presc.description,
-          priority_rank: presc.priorityRank,
-          remediation_copy: presc.remediationCopy,
-          validation_steps: presc.validationSteps,
-          evidence_links: presc.evidenceLinks,
-          automation_tier: presc.automationTier,
-          execute_url: presc.executeUrl,
-          execute_label: presc.executeLabel,
-        });
+      // Per-URL inputs to the decision framework. Both can be null:
+      //   clicksPerMonth = null → no GSC → decideAction falls back to
+      //                          distance + backlinks bucketing
+      //   backlinks = null → no provider configured → treated as 0 ref-domains
+      // Backlinks lookup is paid; only fetch when the action might flip
+      // (clicks <5 OR no-GSC distance > divergent).
+      let clicksPerMonth: number | null = null;
+      if (gscConnected) {
+        clicksPerMonth = await getClicksPerMonthForUrl(firmId, page.url);
+        // null here means GSC has zero impressions for this URL in the
+        // window (genuine "0 clicks"), not "no GSC" — caller already
+        // ensured gscConnected. Treat as 0.
+        if (clicksPerMonth == null) clicksPerMonth = 0;
       }
+
+      let backlinks: BacklinkCount | null = null;
+      const needsBacklinks =
+        (clicksPerMonth != null && clicksPerMonth < 5) ||
+        (clicksPerMonth == null && distance > 0.55);
+      if (needsBacklinks) {
+        backlinks = await backlinksProvider.getBacklinks(page.url);
+      }
+
+      const decision = decideAction({
+        distance,
+        clicksPerMonth,
+        backlinks: backlinks ? { refDomains: backlinks.refDomains } : null,
+      });
+      if (decision.action === 'aligned') continue;
+
+      const [finding] = await db
+        .insert(legacyFindings)
+        .values({
+          page_id: pageId,
+          semantic_distance: distance,
+          action: decision.action,
+          rationale: decision.rationale,
+          decided_with_gsc: decision.decidedWithGsc,
+        })
+        .returning({ id: legacyFindings.id });
+
+      // Route to the right sop_run per bucket. delete/redirect/noindex
+      // stay in Suppression (Phase 1); keep_update + rewrite (no-GSC
+      // transitional bucket) go to Content Repositioning (Phase 3).
+      const targetSop = targetSopKeyForAction(decision.action);
+      const ticketSopRunId =
+        targetSop === 'content_repositioning'
+          ? repositioningRunId
+          : suppressionRunId;
+
+      // Due-date policy per bucket:
+      //   delete      → 7 days  (review window before destructive action)
+      //   noindex     → 3 days  (unaligned page leaking to LLMs is urgent)
+      //   redirect    → 7 days  (operator needs to map to target page)
+      //   keep_update → 14 days (content work, longest runway)
+      //   rewrite     → 14 days (transitional, same runway as keep_update)
+      const dueDays =
+        decision.action === 'noindex' ? 3 :
+        decision.action === 'redirect' ? 7 :
+        decision.action === 'delete' ? 7 :
+        14;
+      const playbookStep =
+        decision.action === 'noindex' ? 'suppress' :
+        decision.action === 'redirect' ? 'redirect' :
+        decision.action === 'delete' ? 'delete' :
+        decision.action === 'keep_update' ? 'keep_update' :
+        'rewrite';
+
+      const presc = prescribeLegacyTicket({
+        pageUrl: page.url,
+        pageTitle: page.title,
+        wordCount: page.wordCount,
+        action: decision.action,
+        rationale: decision.rationale,
+        semanticDistance: distance,
+        clicksPerMonth,
+        decidedWithGsc: decision.decidedWithGsc,
+      });
+      await db.insert(remediationTickets).values({
+        firm_id: firmId,
+        source_type: 'legacy',
+        source_id: finding!.id,
+        sop_run_id: ticketSopRunId,
+        status: 'open',
+        playbook_step: playbookStep,
+        due_at: new Date(Date.now() + dueDays * 24 * 60 * 60 * 1000),
+        title: presc.title,
+        description: presc.description,
+        priority_rank: presc.priorityRank,
+        remediation_copy: presc.remediationCopy,
+        validation_steps: presc.validationSteps,
+        evidence_links: presc.evidenceLinks,
+        automation_tier: presc.automationTier,
+        execute_url: presc.executeUrl,
+        execute_label: presc.executeLabel,
+      });
     }
 
     await db
@@ -409,4 +461,98 @@ export async function runSuppressionScan(
   }
 
   return runId;
+}
+
+/**
+ * When the firm has no GSC connection at scan time we can't apply Toth's
+ * click-based decision framework. Surface this as a single, idempotent
+ * config-gate ticket attached to the gsc_setup sop_run so operators see
+ * the missing prerequisite in Phase 1 instead of silently degrading to
+ * the no-GSC fallback. Re-runs of the scanner reuse the existing open
+ * ticket rather than spamming a new one.
+ */
+async function emitGscSetupConfigGateTicket(firmId: string): Promise<void> {
+  const db = getDb();
+  const gscSetupRunId = await ensureSopRun(
+    firmId,
+    'gsc_setup',
+    'scanner:suppression',
+  );
+
+  // Idempotency: skip if an open config-gate ticket already exists for
+  // this firm + sop_run.
+  const existing = await db
+    .select({ id: remediationTickets.id })
+    .from(remediationTickets)
+    .where(
+      and(
+        eq(remediationTickets.firm_id, firmId),
+        eq(remediationTickets.sop_run_id, gscSetupRunId),
+        eq(remediationTickets.source_type, 'sop'),
+        inArray(remediationTickets.status, ['open', 'in_progress']),
+      ),
+    )
+    .limit(1);
+  if (existing.length > 0) return;
+
+  // source_id references the step-1 sop_step_state row for gsc_setup.
+  // ensureSopRun already inserted step states (one per def.steps) so the
+  // row exists. We use source_type='sop' (the canonical SOP-emitted-
+  // ticket type) since remediation_ticket.source_id is NOT NULL and
+  // a 'config_gate' source_type would need its own source table.
+  const [stepState] = await db
+    .select({ id: sopStepStates.id })
+    .from(sopStepStates)
+    .where(
+      and(
+        eq(sopStepStates.sop_run_id, gscSetupRunId),
+        eq(sopStepStates.step_number, 1),
+      ),
+    )
+    .limit(1);
+  if (!stepState) {
+    // ensureSopRun guarantees this row exists — failure here means the
+    // gsc_setup SopDefinition has zero steps, which is a registry bug.
+    console.warn(
+      `[suppression] gsc_setup sop_run ${gscSetupRunId} has no step 1 — skipping config-gate ticket emit`,
+    );
+    return;
+  }
+
+  await db.insert(remediationTickets).values({
+    firm_id: firmId,
+    source_type: 'sop',
+    source_id: stepState.id,
+    sop_run_id: gscSetupRunId,
+    sop_step_number: 1,
+    status: 'open',
+    playbook_step: 'connect_gsc_oauth',
+    due_at: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+    title: 'Connect Google Search Console to enable Toth STEP3 bucketing',
+    description:
+      'Suppression scans currently run in **no-GSC fallback mode** — bucket selection (Delete / 301 / NoIndex / Keep-Update) requires per-URL clicks data from Google Search Console.\n\n' +
+      'Until Search Console is connected:\n' +
+      '- Drifted pages (d > 0.55) with ≥5 referring domains → 301 redirect\n' +
+      '- Drifted pages (d > 0.55) with <5 referring domains → noindex\n' +
+      '- Drift band (0.40 < d ≤ 0.55) → rewrite (provisional)\n\n' +
+      'Once GSC is connected, an automatic re-bucketing pass will move provisional findings into Toth STEP3\'s click-aware buckets (≥50 clicks/mo → keep_update, 10-49 → redirect, 5-9 → noindex, <5 → delete/redirect by backlinks).',
+    priority_rank: 1,
+    remediation_copy:
+      '**Action:** Connect Google Search Console for this firm.\n\n' +
+      '1. Open the firm settings page (`/dashboard/{firmSlug}/settings/integrations`).\n' +
+      '2. Click **Connect Search Console** and complete the OAuth flow with an account that has GSC access to the firm\'s site.\n' +
+      '3. After OAuth completes, the next Suppression scan will pull last-30-days per-URL clicks and re-bucket provisional findings.\n\n' +
+      'No other action is needed — re-bucketing runs automatically on the next scan.',
+    validation_steps: [
+      { description: 'Complete the GSC OAuth flow from the firm integrations page' },
+      { description: 'Re-run Suppression scan' },
+      { description: 'Confirm Phase 1 → Suppression tickets now carry click counts in their descriptions' },
+    ],
+    evidence_links: [],
+    automation_tier: 'manual',
+    manual_reason:
+      'GSC OAuth must be initiated by a human signed into a Google account with Search Console access — Claude cannot complete OAuth flows on the user\'s behalf.',
+    execute_url: undefined,
+    execute_label: undefined,
+  });
 }

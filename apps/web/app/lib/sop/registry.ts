@@ -929,6 +929,64 @@ function stub(number: number, key: string, title: string): SopDefinition['steps'
   };
 }
 
+// gsc_setup — connect Google Search Console as a prerequisite for the
+// Suppression decision framework. Without GSC the Suppression scanner
+// can't apply Toth's clicks-based bucketing (Delete / 301 / NoIndex /
+// Keep-Update) and falls back to distance-only logic. This SOP exists
+// to surface "Connect GSC" as a discoverable workflow rather than
+// hiding the gate inside Suppression. Single step today; expand into
+// baseline-pull / per-URL-backfill / sync-verification when the
+// integration matures.
+const GSC_SETUP: SopDefinition = {
+  key: 'gsc_setup',
+  phase: 1,
+  name: 'GSC Setup',
+  purpose:
+    'Connect Google Search Console as the data source for Toth\'s Suppression decision framework. Per-URL clicks/month is required to bucket pages into Delete (<5 clicks) / 301 (10+ clicks) / NoIndex (5-9 clicks) / Keep-Update (50+ clicks). Without GSC, Suppression falls back to distance-only logic and emits findings that may rebucket once click data lands.',
+  timeRequired: '10-15 minutes (OAuth flow + property selection)',
+  scope: [
+    'Every firm before its first Suppression scan emits actionable Delete / Keep-Update tickets',
+    'Re-run when access tokens expire or the property selection changes',
+  ],
+  prerequisites: {
+    tools: ['Google Search Console with the firm\'s property verified'],
+    access: ['Google account that owns / has full access to the GSC property'],
+    data: ['Firm primary_url in Brand Truth (used to match the GSC property)'],
+  },
+  dependsOnSops: [],
+  cadence: 'one-time',
+  steps: [
+    {
+      number: 1,
+      key: 'connect_gsc_oauth',
+      title: 'Connect Google Search Console via OAuth',
+      process: [
+        'Operator clicks "Connect GSC" on the dashboard',
+        'Operator signs into Google with an account that owns the property',
+        'Operator selects the verified property matching primary_url',
+        'OAuth flow persists access + refresh tokens in `gsc_connection`',
+        'First per-URL sync runs lazily on the next Suppression scan',
+      ],
+      dataInputs: [
+        { kind: 'brand_truth', label: 'Brand Truth primary_url (matched against GSC property)', required: true },
+      ],
+      operatorActions: [
+        'Authorize the OAuth scope (read-only SearchAnalytics access)',
+        'Pick the correct property if multiple are listed',
+      ],
+      gates: [
+        { key: 'gsc_connection_persisted', label: 'gsc_connection row exists with non-expired access token', kind: 'attestation', required: true },
+      ],
+      output: 'Active GSC connection unlocking Toth STEP3 click-based bucketing in Suppression',
+    },
+  ],
+  troubleshooting: [
+    { issue: 'OAuth completes but property dropdown is empty', cause: 'Google account lacks verified-ownership on any property', solution: 'Grant the account "Full" access on Search Console first; re-run the OAuth flow.' },
+    { issue: 'Per-URL sync errors after connection', cause: 'GSC API has not yet aggregated the property (~24-48h after verification)', solution: 'Wait 48h then re-run a Suppression scan; the per-URL fetch will populate gsc_url_metric.' },
+  ],
+  relatedSops: ['legacy_content_suppression'],
+};
+
 const GA4_LLM_TRAFFIC_SETUP: SopDefinition = {
   key: 'ga4_llm_traffic_setup',
   phase: 2,
@@ -1744,7 +1802,7 @@ export const PHASES: PhaseDefinition[] = [
     phaseKey: 'brand-audit-analysis',
     name: 'Brand Audit & Analysis',
     description: 'Establish baseline: how do LLMs describe the firm today, what legacy content confuses them, and what is the canonical messaging?',
-    sopKeys: ['brand_visibility_audit', 'legacy_content_suppression', 'brand_messaging_standardization'],
+    sopKeys: ['brand_visibility_audit', 'legacy_content_suppression', 'brand_messaging_standardization', 'gsc_setup'],
   },
   {
     phase: 2,
@@ -1800,6 +1858,7 @@ const ALL_SOPS_LIST: SopDefinition[] = [
   BRAND_VISIBILITY_AUDIT,
   LEGACY_CONTENT_SUPPRESSION,
   BRAND_MESSAGING_STANDARDIZATION,
+  GSC_SETUP,
   // Phase 2
   GA4_LLM_TRAFFIC_SETUP,
   AI_BOT_LOG_FILE_ANALYSIS,

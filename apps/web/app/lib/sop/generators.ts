@@ -37,7 +37,8 @@ async function resolveFullAuditRunId(firmId: string, anchored: string | undefine
 }
 import type { SopDefinition, SopKey } from './types';
 import { generatePriorityActions } from './ticket-factories/priority-actions';
-import { generateSuppressionTickets } from './ticket-factories/suppression-decisions';
+// generateSuppressionTickets retired in C1 — see comment on the
+// 'suppression_decisions_to_tickets' branch below.
 import { buildComparisonMatrixXlsx } from './deliverables/comparison-matrix-xlsx';
 import { buildSuppressionArtifacts } from './deliverables/suppression-artifacts';
 import {
@@ -119,26 +120,24 @@ export async function dispatchStepGenerators(input: DispatchInput): Promise<Disp
   }
 
   if (gen.ticketsFromFactory === 'suppression_decisions_to_tickets') {
-    try {
-      const [firmRow] = await db
-        .select({ name: firms.name })
-        .from(firms)
-        .where(eq(firms.id, input.firmId))
-        .limit(1);
-      const primaryUrl = typeof (anchors.primary_url) === 'string' ? (anchors.primary_url as string) : null;
-      const r = await generateSuppressionTickets({
-        firmSlug: input.firmSlug,
-        firmId: input.firmId,
-        firmName: firmRow?.name ?? 'Firm',
-        primaryUrl,
-        sopKey: 'legacy_content_suppression',
-        runId: input.runId,
-        stepNumber: input.stepNumber,
-      });
-      out.ticketsCreated += r.created.length;
-    } catch (e) {
-      out.warnings.push(`suppression_decisions failed: ${e instanceof Error ? e.message : String(e)}`);
-    }
+    // Retired in C1 (Suppression Decision Framework Rewrite).
+    //
+    // Prior to C1 this branch called generateSuppressionTickets() which
+    // ran buildSuppressionArtifacts() (a distance-only decision pass)
+    // and emitted tickets onto the legacy_content_suppression sop_run.
+    //
+    // After C1 the Suppression *scanner* (lib/suppression/scan.ts) is
+    // the single source of truth for ticket emit — it runs Toth STEP3
+    // with per-URL GSC clicks, routes keep_update to Repositioning,
+    // delete/redirect/noindex to Suppression, and emits a gsc_setup
+    // config-gate ticket when no GSC connection exists.
+    //
+    // Running the legacy factory here would double-emit. Skip with a
+    // warning so an operator who completed the suppression step in the
+    // SOP runner sees that emit already happened via the scanner path.
+    out.warnings.push(
+      'suppression_decisions_to_tickets: retired (C1) — tickets are emitted by the Suppression scanner directly. Run Phase 1 → Suppression to (re)populate.',
+    );
   }
 
   // Other factories — schema_patches_per_page, reddit_escalations,

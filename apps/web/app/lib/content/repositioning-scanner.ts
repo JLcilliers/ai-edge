@@ -1,36 +1,34 @@
 /**
  * Content Repositioning scanner — Phase 3 SOP `content_repositioning`.
  *
- * Reuses the Suppression scan's `Keep + update` bucket. The Suppression
- * deliverable builder (lib/sop/deliverables/suppression-artifacts.ts)
- * already runs the decision framework:
+ * ── After C1 (Suppression Decision Framework Rewrite) ──
  *
- *   ≥50 clicks/mo + drifted from Brand Truth → action='keep'
- *      → "refresh in place rather than suppress"
+ * The Suppression scanner now writes Toth STEP3 buckets directly into
+ * two sop_runs — `legacy_content_suppression` for delete/redirect/
+ * noindex, and `content_repositioning` for keep_update (≥50 clicks/mo
+ * + drift) and rewrite (transitional no-GSC bucket). That means the
+ * Repositioning sop_run's task list is ALREADY populated as a side
+ * effect of running Suppression.
  *
- * Those pages are *not* suppression candidates — they have real traffic
- * and real authority. They're Content Repositioning candidates: rewrite
- * them in place to match current Brand Truth.
+ * This scanner's job after C1 is the synthesis pass on top of those
+ * tickets:
+ *   - Confirm Suppression has actually run (legacy_findings exist).
+ *   - Enrich the Suppression-emitted tickets with step_number=2
+ *     (Identify Required Changes — the synthesis step) so they appear
+ *     under Step 2 of the Repositioning workflow instead of "no step".
+ *   - Upgrade the remediation_copy to the full SOP-aligned rewrite
+ *     checklist (intro+H1+meta → restructure → schema → publish →
+ *     verify with LLM-Friendly scan).
+ *   - Mark scanner steps complete up through step 2.
  *
- * The Suppression ticket factory already emits a "Refresh content"
- * ticket for these pages, but those tickets are attached to the
- * legacy_content_suppression sop_run, so they don't surface in Phase 3's
- * task list. This scanner is the bridge — it re-emits them attached to
- * the content_repositioning sop_run with a proper SOP-aligned rewrite
- * checklist (intro + H1 + meta → body restructure → schema update →
- * publish + verify).
+ * The pre-C1 path called `buildSuppressionArtifacts()` and re-emitted
+ * the keep rows as fresh tickets attached to the Repositioning run —
+ * which duplicated work that Suppression now does directly. That code
+ * is retired here. `buildSuppressionArtifacts` itself remains for the
+ * xlsx-export deliverable path only.
  *
- * Per run:
- *   1. Resolve firm + load Brand Truth.
- *   2. Call buildSuppressionArtifacts() to get the current decision matrix.
- *   3. Filter to action='keep' rows.
- *   4. Create or update the content_repositioning sop_run.
- *   5. Clear prior open tickets on this run.
- *   6. Emit one assist-tier ticket per keep page, sorted by clicks DESC
- *      (highest-traffic pages have biggest upside from a refresh).
- *
- * If Suppression has never run for the firm, the scanner emits a single
- * config-gate ticket pointing at the Suppression scan.
+ * Gating: if Suppression has never run for the firm, the scanner emits
+ * a single config-gate ticket pointing at the Suppression scan.
  */
 
 import {
@@ -43,11 +41,9 @@ import {
   remediationTickets,
   brandTruthVersions,
 } from '@ai-edge/db';
-import type { BrandTruth } from '@ai-edge/shared';
-import { and, eq, desc, inArray } from 'drizzle-orm';
+import { and, eq, desc, inArray, sql } from 'drizzle-orm';
 import { createTicketFromStep } from '../../actions/sop-actions';
 import { getSopDefinition } from '../sop/registry';
-import { buildSuppressionArtifacts } from '../sop/deliverables/suppression-artifacts';
 
 const SOP_KEY = 'content_repositioning' as const;
 // Tickets attach to step 2 (Identify Required Changes) — the synthesis
@@ -152,20 +148,6 @@ async function findOrCreateScannerRun(firmId: string): Promise<string> {
   return runId;
 }
 
-async function clearPriorOpenTickets(firmId: string, runId: string): Promise<void> {
-  const db = getDb();
-  await db
-    .delete(remediationTickets)
-    .where(
-      and(
-        eq(remediationTickets.firm_id, firmId),
-        eq(remediationTickets.sop_run_id, runId),
-        eq(remediationTickets.sop_step_number, TICKET_STEP_NUMBER),
-        inArray(remediationTickets.status, ['open', 'in_progress']),
-      ),
-    );
-}
-
 async function markScannerStepsComplete(runId: string): Promise<void> {
   const db = getDb();
   const now = new Date();
@@ -213,7 +195,7 @@ async function hasSuppressionData(firmId: string): Promise<boolean> {
   return !!row;
 }
 
-function buildSuppressionGateTicket(firmSlug: string): {
+function buildSuppressionGateTicket(): {
   title: string;
   description: string;
   remediationCopy: string;
@@ -240,32 +222,27 @@ Suppression uses semantic distance + GSC click data to bucket pages. High-traffi
   };
 }
 
-function buildRepositioningTicket(d: {
+/**
+ * SOP-aligned rewrite checklist that replaces the Suppression scanner's
+ * default `keep_update` copy. Suppression's prescription is short
+ * (deliberately — it's emitted from a Phase 1 scanner whose
+ * descriptions cover all four buckets); Repositioning is the Phase 3
+ * synthesis step where the full Toth Content Repositioning checklist
+ * lives.
+ */
+function buildRepositioningRemediationCopy(args: {
   url: string;
-  title: string | null;
-  clicks12m: number;
+  clicksPerMonth: number | null;
   semanticDistance: number;
-  wordCount: number | null;
-  rationale: string;
-}): {
-  title: string;
-  description: string;
-  remediationCopy: string;
-  validationSteps: Array<{ description: string }>;
-} {
-  const titleText = d.title ?? d.url;
-  const title = `Reposition ${titleText} (${d.clicks12m.toFixed(0)} clicks/mo, drift d=${d.semanticDistance.toFixed(2)})`;
-  const description =
-    `${d.rationale}\n\n` +
-    `URL: ${d.url}\n` +
-    `Clicks/mo: ${d.clicks12m.toFixed(0)}\n` +
-    `Semantic distance from Brand Truth: ${d.semanticDistance.toFixed(3)}\n` +
-    `Word count: ${d.wordCount ?? 'unknown'}\n\n` +
-    `This page has real traffic and real authority — repositioning in place beats suppression.`;
+}): string {
+  const clicksLine =
+    args.clicksPerMonth != null
+      ? `**Why it qualifies:** ${args.clicksPerMonth} clicks/mo (≥50 Toth STEP3 keep-update threshold) + semantic distance ${args.semanticDistance.toFixed(2)} from Brand Truth. Real audience, drifted positioning. Refresh in place.`
+      : `**Why it qualifies:** Provisional bucket — drift d=${args.semanticDistance.toFixed(2)} flagged for rewrite while GSC is not connected. Once Search Console is wired up the scanner will re-bucket on clicks.`;
 
-  const remediationCopy = `**Page:** ${d.url}
+  return `**Page:** ${args.url}
 
-**Why it qualifies:** ≥50 clicks/mo + semantic distance ${d.semanticDistance.toFixed(2)} from Brand Truth. Real audience, drifted positioning. Refresh in place.
+${clicksLine}
 
 **Rewrite checklist (Steve Toth Content Repositioning SOP):**
 
@@ -282,27 +259,130 @@ function buildRepositioningTicket(d: {
 6. **Publish and verify** — confirm the page renders, validate at https://search.google.com/test/rich-results, request re-indexing in GSC.
 
 7. **Run the LLM-Friendly Content Checklist scan** afterwards to confirm the page now scores ≥ 5/7.`;
+}
 
-  const validationSteps = [
-    { description: 'Diff current page copy against Brand Truth' },
-    { description: 'Rewrite intro + H1 + meta to match Brand Truth' },
-    { description: 'Restructure body with scannable headings + definitions' },
-    { description: 'Update schema markup' },
-    { description: 'Publish and verify in browser + GSC URL Inspection' },
-    { description: 'Re-run LLM-Friendly Content Checklist scan; confirm score ≥ 5/7' },
-  ];
+const REPOSITIONING_VALIDATION_STEPS: Array<{ description: string }> = [
+  { description: 'Diff current page copy against Brand Truth' },
+  { description: 'Rewrite intro + H1 + meta to match Brand Truth' },
+  { description: 'Restructure body with scannable headings + definitions' },
+  { description: 'Update schema markup' },
+  { description: 'Publish and verify in browser + GSC URL Inspection' },
+  { description: 'Re-run LLM-Friendly Content Checklist scan; confirm score ≥ 5/7' },
+];
 
-  return { title, description, remediationCopy, validationSteps };
+/**
+ * Find the Suppression-emitted tickets that already live on this firm's
+ * content_repositioning sop_run. Those are the tickets the upstream
+ * Suppression scanner inserted in C1's dual-routing path — they carry
+ * source_type='legacy' + source_id=legacy_finding.id, but they're
+ * attached to the Repositioning sop_run, not Suppression's.
+ */
+async function findSuppressionEmittedKeepTickets(repositioningRunId: string): Promise<Array<{
+  ticketId: string;
+  findingId: string;
+  pageUrl: string;
+  pageTitle: string | null;
+  wordCount: number | null;
+  semanticDistance: number;
+  decidedWithGsc: boolean;
+  /** Reconstructed from the GSC URL metrics table; null when no GSC. */
+  clicksPerMonth: number | null;
+  priorityHint: number;
+}>> {
+  const db = getDb();
+  // Join ticket → legacy_finding → page so we have the full row needed
+  // to rebuild the SOP-aligned remediation copy.
+  const rows = await db
+    .select({
+      ticketId: remediationTickets.id,
+      findingId: legacyFindings.id,
+      pageUrl: pages.url,
+      pageTitle: pages.title,
+      wordCount: pages.word_count,
+      semanticDistance: legacyFindings.semantic_distance,
+      action: legacyFindings.action,
+      decidedWithGsc: legacyFindings.decided_with_gsc,
+      // We don't store clicks in legacy_finding directly; the prescription
+      // helper used to receive them from the scanner. The Suppression
+      // ticket's description preserves them in a `GSC clicks (last 30
+      // days): N` line which we could parse — but easier and more
+      // robust: pull them from gsc_url_metric directly when needed.
+      clicks: sql<number | null>`(
+        SELECT m.clicks
+        FROM gsc_url_metric m
+        WHERE m.firm_id = ${remediationTickets.firm_id}
+          AND m.url = ${pages.url}
+        ORDER BY m.window_end_date DESC
+        LIMIT 1
+      )`.as('clicks'),
+    })
+    .from(remediationTickets)
+    .innerJoin(legacyFindings, eq(legacyFindings.id, remediationTickets.source_id))
+    .innerJoin(pages, eq(pages.id, legacyFindings.page_id))
+    .where(
+      and(
+        eq(remediationTickets.sop_run_id, repositioningRunId),
+        eq(remediationTickets.source_type, 'legacy'),
+        inArray(remediationTickets.status, ['open', 'in_progress']),
+        inArray(legacyFindings.action, ['keep_update', 'rewrite']),
+      ),
+    );
+
+  // keep_update (real Toth bucket, ≥50 clicks) outranks rewrite
+  // (transitional fallback) — sort that way before assigning priority.
+  // Within keep_update, sort by clicks DESC.
+  const sorted = rows
+    .map((r, i) => ({
+      ticketId: r.ticketId,
+      findingId: r.findingId,
+      pageUrl: r.pageUrl,
+      pageTitle: r.pageTitle,
+      wordCount: r.wordCount,
+      semanticDistance: Number(r.semanticDistance),
+      decidedWithGsc: r.decidedWithGsc,
+      clicksPerMonth: r.clicks != null ? Number(r.clicks) : null,
+      action: r.action,
+      priorityHint: i,
+    }))
+    .sort((a, b) => {
+      // keep_update before rewrite
+      if (a.action !== b.action) return a.action === 'keep_update' ? -1 : 1;
+      // Within keep_update, clicks DESC
+      return (b.clicksPerMonth ?? 0) - (a.clicksPerMonth ?? 0);
+    });
+
+  return sorted.map((r, i) => ({
+    ticketId: r.ticketId,
+    findingId: r.findingId,
+    pageUrl: r.pageUrl,
+    pageTitle: r.pageTitle,
+    wordCount: r.wordCount,
+    semanticDistance: r.semanticDistance,
+    decidedWithGsc: r.decidedWithGsc,
+    clicksPerMonth: r.clicksPerMonth,
+    priorityHint: i + 1,
+  }));
 }
 
 export async function runRepositioningScan(firmId: string): Promise<RepositioningScanResult> {
   const firm = await resolveFirm({ id: firmId });
+  const db = getDb();
 
   // Gate on Suppression having run.
   if (!(await hasSuppressionData(firm.id))) {
     const runId = await findOrCreateScannerRun(firm.id);
-    await clearPriorOpenTickets(firm.id, runId);
-    const gate = buildSuppressionGateTicket(firm.slug);
+    // Wipe prior gate tickets so we don't double-up.
+    await db
+      .delete(remediationTickets)
+      .where(
+        and(
+          eq(remediationTickets.firm_id, firm.id),
+          eq(remediationTickets.sop_run_id, runId),
+          eq(remediationTickets.sop_step_number, TICKET_STEP_NUMBER),
+          inArray(remediationTickets.status, ['open', 'in_progress']),
+        ),
+      );
+    const gate = buildSuppressionGateTicket();
     await createTicketFromStep({
       firmSlug: firm.slug,
       sopKey: SOP_KEY,
@@ -328,66 +408,44 @@ export async function runRepositioningScan(firmId: string): Promise<Repositionin
     };
   }
 
-  // Pull the latest decision matrix from the Suppression deliverable
-  // builder. This recomputes from current data — no need to read a
-  // cached deliverable.
-  const artifacts = await buildSuppressionArtifacts({
-    firmId: firm.id,
-    firmName: firm.name,
-    primaryUrl: firm.primaryUrl,
-    generatedAt: new Date(),
-  });
-
-  const keepRows = artifacts.decisions
-    .filter((d) => d.action === 'keep')
-    .sort((a, b) => b.clicks12m - a.clicks12m);
-
+  // Suppression has run. Find the keep_update / rewrite tickets it
+  // already emitted onto our sop_run and enrich them.
   const runId = await findOrCreateScannerRun(firm.id);
-  await clearPriorOpenTickets(firm.id, runId);
+  const candidates = await findSuppressionEmittedKeepTickets(runId);
 
-  let priorityRank = 1;
-  let ticketsCreated = 0;
   let totalClicks = 0;
-  for (const d of keepRows) {
-    totalClicks += d.clicks12m;
-    const payload = buildRepositioningTicket({
-      url: d.url,
-      title: d.title,
-      clicks12m: d.clicks12m,
-      semanticDistance: d.semanticDistance,
-      wordCount: d.wordCount,
-      rationale: d.rationale,
+  for (const c of candidates) {
+    if (c.clicksPerMonth != null) totalClicks += c.clicksPerMonth;
+
+    const titleText = c.pageTitle?.trim() || c.pageUrl;
+    const clicksFragment =
+      c.clicksPerMonth != null ? `${c.clicksPerMonth} clicks/mo, ` : '';
+    const newTitle = `Reposition ${titleText.slice(0, 70)} (${clicksFragment}drift d=${c.semanticDistance.toFixed(2)})`;
+    const newRemediation = buildRepositioningRemediationCopy({
+      url: c.pageUrl,
+      clicksPerMonth: c.clicksPerMonth,
+      semanticDistance: c.semanticDistance,
     });
-    await createTicketFromStep({
-      firmSlug: firm.slug,
-      sopKey: SOP_KEY,
-      runId,
-      stepNumber: TICKET_STEP_NUMBER,
-      title: payload.title,
-      description: payload.description,
-      priorityRank: priorityRank++,
-      remediationCopy: payload.remediationCopy,
-      validationSteps: payload.validationSteps,
-      evidenceLinks: [
-        {
-          kind: 'page_url',
-          url: d.url,
-          description: `${d.clicks12m.toFixed(0)} clicks/mo · drift d=${d.semanticDistance.toFixed(2)}`,
-        },
-      ],
-      automationTier: 'assist',
-      executeUrl: d.url,
-      executeLabel: 'Open page',
-    });
-    ticketsCreated += 1;
+
+    await db
+      .update(remediationTickets)
+      .set({
+        sop_step_number: TICKET_STEP_NUMBER,
+        title: newTitle,
+        remediation_copy: newRemediation,
+        validation_steps: REPOSITIONING_VALIDATION_STEPS,
+        priority_rank: c.priorityHint,
+        playbook_step: 'repositioning:rewrite',
+      })
+      .where(eq(remediationTickets.id, c.ticketId));
   }
 
   await markScannerStepsComplete(runId);
 
   return {
     runId,
-    candidatesFound: keepRows.length,
-    ticketsCreated,
+    candidatesFound: candidates.length,
+    ticketsCreated: candidates.length,
     totalKeepClicks: Math.round(totalClicks),
     blockedOnSuppression: false,
   };

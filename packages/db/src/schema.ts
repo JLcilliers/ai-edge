@@ -144,10 +144,43 @@ export const legacyFindings = pgTable('legacy_finding', {
   id: uuid('id').primaryKey().defaultRandom(),
   page_id: uuid('page_id').notNull().references(() => pages.id, { onDelete: 'cascade' }),
   semantic_distance: real('semantic_distance').notNull(),
-  action: text('action').notNull(), // 'rewrite' | 'redirect' | 'noindex'
+  // Bucket per Toth STEP3 decision framework:
+  //   'delete' | 'redirect' | 'noindex' | 'keep_update'
+  // Legacy values from pre-C1 code path still in the table:
+  //   'rewrite' (now mapped to 'keep_update' on next scan)
+  //   'aligned' (informational; doesn't emit a ticket)
+  action: text('action').notNull(),
   rationale: text('rationale'),
   detected_at: timestamp('detected_at', { withTimezone: true }).defaultNow().notNull(),
+  // (0017) Provenance flag — TRUE if this finding was bucketed using
+  // Toth's clicks-aware framework (per-URL GSC data available). FALSE
+  // means no-GSC fallback (semantic distance + backlinks only). Used
+  // by the rebucketing query when a firm first connects GSC.
+  decided_with_gsc: boolean('decided_with_gsc').notNull().default(false),
 });
+
+// (0017) Per-URL GSC metrics over a rolling window. Populated lazily
+// at Suppression scan time when the firm has a gsc_connection — fetches
+// last 30 days of (clicks, impressions, ctr, position) per page via
+// `dimensions: ['page']` on the SearchAnalytics API. One row per
+// (firm, url, window_end_date) so re-fetches upsert cleanly.
+export const gscUrlMetrics = pgTable('gsc_url_metric', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  firm_id: uuid('firm_id').notNull().references(() => firms.id, { onDelete: 'cascade' }),
+  url: text('url').notNull(),
+  window_start_date: text('window_start_date').notNull(), // YYYY-MM-DD
+  window_end_date: text('window_end_date').notNull(),     // YYYY-MM-DD
+  clicks: integer('clicks').notNull(),
+  impressions: integer('impressions').notNull(),
+  ctr: real('ctr'),
+  position: real('position'),
+  fetched_at: timestamp('fetched_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  firmUrlWindowIdx: uniqueIndex('gsc_url_metric_firm_url_window')
+    .on(t.firm_id, t.url, t.window_end_date),
+  firmUrlRecentIdx: index('gsc_url_metric_firm_url_recent_idx')
+    .on(t.firm_id, t.url, t.window_end_date),
+}));
 
 // ── Remediation queue (Action Items) ────────────────────────
 // Per the SOP engine (migration 0013), tickets carry SOP provenance +
