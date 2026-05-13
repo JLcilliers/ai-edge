@@ -23,6 +23,7 @@ import {
 } from './budget';
 import { ensureSopRun } from '../sop/ensure-run';
 import { prescribeAuditTicket } from '../sop/legacy-prescription';
+import { computePriority } from '../sop/priority-score';
 
 /**
  * Options for an audit run.
@@ -345,14 +346,28 @@ export async function runAudit(
         // LLM made + tells them how to fix it. Without this, the ticket
         // is a bare status row that says "something happened, go look."
         if (canonical.score.remediation_priority === 'red' && alignmentRow) {
+          const factualErrors = canonical.score.factual_accuracy?.errors ?? [];
           const presc = prescribeAuditTicket({
             queryText,
             provider: canonical.sample.providerName,
             ragLabel: canonical.score.remediation_priority,
             gapReasons: canonical.score.gap_reasons,
-            factualErrors: canonical.score.factual_accuracy?.errors ?? [],
+            factualErrors,
             citations: canonical.score.citations,
             mentioned: majorityMentioned,
+          });
+          // Unified priority (migration 0018). Audit-class tickets carry
+          // a single provider per row today (one ticket per
+          // alignment_score, alignment_score is per-sample), so
+          // providerCount=1 — the provider_count multiplier is a
+          // forward-compat input for a future "consolidate same-query
+          // tickets across providers" pass.
+          const { priorityClass, priorityScore } = computePriority({
+            sourceType: 'audit',
+            sopKey: 'brand_visibility_audit',
+            auditHasFactualErrors: factualErrors.length > 0,
+            auditMentioned: majorityMentioned,
+            providerCount: 1,
           });
           await db.insert(remediationTickets).values({
             firm_id: firmId,
@@ -365,6 +380,8 @@ export async function runAudit(
             title: presc.title,
             description: presc.description,
             priority_rank: presc.priorityRank,
+            priority_class: priorityClass,
+            priority_score: priorityScore,
             remediation_copy: presc.remediationCopy,
             validation_steps: presc.validationSteps,
             evidence_links: presc.evidenceLinks,

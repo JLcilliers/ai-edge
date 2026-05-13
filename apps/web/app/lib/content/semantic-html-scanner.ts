@@ -31,6 +31,7 @@ import {
 import { and, eq, desc, inArray } from 'drizzle-orm';
 import { createTicketFromStep } from '../../actions/sop-actions';
 import { getSopDefinition } from '../sop/registry';
+import { computePriority } from '../sop/priority-score';
 import {
   scoreSemanticHtml,
   TICKET_THRESHOLD,
@@ -357,6 +358,12 @@ export async function runSemanticHtmlScan(firmId: string): Promise<SemanticHtmlS
   let ticketsCreated = 0;
   for (const score of failing) {
     const payload = buildTicketPayload(score);
+    const { priorityClass, priorityScore } = computePriority({
+      sourceType: 'sop',
+      sopKey: SOP_KEY,
+      rubricScore: score.total,
+      rubricMax: 100,
+    });
     await createTicketFromStep({
       firmSlug: firm.slug,
       sopKey: SOP_KEY,
@@ -365,6 +372,8 @@ export async function runSemanticHtmlScan(firmId: string): Promise<SemanticHtmlS
       title: payload.title,
       description: payload.description,
       priorityRank: priorityRank++,
+      priorityClass,
+      priorityScore,
       remediationCopy: payload.remediationCopy,
       validationSteps: payload.validationSteps,
       evidenceLinks: [

@@ -9,6 +9,7 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "score:recompute": "tsx scripts/score-recompute.ts",
     "demo:seed": "tsx scripts/seed-cellino.ts",
     "demo:run": "tsx scripts/demo-cellino.ts",
     "demo:dev": "dotenv -e ../../.env.local --override -- next dev --turbopack"

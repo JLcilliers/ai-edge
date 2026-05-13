@@ -42,6 +42,7 @@ import {
 import { and, eq, desc, inArray } from 'drizzle-orm';
 import { createTicketFromStep } from '../../actions/sop-actions';
 import { getSopDefinition } from '../sop/registry';
+import { computePriority } from '../sop/priority-score';
 
 const SOP_KEY = 'content_freshness_audit' as const;
 // Tickets attach to the synthesis step (Prioritize for Refresh).
@@ -509,6 +510,16 @@ export async function runFreshnessScan(firmId: string): Promise<FreshnessScanRes
   let ticketsCreated = 0;
   for (const finding of failing) {
     const payload = buildTicketPayload(finding);
+    // monthsDormant from ageDays — approximate (30.4 days/month). Pages
+    // with no ageDays signal default to a mid-urgency 12 months.
+    const monthsDormant = finding.ageDays != null
+      ? finding.ageDays / 30.4
+      : 12;
+    const { priorityClass, priorityScore } = computePriority({
+      sourceType: 'sop',
+      sopKey: SOP_KEY,
+      monthsDormant,
+    });
     await createTicketFromStep({
       firmSlug: firm.slug,
       sopKey: SOP_KEY,
@@ -517,6 +528,8 @@ export async function runFreshnessScan(firmId: string): Promise<FreshnessScanRes
       title: payload.title,
       description: payload.description,
       priorityRank: priorityRank++,
+      priorityClass,
+      priorityScore,
       remediationCopy: payload.remediationCopy,
       validationSteps: payload.validationSteps,
       evidenceLinks: [

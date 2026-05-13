@@ -234,7 +234,20 @@ export const remediationTickets = pgTable('remediation_ticket', {
   // requires Talk-page edit request, not direct edit", "SME interview
   // is a 1:1 conversation").
   manual_reason: text('manual_reason'),
-});
+  // ── Unified priority (0018) ────────────────────────────────
+  // priority_rank above is scanner-internal. priority_class +
+  // priority_score are the cross-scanner sort path the UI reads.
+  // Computed by lib/sop/priority-score.ts. See migration 0018 for
+  // the rationale + class taxonomy.
+  priority_class: text('priority_class').notNull().default('unknown'),
+  priority_score: integer('priority_score').notNull().default(0),
+}, (t) => ({
+  // Composite index for the new default sort in /tickets + per-phase
+  // pages. Prefix (firm_id, status) also serves the firm-scoped badge
+  // queries that filter on status without sort order.
+  priorityIdx: index('remediation_ticket_priority_idx')
+    .on(t.firm_id, t.status, t.priority_score.desc(), t.created_at.desc()),
+}));
 
 // ── Reddit ──────────────────────────────────────────────────
 // `triage_status` turns the raw mention feed into an operator queue:

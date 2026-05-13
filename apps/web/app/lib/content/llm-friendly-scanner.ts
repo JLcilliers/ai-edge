@@ -45,6 +45,7 @@ import { and, eq, desc, inArray } from 'drizzle-orm';
 import { brandTruthToText, embedSingle, semanticDistance } from '../suppression/embeddings';
 import { createTicketFromStep } from '../../actions/sop-actions';
 import { getSopDefinition } from '../sop/registry';
+import { computePriority } from '../sop/priority-score';
 import {
   scorePage,
   extractRequiredPhrases,
@@ -334,6 +335,12 @@ export async function runLlmFriendlyScan(firmId: string): Promise<LlmFriendlySca
   let ticketsCreated = 0;
   for (const score of failing) {
     const payload = buildTicketPayload(score);
+    const { priorityClass, priorityScore } = computePriority({
+      sourceType: 'sop',
+      sopKey: SOP_KEY,
+      rubricScore: score.total,
+      rubricMax: MAX_SCORE,
+    });
     await createTicketFromStep({
       firmSlug: firm.slug,
       sopKey: SOP_KEY,
@@ -342,6 +349,8 @@ export async function runLlmFriendlyScan(firmId: string): Promise<LlmFriendlySca
       title: payload.title,
       description: payload.description,
       priorityRank: priorityRank++,
+      priorityClass,
+      priorityScore,
       remediationCopy: payload.remediationCopy,
       validationSteps: payload.validationSteps,
       evidenceLinks: [

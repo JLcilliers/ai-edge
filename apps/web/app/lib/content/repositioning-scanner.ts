@@ -47,6 +47,7 @@ import type { BrandTruth } from '@ai-edge/shared';
 import { and, eq, desc, inArray } from 'drizzle-orm';
 import { createTicketFromStep } from '../../actions/sop-actions';
 import { getSopDefinition } from '../sop/registry';
+import { computePriority } from '../sop/priority-score';
 import { buildSuppressionArtifacts } from '../sop/deliverables/suppression-artifacts';
 
 const SOP_KEY = 'content_repositioning' as const;
@@ -303,6 +304,18 @@ export async function runRepositioningScan(firmId: string): Promise<Repositionin
     const runId = await findOrCreateScannerRun(firm.id);
     await clearPriorOpenTickets(firm.id, runId);
     const gate = buildSuppressionGateTicket(firm.slug);
+    // The "run Suppression first" ticket is a workflow prerequisite —
+    // closest fit is content_drift (it blocks downstream content work)
+    // but it has no signal-driven offset, so score at the class floor.
+    const gatePriority = computePriority({
+      sourceType: 'sop',
+      sopKey: SOP_KEY,
+      // No legacyAction available because there's no suppression data
+      // yet — the function falls through to unknown class. Override to
+      // content_drift via direct class injection isn't supported; let
+      // it land in unknown so the operator at least sees it above
+      // config_gate.
+    });
     await createTicketFromStep({
       firmSlug: firm.slug,
       sopKey: SOP_KEY,
@@ -311,6 +324,8 @@ export async function runRepositioningScan(firmId: string): Promise<Repositionin
       title: gate.title,
       description: gate.description,
       priorityRank: 1,
+      priorityClass: gatePriority.priorityClass,
+      priorityScore: gatePriority.priorityScore,
       remediationCopy: gate.remediationCopy,
       validationSteps: gate.validationSteps,
       evidenceLinks: [],
@@ -358,6 +373,17 @@ export async function runRepositioningScan(firmId: string): Promise<Repositionin
       wordCount: d.wordCount,
       rationale: d.rationale,
     });
+    // Repositioning candidates are high-traffic drifted pages →
+    // content_drift class. The legacyAction signal ('keep_update' is
+    // C1's name; on main this scanner calls it 'keep' but that's not
+    // a recognized action so we encode it as keep_update for the
+    // priority math).
+    const { priorityClass, priorityScore } = computePriority({
+      sourceType: 'legacy',
+      legacyAction: 'keep_update',
+      semanticDistance: d.semanticDistance,
+      clicksPerMonth: d.clicks12m,
+    });
     await createTicketFromStep({
       firmSlug: firm.slug,
       sopKey: SOP_KEY,
@@ -366,6 +392,8 @@ export async function runRepositioningScan(firmId: string): Promise<Repositionin
       title: payload.title,
       description: payload.description,
       priorityRank: priorityRank++,
+      priorityClass,
+      priorityScore,
       remediationCopy: payload.remediationCopy,
       validationSteps: payload.validationSteps,
       evidenceLinks: [

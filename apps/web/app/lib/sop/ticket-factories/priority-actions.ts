@@ -37,6 +37,7 @@ import {
 import { eq, and, desc, sql } from 'drizzle-orm';
 import type { BrandTruth } from '@ai-edge/shared';
 import { createTicketFromStep } from '../../../actions/sop-actions';
+import { computePriority } from '../priority-score';
 
 interface Args {
   firmSlug: string;
@@ -354,6 +355,24 @@ export async function generatePriorityActions(args: Args): Promise<{
   for (const r of ranked) {
     const detail = candidates.find((c) => c.title === r.title);
     if (!detail) continue;
+    // The priority-actions factory consolidates audit findings into
+    // synthesized actions ("Update [Platform] description", "Address
+    // recurring LLM gap", "Create Wikipedia entry"). These are
+    // *prescribed actions*, not the audit findings themselves, so
+    // routing through factual_error/non_mention would over-rank them.
+    // Route through the audit-fallback (content_drift) path so they
+    // sit above per-page quality work but below raw audit tickets.
+    // Multi-provider impact is encoded via providerCount = evidence
+    // count (more LLM citations → higher within-class offset, capped
+    // at 90).
+    const providerCount = Math.max(1, detail.evidence?.length ?? 1);
+    const { priorityClass, priorityScore } = computePriority({
+      sourceType: 'audit',
+      sopKey: args.sopKey,
+      auditHasFactualErrors: false,
+      auditMentioned: true,
+      providerCount,
+    });
     const result = await createTicketFromStep({
       firmSlug: args.firmSlug,
       sopKey: args.sopKey,
@@ -362,6 +381,8 @@ export async function generatePriorityActions(args: Args): Promise<{
       title: detail.title,
       description: detail.description,
       priorityRank: r.priorityRank,
+      priorityClass,
+      priorityScore,
       remediationCopy: detail.remediation,
       validationSteps: detail.validation,
       evidenceLinks: detail.evidence,

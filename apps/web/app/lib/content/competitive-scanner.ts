@@ -41,6 +41,7 @@ import {
 import { and, eq, desc, inArray, gte, lt, sql } from 'drizzle-orm';
 import { createTicketFromStep } from '../../actions/sop-actions';
 import { getSopDefinition } from '../sop/registry';
+import { computePriority } from '../sop/priority-score';
 
 const SOP_KEY = 'competitive_llm_monitoring' as const;
 // Tickets attach to step 3 (Identify Threats) — the synthesis step.
@@ -443,6 +444,11 @@ export async function runCompetitiveScan(firmId: string): Promise<CompetitiveSca
   let ticketsCreated = 0;
   let threats = 0;
   let opportunities = 0;
+  // Competitive monitoring tickets are trend/threat alerts about
+  // competitor positioning — not direct site-improvement tasks.
+  // Defaults to unknown class for v1; refine once the operator
+  // workflow for these signals is clearer.
+  const competitivePriority = computePriority({ sourceType: 'sop', sopKey: SOP_KEY });
   for (const f of findings) {
     const isThreat = f.kind !== 'opportunity_high_praise';
     if (isThreat) threats += 1;
@@ -456,6 +462,8 @@ export async function runCompetitiveScan(firmId: string): Promise<CompetitiveSca
       title: payload.title,
       description: payload.description,
       priorityRank: priorityRank++,
+      priorityClass: competitivePriority.priorityClass,
+      priorityScore: competitivePriority.priorityScore,
       remediationCopy: payload.remediationCopy,
       validationSteps: payload.validationSteps,
       evidenceLinks: f.competitorWebsite

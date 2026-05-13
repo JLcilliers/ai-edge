@@ -266,7 +266,12 @@ export async function listRemediationTickets(
     })
     .from(remediationTickets)
     .where(and(...conditions))
-    .orderBy(desc(remediationTickets.created_at))
+    // Default sort: priority_score DESC, then created_at DESC.
+    // Migration 0018 added the score column;
+    // lib/sop/priority-score.ts owns the formula. Score breaks the
+    // cross-scanner rank ambiguity that priority_rank used to leave
+    // behind (21+ tickets formerly collapsed at "rank 1").
+    .orderBy(desc(remediationTickets.priority_score), desc(remediationTickets.created_at))
     .limit(300);
 
   const typed = rawRows.map((r) => ({

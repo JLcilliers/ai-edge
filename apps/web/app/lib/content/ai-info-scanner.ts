@@ -36,6 +36,7 @@ import type { BrandTruth } from '@ai-edge/shared';
 import { and, eq, desc, inArray, or, like } from 'drizzle-orm';
 import { createTicketFromStep } from '../../actions/sop-actions';
 import { getSopDefinition } from '../sop/registry';
+import { computePriority } from '../sop/priority-score';
 
 const SOP_KEY = 'ai_info_page_creation' as const;
 // Tickets attach to step 1 (Draft Page Structure) — the create-step.
@@ -416,6 +417,16 @@ export async function runAiInfoScan(firmId: string): Promise<AiInfoScanResult> {
     (brandTruth as { primary_url?: string } | null | undefined)?.primary_url ?? null;
 
   const payload = buildCreateTicket(firm.name, primaryUrl, brandTruth);
+  // AI-info page creation is a one-shot per-page rubric. The firm
+  // either has the page (rubric = max) or doesn't (rubric = 0 →
+  // offset 99). This ticket only fires when the page is missing, so
+  // we score at the high-urgency end of per_page_quality.
+  const { priorityClass, priorityScore } = computePriority({
+    sourceType: 'sop',
+    sopKey: SOP_KEY,
+    rubricScore: 0,
+    rubricMax: 100,
+  });
   await createTicketFromStep({
     firmSlug: firm.slug,
     sopKey: SOP_KEY,
@@ -424,6 +435,8 @@ export async function runAiInfoScan(firmId: string): Promise<AiInfoScanResult> {
     title: payload.title,
     description: payload.description,
     priorityRank: 1,
+    priorityClass,
+    priorityScore,
     remediationCopy: payload.remediationCopy,
     validationSteps: payload.validationSteps,
     evidenceLinks: primaryUrl

@@ -16,6 +16,7 @@ import {
 } from '../suppression/embeddings';
 import { ensureSopRun } from '../sop/ensure-run';
 import { prescribeEntityTicket } from '../sop/legacy-prescription';
+import { computePriority } from '../sop/priority-score';
 
 /**
  * Cross-source vector alignment + third-party badge verification scanner
@@ -351,6 +352,13 @@ export async function runCrossSourceScan(
           divergenceFlags: flags,
           playbookStep,
         });
+        const { priorityClass, priorityScore } = computePriority({
+          sourceType: 'entity',
+          sopKey: 'entity_optimization',
+          entityDivergenceKind: playbookStep.includes('badge-unverified')
+            ? 'badge_unverified'
+            : 'third_party_listing_diverges',
+        });
         await db.insert(remediationTickets).values({
           firm_id: firmId,
           source_type: 'entity',
@@ -362,6 +370,8 @@ export async function runCrossSourceScan(
           title: presc.title,
           description: presc.description,
           priority_rank: presc.priorityRank,
+          priority_class: priorityClass,
+          priority_score: priorityScore,
           remediation_copy: presc.remediationCopy,
           validation_steps: presc.validationSteps,
           evidence_links: presc.evidenceLinks,
