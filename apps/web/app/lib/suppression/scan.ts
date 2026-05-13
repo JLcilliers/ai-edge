@@ -26,6 +26,7 @@ import {
 } from './backlinks';
 import { ensureSopRun } from '../sop/ensure-run';
 import { prescribeLegacyTicket } from '../sop/legacy-prescription';
+import { computePriority } from '../sop/priority-score';
 
 /**
  * Suppression scan — see PLAN §5.3.
@@ -372,6 +373,17 @@ export async function runSuppressionScan(
           rationale,
           semanticDistance: distance,
         });
+        // Unified priority (migration 0018). Pre-C1 emit path has no
+        // clicksPerMonth signal; the function falls back to distance-
+        // based offset for content_drift. When C1 lands its scanner
+        // emits clicksPerMonth too and the click-based offset takes
+        // over for keep_update tickets.
+        const { priorityClass, priorityScore } = computePriority({
+          sourceType: 'legacy',
+          sopKey: 'legacy_content_suppression',
+          legacyAction: action,
+          semanticDistance: distance,
+        });
         await db.insert(remediationTickets).values({
           firm_id: firmId,
           source_type: 'legacy',
@@ -383,6 +395,8 @@ export async function runSuppressionScan(
           title: presc.title,
           description: presc.description,
           priority_rank: presc.priorityRank,
+          priority_class: priorityClass,
+          priority_score: priorityScore,
           remediation_copy: presc.remediationCopy,
           validation_steps: presc.validationSteps,
           evidence_links: presc.evidenceLinks,

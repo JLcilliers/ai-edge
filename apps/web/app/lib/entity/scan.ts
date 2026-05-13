@@ -11,6 +11,23 @@ import { scanJsonLd, diffExpectedTypes } from './schema-scan';
 import { probeWikidata, probeGoogleKg } from './kg-probe';
 import { ensureSopRun } from '../sop/ensure-run';
 import { prescribeEntityTicket } from '../sop/legacy-prescription';
+import { computePriority } from '../sop/priority-score';
+
+/**
+ * Map the entity scanner's playbook_step string (e.g. 'entity:wikidata:create',
+ * 'entity:google-kg:claim', 'entity:schema:Person') to the PLATFORM_PRIORITY
+ * key in lib/sop/priority-score.ts. Unknown shapes return '' which the
+ * priority function treats as offset 0.
+ */
+function divergenceKindFromPlaybookStep(step: string): string {
+  if (step.startsWith('entity:wikidata:create')) return 'wikidata_create';
+  if (step.startsWith('entity:wikidata:update')) return 'wikidata_update';
+  if (step.startsWith('entity:google-kg:claim')) return 'google_kg_claim';
+  if (step.startsWith('entity:schema:')) return 'schema_add';
+  if (step.includes('cross-source:divergent')) return 'third_party_listing_diverges';
+  if (step.includes('badge-unverified')) return 'badge_unverified';
+  return '';
+}
 
 /**
  * Entity-signals orchestrator (PLAN §5.6).
@@ -247,6 +264,11 @@ export async function runEntityScan(firmId: string): Promise<string> {
         divergenceFlags: [],
         playbookStep: t.playbook_step,
       });
+      const { priorityClass, priorityScore } = computePriority({
+        sourceType: 'entity',
+        sopKey: 'entity_optimization',
+        entityDivergenceKind: divergenceKindFromPlaybookStep(t.playbook_step),
+      });
       await db.insert(remediationTickets).values({
         firm_id: firmId,
         source_type: 'entity',
@@ -258,6 +280,8 @@ export async function runEntityScan(firmId: string): Promise<string> {
         title: presc.title,
         description: presc.description,
         priority_rank: presc.priorityRank,
+        priority_class: priorityClass,
+        priority_score: priorityScore,
         remediation_copy: presc.remediationCopy,
         validation_steps: presc.validationSteps,
         evidence_links: presc.evidenceLinks,

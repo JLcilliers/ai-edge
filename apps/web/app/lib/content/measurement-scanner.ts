@@ -33,6 +33,7 @@ import {
 import { and, eq, desc, inArray, gte, lt, sql } from 'drizzle-orm';
 import { createTicketFromStep } from '../../actions/sop-actions';
 import { getSopDefinition } from '../sop/registry';
+import { computePriority } from '../sop/priority-score';
 import type { SopKey } from '../sop/types';
 
 const SOP_GA4 = 'ga4_llm_traffic_setup' as const;
@@ -373,6 +374,13 @@ export async function runMeasurementTriageScan(
   const priorWindowStart = new Date(windowStart.getTime() - WINDOW_DAYS * DAY_MS);
 
   // ── GA4 + AI Bot config-gate tickets (always emitted until creds wired) ──
+  // Both classify as config_gate — prerequisites for site measurement,
+  // not site-improvement tasks. priority_score = 0 keeps them out of
+  // the main score-sorted queue; the UI renders them in a separate
+  // "Prerequisites" strip when it wants.
+  const ga4Priority = computePriority({ sourceType: 'sop', sopKey: SOP_GA4 });
+  const aiBotPriority = computePriority({ sourceType: 'sop', sopKey: SOP_AI_BOT });
+
   const ga4RunId = await findOrCreateSopRun(firm.id, SOP_GA4);
   await clearPriorOpenTickets(firm.id, ga4RunId, TICKET_STEP_NUMBER);
   const ga4Payload = buildGa4ConfigTicket();
@@ -384,6 +392,8 @@ export async function runMeasurementTriageScan(
     title: ga4Payload.title,
     description: ga4Payload.description,
     priorityRank: 1,
+    priorityClass: ga4Priority.priorityClass,
+    priorityScore: ga4Priority.priorityScore,
     remediationCopy: ga4Payload.remediationCopy,
     validationSteps: ga4Payload.validationSteps,
     evidenceLinks: [],
@@ -404,6 +414,8 @@ export async function runMeasurementTriageScan(
     title: aiBotPayload.title,
     description: aiBotPayload.description,
     priorityRank: 1,
+    priorityClass: aiBotPriority.priorityClass,
+    priorityScore: aiBotPriority.priorityScore,
     remediationCopy: aiBotPayload.remediationCopy,
     validationSteps: aiBotPayload.validationSteps,
     evidenceLinks: [],
@@ -422,6 +434,12 @@ export async function runMeasurementTriageScan(
 
   let regressionTickets = 0;
 
+  // Bi-weekly tickets are trend/regression alerts, not site-improvement
+  // findings. Classify as unknown for v1 — score 100, surfaces below
+  // any actionable ticket. Refine to a real class once we settle on a
+  // taxonomy for measurement-side alerts.
+  const biWeeklyPriority = computePriority({ sourceType: 'sop', sopKey: SOP_BI_WEEKLY });
+
   if (!current) {
     // No audits in the current window — surface that as a finding.
     await createTicketFromStep({
@@ -432,6 +450,8 @@ export async function runMeasurementTriageScan(
       title: 'No audits in the past 14 days — bi-weekly monitoring needs fresh data',
       description: `Bi-weekly LLM monitoring rolls up alignment + mention metrics over the past 14 days vs the prior 14. The current window has zero audit runs, so there's nothing to roll up.\n\nWindow: ${windowStart.toISOString()} → ${windowEnd.toISOString()}\n\nQueue a Brand Visibility Audit run to repopulate.`,
       priorityRank: 1,
+      priorityClass: biWeeklyPriority.priorityClass,
+      priorityScore: biWeeklyPriority.priorityScore,
       remediationCopy:
         'Run a full Brand Visibility Audit (Phase 1) to populate the consensus_response + alignment_score tables. Bi-weekly monitoring re-runs automatically after audits land.',
       validationSteps: [
@@ -460,6 +480,8 @@ export async function runMeasurementTriageScan(
         title: payload.title,
         description: payload.description,
         priorityRank: 1,
+        priorityClass: biWeeklyPriority.priorityClass,
+        priorityScore: biWeeklyPriority.priorityScore,
         remediationCopy: payload.remediationCopy,
         validationSteps: payload.validationSteps,
         evidenceLinks: [],
@@ -480,6 +502,8 @@ export async function runMeasurementTriageScan(
         title: payload.title,
         description: payload.description,
         priorityRank: 2,
+        priorityClass: biWeeklyPriority.priorityClass,
+        priorityScore: biWeeklyPriority.priorityScore,
         remediationCopy: payload.remediationCopy,
         validationSteps: payload.validationSteps,
         evidenceLinks: [],

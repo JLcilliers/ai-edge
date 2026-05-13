@@ -715,6 +715,17 @@ export interface CreateTicketInput {
   executeUrl?: string;
   executeLabel?: string;
   manualReason?: string;
+  /**
+   * Unified priority columns (migration 0018). Computed by
+   * `lib/sop/priority-score.ts::computePriority` at the scanner level
+   * (after `prescribeXTicket`, before `createTicketFromStep`). When
+   * omitted the DB defaults fire (priority_class='unknown',
+   * priority_score=0) which puts the ticket at the bottom of the
+   * score-sorted queue — safe but invisible to operators using the
+   * default sort, so callers should populate these explicitly.
+   */
+  priorityClass?: string;
+  priorityScore?: number;
 }
 
 export async function createTicketFromStep(input: CreateTicketInput): Promise<{ id: string }> {
@@ -754,6 +765,11 @@ export async function createTicketFromStep(input: CreateTicketInput): Promise<{ 
       execute_url: input.executeUrl,
       execute_label: input.executeLabel,
       manual_reason: input.manualReason,
+      // Drop priority_class / priority_score only when explicitly
+      // passed so the DB defaults ('unknown' / 0) still fire for legacy
+      // callers that haven't been wired up to computePriority yet.
+      ...(input.priorityClass != null ? { priority_class: input.priorityClass } : {}),
+      ...(input.priorityScore != null ? { priority_score: input.priorityScore } : {}),
     })
     .returning({ id: remediationTickets.id });
   const t = ticketRows[0];
@@ -820,6 +836,10 @@ export interface ExecutionTask {
   title: string;
   description: string | null;
   priorityRank: number | null;
+  /** Unified priority signal (0018). Sort by priorityScore DESC. */
+  priorityScore: number | null;
+  /** Stable class label from lib/sop/priority-score.ts (0018). */
+  priorityClass: string | null;
   status: string;
   automationTier: 'auto' | 'assist' | 'manual' | null;
   executeUrl: string | null;
@@ -903,6 +923,8 @@ export async function getPhaseExecutionTasks(
       title: r.title ?? deriveTitleFromSource(r.source_type),
       description: r.description,
       priorityRank: r.priority_rank,
+      priorityScore: r.priority_score,
+      priorityClass: r.priority_class,
       status: r.status,
       automationTier: r.automation_tier as ExecutionTask['automationTier'],
       executeUrl: r.execute_url,
@@ -918,12 +940,16 @@ export async function getPhaseExecutionTasks(
       createdAt: r.created_at,
     }));
 
-    // Rank: priority_rank ASC (NULLs last), then tier order, then newest first.
+    // Rank: priority_score DESC (migration 0018), then tier order,
+    // then newest first. priority_score replaces priority_rank as the
+    // primary sort — see lib/sop/priority-score.ts. tier order stays
+    // as a secondary signal so within-score the auto/assist/manual
+    // affordance still groups visually for the operator.
     const tierOrder: Record<string, number> = { auto: 0, assist: 1, manual: 2 };
     tasks.sort((a, b) => {
-      const ap = a.priorityRank ?? 1_000_000;
-      const bp = b.priorityRank ?? 1_000_000;
-      if (ap !== bp) return ap - bp;
+      const ascore = a.priorityScore ?? 0;
+      const bscore = b.priorityScore ?? 0;
+      if (ascore !== bscore) return bscore - ascore; // DESC
       const at = tierOrder[a.automationTier ?? 'assist'] ?? 1;
       const bt = tierOrder[b.automationTier ?? 'assist'] ?? 1;
       if (at !== bt) return at - bt;

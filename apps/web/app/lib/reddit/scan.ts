@@ -11,6 +11,7 @@ import { searchReddit, type RedditPost } from './client';
 import { classifySentiment, type RedditSentiment } from './sentiment';
 import { ensureSopRun } from '../sop/ensure-run';
 import { prescribeRedditTicket } from '../sop/legacy-prescription';
+import { computePriority } from '../sop/priority-score';
 
 /**
  * Run a Reddit sentiment scan for a firm.
@@ -281,6 +282,14 @@ export async function runRedditScan(firmId: string): Promise<string> {
             text: row.text,
             postedAt: row.postedAt,
           });
+          // Unified priority (migration 0018). Reddit complaints
+          // classify as time_sensitive — open complaint mentions leak
+          // to LLMs the same way drifted noindex-candidate pages do.
+          const { priorityClass, priorityScore } = computePriority({
+            sourceType: 'reddit',
+            sopKey: 'reddit_brand_sentiment_monitoring',
+            redditIsComplaint: true,
+          });
           return {
             firm_id: firmId,
             source_type: 'reddit' as const,
@@ -292,6 +301,8 @@ export async function runRedditScan(firmId: string): Promise<string> {
             title: presc.title,
             description: presc.description,
             priority_rank: presc.priorityRank,
+            priority_class: priorityClass,
+            priority_score: priorityScore,
             remediation_copy: presc.remediationCopy,
             validation_steps: presc.validationSteps,
             evidence_links: presc.evidenceLinks,

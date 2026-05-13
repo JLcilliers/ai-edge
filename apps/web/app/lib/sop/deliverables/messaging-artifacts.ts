@@ -18,6 +18,7 @@ import { getDb, brandTruthVersions, firms } from '@ai-edge/db';
 import { eq, desc } from 'drizzle-orm';
 import type { BrandTruth } from '@ai-edge/shared';
 import { createTicketFromStep } from '../../../actions/sop-actions';
+import { computePriority } from '../priority-score';
 
 interface BuildArgs {
   firmId: string;
@@ -403,6 +404,13 @@ export async function generateThirdPartyListingTickets(args: FactoryArgs): Promi
             { description: `Log the change date in the messaging guide platform log` },
           ];
 
+    // Third-party listing updates → entity_gap with the
+    // third_party_listing_diverges offset.
+    const { priorityClass, priorityScore } = computePriority({
+      sourceType: 'entity',
+      sopKey: args.sopKey,
+      entityDivergenceKind: 'third_party_listing_diverges',
+    });
     const r = await createTicketFromStep({
       firmSlug: args.firmSlug,
       sopKey: args.sopKey,
@@ -411,6 +419,8 @@ export async function generateThirdPartyListingTickets(args: FactoryArgs): Promi
       title,
       description,
       priorityRank: i + 1,
+      priorityClass,
+      priorityScore,
       remediationCopy: remediation,
       validationSteps: validation,
       evidenceLinks: [{ kind: 'third_party_listing', url: l.url, description: platformName }],

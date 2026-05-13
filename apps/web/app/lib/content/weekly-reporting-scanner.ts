@@ -36,6 +36,7 @@ import {
 } from '../reports/build-weekly-report';
 import { createTicketFromStep } from '../../actions/sop-actions';
 import { getSopDefinition } from '../sop/registry';
+import { computePriority } from '../sop/priority-score';
 
 const SOP_KEY = 'weekly_aeo_reporting' as const;
 const SEND_STEP_NUMBER = 4; // Step 4 = Draft Report; we attach the "send" ticket here
@@ -199,6 +200,9 @@ export async function runWeeklyReportingScan(
   const deliverableId = delivered!.id;
 
   const sendTicketPayload = buildSendTicket(payload, firm.name);
+  // Weekly reporting "send the report" tickets are workflow-state, not
+  // site-improvement. Defaults to unknown class with score 100.
+  const sendPriority = computePriority({ sourceType: 'sop', sopKey: SOP_KEY });
   const ticket = await createTicketFromStep({
     firmSlug: firm.slug,
     sopKey: SOP_KEY,
@@ -207,6 +211,8 @@ export async function runWeeklyReportingScan(
     title: sendTicketPayload.title,
     description: sendTicketPayload.description,
     priorityRank: 1,
+    priorityClass: sendPriority.priorityClass,
+    priorityScore: sendPriority.priorityScore,
     remediationCopy: sendTicketPayload.remediationCopy,
     validationSteps: sendTicketPayload.validationSteps,
     evidenceLinks: [],

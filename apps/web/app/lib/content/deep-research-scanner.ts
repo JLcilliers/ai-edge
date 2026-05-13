@@ -51,6 +51,7 @@ import type { BrandTruth } from '@ai-edge/shared';
 import { and, eq, desc, inArray, sql } from 'drizzle-orm';
 import { createTicketFromStep } from '../../actions/sop-actions';
 import { getSopDefinition } from '../sop/registry';
+import { computePriority } from '../sop/priority-score';
 import { calculateCost } from '../audit/pricing';
 
 const SOP_KEY = 'deep_research_content_audit' as const;
@@ -670,6 +671,10 @@ export async function runDeepResearchScan(firmId: string): Promise<DeepResearchS
   const budget = await loadOrInitBudget(firm.id);
   if (budget.qtdUsd + ESTIMATED_RUN_COST_USD > budget.capUsd) {
     const gate = buildBudgetGateTicket(budget.capUsd, budget.qtdUsd, ESTIMATED_RUN_COST_USD);
+    // Budget-gate ticket — treated as unknown class for v1 (not a
+    // site-improvement task; closest analog is config_gate but it's a
+    // recurring quarterly thing, not a one-time setup).
+    const gatePriority = computePriority({ sourceType: 'sop', sopKey: SOP_KEY });
     await createTicketFromStep({
       firmSlug: firm.slug,
       sopKey: SOP_KEY,
@@ -678,6 +683,8 @@ export async function runDeepResearchScan(firmId: string): Promise<DeepResearchS
       title: gate.title,
       description: gate.description,
       priorityRank: 1,
+      priorityClass: gatePriority.priorityClass,
+      priorityScore: gatePriority.priorityScore,
       remediationCopy: gate.remediationCopy,
       validationSteps: gate.validationSteps,
       evidenceLinks: [],
@@ -734,6 +741,20 @@ export async function runDeepResearchScan(firmId: string): Promise<DeepResearchS
   let ticketsCreated = 0;
   for (const f of sorted) {
     const payload = buildFindingTicket(f, primaryUrl);
+    // Deep-research findings are content-shaped recommendations (build
+    // a page about X, expand Y). Map LLM-supplied priority to a
+    // rubric-equivalent score under per_page_quality. Deep research is
+    // added to PER_PAGE_QUALITY_SOPS via the priority-score module.
+    const rubricEquivalent =
+      f.priority === 'high' ? 20 :
+      f.priority === 'medium' ? 50 :
+      80;
+    const { priorityClass, priorityScore } = computePriority({
+      sourceType: 'sop',
+      sopKey: SOP_KEY,
+      rubricScore: rubricEquivalent,
+      rubricMax: 100,
+    });
     await createTicketFromStep({
       firmSlug: firm.slug,
       sopKey: SOP_KEY,
@@ -742,6 +763,8 @@ export async function runDeepResearchScan(firmId: string): Promise<DeepResearchS
       title: payload.title,
       description: payload.description,
       priorityRank: priorityRank++,
+      priorityClass,
+      priorityScore,
       remediationCopy: payload.remediationCopy,
       validationSteps: payload.validationSteps,
       evidenceLinks: [],

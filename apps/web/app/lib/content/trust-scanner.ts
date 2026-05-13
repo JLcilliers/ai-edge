@@ -32,6 +32,7 @@ import type { BrandTruth } from '@ai-edge/shared';
 import { and, eq, desc, inArray } from 'drizzle-orm';
 import { createTicketFromStep } from '../../actions/sop-actions';
 import { getSopDefinition } from '../sop/registry';
+import { computePriority } from '../sop/priority-score';
 import {
   detectFindings,
   extractClaims,
@@ -278,6 +279,19 @@ export async function runTrustAlignmentScan(firmId: string): Promise<TrustScanRe
     // executeUrl so the operator has somewhere to click; the
     // description lists every affected URL.
     const primaryUrl = finding.pageUrls[0] ?? '';
+    // Trust alignment is a per-page-quality audit (E-E-A-T-style signals
+    // present or absent on a page). Map severity to rubric-equivalent
+    // like schema-markup-scanner does.
+    const rubricEquivalent =
+      finding.severity === 'high' ? 20 :
+      finding.severity === 'medium' ? 50 :
+      80;
+    const { priorityClass, priorityScore } = computePriority({
+      sourceType: 'sop',
+      sopKey: SOP_KEY,
+      rubricScore: rubricEquivalent,
+      rubricMax: 100,
+    });
     await createTicketFromStep({
       firmSlug: firm.slug,
       sopKey: SOP_KEY,
@@ -286,6 +300,8 @@ export async function runTrustAlignmentScan(firmId: string): Promise<TrustScanRe
       title: payload.title,
       description: payload.description,
       priorityRank: priorityRank++,
+      priorityClass,
+      priorityScore,
       remediationCopy: payload.remediationCopy,
       validationSteps: payload.validationSteps,
       evidenceLinks: finding.pageUrls.slice(0, 10).map((u) => ({

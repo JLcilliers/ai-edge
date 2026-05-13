@@ -53,6 +53,7 @@ import {
 import { and, eq, desc, inArray, gte, sql } from 'drizzle-orm';
 import { createTicketFromStep } from '../../actions/sop-actions';
 import { getSopDefinition } from '../sop/registry';
+import { computePriority } from '../sop/priority-score';
 import type { SopKey } from '../sop/types';
 
 const SOP_REDDIT = 'reddit_brand_sentiment_monitoring' as const;
@@ -348,6 +349,13 @@ export async function runThirdPartyTriageScan(firmId: string): Promise<ThirdPart
       text: r.text,
       postedAt: r.postedAt,
     });
+    // Reddit-surfaced rows in this scanner are already filtered to
+    // complaint-classified mentions. Score as time_sensitive.
+    const redditPriority = computePriority({
+      sourceType: 'reddit',
+      sopKey: SOP_REDDIT,
+      redditIsComplaint: true,
+    });
     await createTicketFromStep({
       firmSlug: firm.slug,
       sopKey: SOP_REDDIT,
@@ -356,6 +364,8 @@ export async function runThirdPartyTriageScan(firmId: string): Promise<ThirdPart
       title: payload.title,
       description: payload.description,
       priorityRank: priorityRank++,
+      priorityClass: redditPriority.priorityClass,
+      priorityScore: redditPriority.priorityScore,
       remediationCopy: payload.remediationCopy,
       validationSteps: payload.validationSteps,
       evidenceLinks: [{ kind: 'reddit_thread', url: r.url, description: `r/${r.subreddit}` }],
@@ -397,6 +407,13 @@ export async function runThirdPartyTriageScan(firmId: string): Promise<ThirdPart
       url: e.url,
       divergence_flags: (e.divergence_flags ?? []) as string[],
     });
+    // Third-party platform divergence → entity_gap with the
+    // third_party_listing_diverges offset.
+    const entityPriority = computePriority({
+      sourceType: 'entity',
+      sopKey: SOP_ENTITY,
+      entityDivergenceKind: 'third_party_listing_diverges',
+    });
     await createTicketFromStep({
       firmSlug: firm.slug,
       sopKey: SOP_ENTITY,
@@ -405,6 +422,8 @@ export async function runThirdPartyTriageScan(firmId: string): Promise<ThirdPart
       title: payload.title,
       description: payload.description,
       priorityRank: priorityRank++,
+      priorityClass: entityPriority.priorityClass,
+      priorityScore: entityPriority.priorityScore,
       remediationCopy: payload.remediationCopy,
       validationSteps: payload.validationSteps,
       evidenceLinks: e.url
@@ -425,6 +444,15 @@ export async function runThirdPartyTriageScan(firmId: string): Promise<ThirdPart
   const goldenRunId = await findOrCreateSopRun(firm.id, SOP_GOLDEN_LINKS);
   await clearPriorOpenTickets(firm.id, goldenRunId, GOLDEN_LINKS_STEP);
   const goldenPayload = buildGoldenLinksConfigTicket();
+  // Golden Links config-gate is an entity_gap-adjacent prerequisite,
+  // but its function is "wire Ahrefs creds" — closer to config_gate
+  // semantically. Routes through the sop → entity_gap branch because
+  // SOP_GOLDEN_LINKS is in ENTITY_GAP_SOPS; no divergence kind passed
+  // so offset is 0 → score 200 (entity_gap floor).
+  const goldenPriority = computePriority({
+    sourceType: 'sop',
+    sopKey: SOP_GOLDEN_LINKS,
+  });
   await createTicketFromStep({
     firmSlug: firm.slug,
     sopKey: SOP_GOLDEN_LINKS,
@@ -433,6 +461,8 @@ export async function runThirdPartyTriageScan(firmId: string): Promise<ThirdPart
     title: goldenPayload.title,
     description: goldenPayload.description,
     priorityRank: 1,
+    priorityClass: goldenPriority.priorityClass,
+    priorityScore: goldenPriority.priorityScore,
     remediationCopy: goldenPayload.remediationCopy,
     validationSteps: goldenPayload.validationSteps,
     evidenceLinks: [],

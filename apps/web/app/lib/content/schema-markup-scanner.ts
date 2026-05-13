@@ -35,6 +35,7 @@ import {
 import { and, eq, desc, inArray } from 'drizzle-orm';
 import { createTicketFromStep } from '../../actions/sop-actions';
 import { getSopDefinition } from '../sop/registry';
+import { computePriority } from '../sop/priority-score';
 import {
   auditPageSchema,
   compareAuditsBySeverity,
@@ -393,6 +394,21 @@ export async function runSchemaMarkupScan(firmId: string): Promise<SchemaScanRes
     for (const finding of findings) {
       severityCounts[finding.severity] += 1;
       const payload = buildTicketForFinding(audit, finding);
+      // Map schema-finding severity to a rubric-equivalent score so the
+      // priority math is consistent with the other per_page_quality
+      // scanners. High-severity schema gap = "this page is barely
+      // machine-readable" = score 20 (offset 80); medium = score 50
+      // (offset 50); low = score 80 (offset 20).
+      const rubricEquivalent =
+        finding.severity === 'high' ? 20 :
+        finding.severity === 'medium' ? 50 :
+        80;
+      const { priorityClass, priorityScore } = computePriority({
+        sourceType: 'sop',
+        sopKey: SOP_KEY,
+        rubricScore: rubricEquivalent,
+        rubricMax: 100,
+      });
       await createTicketFromStep({
         firmSlug: firm.slug,
         sopKey: SOP_KEY,
@@ -401,6 +417,8 @@ export async function runSchemaMarkupScan(firmId: string): Promise<SchemaScanRes
         title: payload.title,
         description: payload.description,
         priorityRank: priorityRank++,
+        priorityClass,
+        priorityScore,
         remediationCopy: payload.remediationCopy,
         validationSteps: payload.validationSteps,
         evidenceLinks: [

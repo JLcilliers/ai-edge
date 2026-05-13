@@ -16,6 +16,7 @@
 
 import { createTicketFromStep } from '../../../actions/sop-actions';
 import { buildSuppressionArtifacts } from '../deliverables/suppression-artifacts';
+import { computePriority } from '../priority-score';
 
 interface Args {
   firmSlug: string;
@@ -132,6 +133,16 @@ export async function generateSuppressionTickets(args: Args): Promise<{
             ? 'Delete via CMS'
             : 'Refresh content (Phase 3)';
 
+    // Map suppression-decision action to the priority class. Mirrors
+    // the legacy scanner's emit path so the factory and the scanner
+    // produce identically-scored tickets.
+    const { priorityClass, priorityScore } = computePriority({
+      sourceType: 'legacy',
+      sopKey: args.sopKey,
+      legacyAction: d.action,
+      semanticDistance: d.semanticDistance,
+      clicksPerMonth: d.clicks12m ?? null,
+    });
     const r = await createTicketFromStep({
       firmSlug: args.firmSlug,
       sopKey: args.sopKey,
@@ -140,6 +151,8 @@ export async function generateSuppressionTickets(args: Args): Promise<{
       title,
       description,
       priorityRank: rankCounter++,
+      priorityClass,
+      priorityScore,
       remediationCopy: remediation,
       validationSteps: validation,
       evidenceLinks: [{ kind: 'page_url', url: d.url, description: `Drifted from Brand Truth (d=${d.semanticDistance.toFixed(2)})` }],
