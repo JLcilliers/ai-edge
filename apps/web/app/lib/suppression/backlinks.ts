@@ -70,12 +70,24 @@ class AhrefsProvider implements BacklinksProvider {
   }
   async getBacklinks(url: string): Promise<BacklinkCount | null> {
     // Ahrefs v3 API endpoint shape:
-    //   GET https://api.ahrefs.com/v3/site-explorer/metrics?target=<url>
+    //   GET https://api.ahrefs.com/v3/site-explorer/backlinks-stats?target=<url>
     //         &date=YYYY-MM-DD&mode=exact
     //   Authorization: Bearer <key>
-    //   Returns: { metrics: { backlinks: number, refdomains: number, ... } }
+    //   Returns: { metrics: { live: number, all_time: number,
+    //                         live_refdomains: number, all_time_refdomains: number } }
+    //
+    // History: this used to call /site-explorer/metrics — which is a
+    // *different* endpoint that returns org_keywords / org_traffic /
+    // paid_* (SERP signals, not backlinks). Both endpoints respond
+    // HTTP 200 with a `metrics` object, so the wrong-endpoint failure
+    // mode was silent: the code read `metrics.backlinks` and
+    // `metrics.refdomains` which simply didn't exist on the /metrics
+    // response, falling through to the `?? 0` defaults. C1's "preserve
+    // link equity via 301 when ≥5 ref-domains" branch had never fired
+    // in production. The smoke check below now catches this class of
+    // silent failure on activation.
     const date = new Date().toISOString().slice(0, 10);
-    const endpoint = new URL('https://api.ahrefs.com/v3/site-explorer/metrics');
+    const endpoint = new URL('https://api.ahrefs.com/v3/site-explorer/backlinks-stats');
     endpoint.searchParams.set('target', url);
     endpoint.searchParams.set('date', date);
     endpoint.searchParams.set('mode', 'exact');
@@ -87,16 +99,37 @@ class AhrefsProvider implements BacklinksProvider {
         },
       });
       if (!res.ok) return null;
-      const json = (await res.json()) as {
-        metrics?: { backlinks?: number; refdomains?: number };
-      };
-      const total = json?.metrics?.backlinks ?? 0;
-      const refDomains = json?.metrics?.refdomains ?? 0;
-      return { total, refDomains, provider: this.name };
+      const json = await res.json();
+      return parseBacklinksStatsResponse(json);
     } catch {
       return null;
     }
   }
+}
+
+/**
+ * Pure JSON-to-BacklinkCount mapper for the backlinks-stats response.
+ * Extracted from AhrefsProvider.getBacklinks so the field-name mapping
+ * can be unit-tested against a recorded fixture (locks the mapping
+ * down so a future refactor can't silently regress it the way the
+ * /metrics endpoint did).
+ *
+ * Returns null when the JSON shape is wholly wrong (no `metrics`
+ * object); returns zeros when the shape is right but the URL has no
+ * inbound data. Callers treat null and zeros differently: null = "we
+ * couldn't tell," zeros = "API said this URL has nothing."
+ */
+export function parseBacklinksStatsResponse(
+  json: unknown,
+): BacklinkCount | null {
+  if (!json || typeof json !== 'object') return null;
+  const metrics = (json as { metrics?: unknown }).metrics;
+  if (!metrics || typeof metrics !== 'object') return null;
+  const m = metrics as { live?: unknown; live_refdomains?: unknown };
+  const total = typeof m.live === 'number' ? m.live : 0;
+  const refDomains =
+    typeof m.live_refdomains === 'number' ? m.live_refdomains : 0;
+  return { total, refDomains, provider: 'ahrefs' };
 }
 
 // ── DataForSEO adapter ────────────────────────────────────────────────
@@ -153,19 +186,57 @@ class NullProvider implements BacklinksProvider {
 // ── Resolver ──────────────────────────────────────────────────────────
 
 /**
- * Pick the best-available provider based on env. Order of preference:
- *   1. Ahrefs (highest data quality)
- *   2. DataForSEO (good quality + bundled with SERP/AIO data)
- *   3. Null (no signal — preserves current behavior)
+ * Smoke check the Ahrefs provider on activation. We probe a known
+ * high-backlink URL (nytimes.com — ~100k live ref-domains, stable for
+ * the foreseeable future) and assert refDomains > 0. The check exists
+ * because the wrong-endpoint failure mode (see history comment on
+ * AhrefsProvider.getBacklinks above) was silent: HTTP 200, malformed
+ * field names, every URL returns 0. A future endpoint rename or
+ * auth-shape change at Ahrefs would exhibit the same shape, so we
+ * gate activation on the probe.
  *
- * Returning Null instead of throwing means the suppression scan stays
- * green on a tenant that hasn't procured any backlinks API; they just
- * keep getting 'noindex' for d > 0.55 like they always have.
+ * If the probe fails or returns 0, we log a clear warning and refuse
+ * to activate the provider — the resolver falls through to DataForSEO
+ * or NullProvider instead. That keeps the bad signal out of the
+ * suppression decision flow rather than silently producing
+ * methodology-wrong tickets.
  */
-export function getBacklinksProvider(): BacklinksProvider {
+async function smokeCheckAhrefs(apiKey: string): Promise<boolean> {
+  const probe = new AhrefsProvider(apiKey);
+  const startMs = Date.now();
+  try {
+    const r = await probe.getBacklinks('https://www.nytimes.com/');
+    const elapsedMs = Date.now() - startMs;
+    if (!r || r.refDomains <= 0) {
+      console.warn(
+        `[AhrefsProvider] smoke check returned ${r?.refDomains ?? 'null'} ref-domains for nytimes.com after ${elapsedMs}ms — endpoint or auth likely broken. Falling back to next provider.`,
+      );
+      return false;
+    }
+    console.log(
+      `[AhrefsProvider] smoke check OK — nytimes.com live_refdomains=${r.refDomains} live=${r.total} (${elapsedMs}ms)`,
+    );
+    return true;
+  } catch (err) {
+    console.warn(
+      `[AhrefsProvider] smoke check threw, falling back: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    return false;
+  }
+}
+
+// One-shot resolution per process — the smoke check is cheap (~600ms
+// network roundtrip) but no reason to re-probe on every scan. The
+// cached promise is shared across concurrent callers; first call pays
+// the latency, subsequent calls are O(1).
+let providerPromise: Promise<BacklinksProvider> | null = null;
+
+async function resolveProvider(): Promise<BacklinksProvider> {
   const ahrefsKey = process.env.AHREFS_API_KEY;
   if (ahrefsKey && ahrefsKey.length > 0) {
-    return new AhrefsProvider(ahrefsKey);
+    const healthy = await smokeCheckAhrefs(ahrefsKey);
+    if (healthy) return new AhrefsProvider(ahrefsKey);
+    // fall through to next provider if smoke check failed
   }
   const dfsLogin = process.env.DATAFORSEO_LOGIN;
   const dfsPassword = process.env.DATAFORSEO_PASSWORD;
@@ -173,6 +244,35 @@ export function getBacklinksProvider(): BacklinksProvider {
     return new DataForSEOProvider(dfsLogin, dfsPassword);
   }
   return new NullProvider();
+}
+
+/**
+ * Pick the best-available provider based on env. Order of preference:
+ *   1. Ahrefs (highest data quality, smoke-checked on activation)
+ *   2. DataForSEO (good quality + bundled with SERP/AIO data)
+ *   3. Null (no signal — preserves current behavior)
+ *
+ * Returning Null instead of throwing means the suppression scan stays
+ * green on a tenant that hasn't procured any backlinks API; they just
+ * keep getting 'noindex' for d > 0.55 like they always have.
+ *
+ * The promise is cached at module scope; first caller pays the smoke
+ * check latency (~600ms), subsequent callers get the resolved provider
+ * immediately. Re-runs of the suppression scanner inside the same
+ * process reuse the cached provider.
+ */
+export function getBacklinksProvider(): Promise<BacklinksProvider> {
+  if (!providerPromise) providerPromise = resolveProvider();
+  return providerPromise;
+}
+
+/**
+ * Test-only escape hatch. Resets the cached provider promise so a
+ * subsequent getBacklinksProvider() call re-runs the resolver with
+ * whatever env state is now in place. Not exported as a public API.
+ */
+export function __resetBacklinksProviderForTests(): void {
+  providerPromise = null;
 }
 
 // ── Decision policy ───────────────────────────────────────────────────
