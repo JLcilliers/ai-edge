@@ -233,7 +233,13 @@ export async function runSuppressionScan(
     // is configured — every getBacklinks() call returns 0 ref-domains so
     // the action policy keeps current 'noindex' behavior. With Ahrefs or
     // DataForSEO credentials in env, providers light up automatically.
-    const backlinksProvider = getBacklinksProvider();
+    //
+    // getBacklinksProvider() is now async because the Ahrefs path runs a
+    // smoke check on first activation to catch silent-zero failures
+    // (the bug fixed in this PR). The smoke check runs once per process
+    // and the resolved provider is cached, so subsequent scans don't
+    // re-pay the ~600ms probe.
+    const backlinksProvider = await getBacklinksProvider();
 
     // 3. Embed Brand Truth centroid + all page contents.
     const bTruthText = brandTruthToText(brandTruth);
